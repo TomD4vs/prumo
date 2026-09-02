@@ -36,7 +36,7 @@ Você precisa de [Node.js 18+](https://nodejs.org) e `git`. Mais nada — sem in
 Abra um terminal **dentro de qualquer repositório git** e rode:
 
 ```bash
-npx prumo
+npx @tomd4vs/prumo
 ```
 
 É isso. O `prumo` acha seus arquivos de contexto sozinho.
@@ -133,15 +133,15 @@ Todo achado te dá **o arquivo, o número da linha e a correção**. Nada é adi
 
 ## Instalando
 
-Você não precisa instalar nada — `npx prumo` sempre funciona. Mas se for usar sempre:
+Você não precisa instalar nada — `npx @tomd4vs/prumo` sempre funciona. Mas se for usar sempre:
 
 ```bash
 # disponível em qualquer lugar da máquina
-npm install -g prumo
+npm install -g @tomd4vs/prumo
 prumo
 
 # ou como dependência de desenvolvimento de um projeto
-npm install --save-dev prumo
+npm install --save-dev @tomd4vs/prumo
 npx prumo
 ```
 
@@ -224,7 +224,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: npx prumo --quiet
+      - run: npx @tomd4vs/prumo --quiet
 ```
 
 > **Importante.** Use o `actions/checkout` normalmente — o `prumo` precisa do índice do git, então um checkout sem ele não funciona.

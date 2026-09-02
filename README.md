@@ -36,7 +36,7 @@ You need [Node.js 18+](https://nodejs.org) and `git`. Nothing else — no instal
 Open a terminal **inside any git repository** and run:
 
 ```bash
-npx prumo
+npx @tomd4vs/prumo
 ```
 
 That is the whole thing. `prumo` finds your context files by itself.
@@ -133,15 +133,15 @@ Every finding gives you **the file, the line number, and the fix**. Nothing is g
 
 ## Installing
 
-You do not have to install anything — `npx prumo` always works. But if you use it often:
+You do not have to install anything — `npx @tomd4vs/prumo` always works. But if you use it often:
 
 ```bash
 # available everywhere on your machine
-npm install -g prumo
+npm install -g @tomd4vs/prumo
 prumo
 
 # or as a dev dependency of one project
-npm install --save-dev prumo
+npm install --save-dev @tomd4vs/prumo
 npx prumo
 ```
 
@@ -224,7 +224,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: npx prumo --quiet
+      - run: npx @tomd4vs/prumo --quiet
 ```
 
 > **Important.** Use `actions/checkout` normally — `prumo` needs the git index, so a checkout without it will not work.
