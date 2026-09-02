@@ -1,0 +1,287 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+
+import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
+import { applyCaseFixes } from '../src/fix.mjs';
+
+const made = [];
+
+/** Builds a throwaway git repository whose index holds exactly the given files. */
+function repoWith(files) {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-test-'));
+  made.push(dir);
+  for (const [path, content] of Object.entries(files)) {
+    const full = join(dir, path);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, content ?? '');
+  }
+  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
+  execSync('git add -A', { cwd: dir, stdio: 'ignore' });
+  return dir;
+}
+
+function run(files, explicit = []) {
+  const repo = repoWith(files);
+  return analyze({ repo, targets: resolveTargets(repo, explicit) });
+}
+
+process.on('exit', () => {
+  for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} }
+});
+
+test('flags a path whose case disagrees with the git index', () => {
+  const r = run({
+    'CLAUDE.md': 'The layout lives in `resources/js/Layouts/App.vue`.\nAlso `layouts/App.vue`.\n',
+    'resources/js/Layouts/App.vue': '',
+  });
+  assert.equal(r.caseMismatch.length, 1);
+  assert.equal(r.caseMismatch[0].cited, 'layouts/App.vue');
+  assert.equal(r.caseMismatch[0].actual, 'resources/js/Layouts/App.vue');
+});
+
+test('stays quiet when the case is right', () => {
+  const r = run({
+    'CLAUDE.md': 'The layout lives in `resources/js/Layouts/App.vue`.\n',
+    'resources/js/Layouts/App.vue': '',
+  });
+  assert.equal(r.caseMismatch.length, 0);
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('finds context files nested in subfolders', () => {
+  const repo = repoWith({
+    'AGENTS.md': '# root\n',
+    'packages/api/CLAUDE.md': '# api\n',
+    'packages/web/AGENTS.md': '# web\n',
+  });
+  const labels = resolveTargets(repo, []).map((t) => t.label).sort();
+  assert.deepEqual(labels, ['AGENTS.md', 'packages/api/CLAUDE.md', 'packages/web/AGENTS.md']);
+});
+
+test('suggests the destination when a naming convention drifted', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'MEMORY.md'), 'index\n');
+  writeFileSync(join(dir, 'deploy_checklist.md'), 'body\n');
+  writeFileSync(join(dir, 'a.md'), 'See [[deploy-checklist]].\n');
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  const link = r.brokenLinks.find((l) => l.cited === 'deploy-checklist');
+  assert.ok(link, 'the broken link should be reported');
+  assert.equal(link.suggestion, 'deploy_checklist');
+});
+
+test('reports a broken link with no candidate and offers no suggestion', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'a.md'), 'See [[nothing-like-this]].\n');
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].suggestion, null);
+});
+
+test('checks markdown links, and accepts the ones that resolve', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'there.md'), 'body\n');
+  writeFileSync(join(dir, 'a.md'), 'Good [x](there.md), bad [y](gone.md).\n');
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].cited, 'gone.md');
+});
+
+test('does not flag a path cited to say it is gone', () => {
+  const r = run({
+    'CLAUDE.md': 'The project does not publish `config/dompdf.php`.\n',
+    'src/a.js': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('exempts a historical entry from path checks', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'phase-2-complete.md'), 'Shipped `app/Gone.php` and `app/Other.php`.\n');
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.stats.historical, 1);
+});
+
+test('ignores build artifacts that live outside git', () => {
+  const r = run({ 'CLAUDE.md': 'Assets go to `public/build/manifest.json` via `.vite/x.json`.\n' });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('resolves an @/ alias and an omitted extension', () => {
+  const r = run({
+    'CLAUDE.md': 'Uses `@/utils/foco.js` and the trait `tests/Concerns/ReadsPdf`.\n',
+    'resources/js/utils/foco.js': '',
+    'tests/Concerns/ReadsPdf.php': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.caseMismatch.length, 0);
+});
+
+test('reports a path that is simply gone', () => {
+  const r = run({
+    'CLAUDE.md': 'Configure it in `config/database.php` before running.\n',
+    'src/a.js': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'config/database.php');
+  assert.equal(r.missingPaths[0].line, 1);
+});
+
+test('lists a note the index never references', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'MEMORY.md'), '- [Linked](linked.md)\n');
+  writeFileSync(join(dir, 'linked.md'), 'body\n');
+  writeFileSync(join(dir, 'forgotten.md'), 'body\n');
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  assert.deepEqual(r.orphans, ['forgotten.md']);
+});
+
+test('throws a clear error outside a git repository', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-nogit-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'CLAUDE.md'), '# x\n');
+  assert.throws(
+    () => analyze({ repo: dir, targets: resolveTargets(dir, []) }),
+    /not a git repository/
+  );
+});
+
+test('reports the file and line of every finding', () => {
+  const r = run({
+    'CLAUDE.md': '# Title\n\nSee `config/missing.php` here.\n',
+    'src/a.js': '',
+  });
+  assert.equal(r.missingPaths[0].file, 'CLAUDE.md');
+  assert.equal(r.missingPaths[0].line, 3);
+  assert.match(r.missingPaths[0].excerpt, /config\/missing\.php/);
+});
+
+test('config: ignore silences a matching path', () => {
+  const r = run({
+    'CLAUDE.md': 'See `config/database.php` and `config/other.php`.\n',
+    '.prumorc.json': JSON.stringify({ ignore: ['config/database.php'] }),
+    'src/a.js': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'config/other.php');
+});
+
+test('config: a glob in ignore silences a whole folder', () => {
+  const r = run({
+    'CLAUDE.md': 'Old `docs/legacy/a.php`, `docs/legacy/deep/b.php`, new `docs/live.php`.\n',
+    '.prumorc.json': JSON.stringify({ ignore: ['docs/legacy/**'] }),
+    'src/a.js': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['docs/live.php']);
+});
+
+test('config: exclude drops a context file from the run', () => {
+  const r = run({
+    'CLAUDE.md': 'See `config/gone.php`.\n',
+    'AGENTS.md': 'Also `config/gone-too.php`.\n',
+    '.prumorc.json': JSON.stringify({ exclude: ['AGENTS.md'] }),
+    'src/a.js': '',
+  });
+  assert.equal(r.stats.targets, 1, 'the header must count only what was actually checked');
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['config/gone.php']);
+});
+
+test('config: invalid JSON fails loudly instead of being ignored', () => {
+  const repo = repoWith({ 'CLAUDE.md': '# x\n', '.prumorc.json': '{ not json' });
+  assert.throws(() => loadConfig(repo), /not valid JSON/);
+});
+
+test('inline marker suppresses its own line and the next one', () => {
+  const r = run({
+    'CLAUDE.md': [
+      'A `config/one.php` <!-- prumo-ignore -->',
+      '<!-- prumo-ignore-next-line -->',
+      'B `config/two.php`',
+      'C `config/three.php`',
+    ].join('\n'),
+    'src/a.js': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['config/three.php']);
+  assert.equal(r.stats.suppressed, 2);
+});
+
+test('a file marker suppresses the whole file', () => {
+  const r = run({
+    'CLAUDE.md': '<!-- prumo-ignore-file -->\nSee `config/gone.php`.\n',
+    'src/a.js': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.stats.suppressed, 1);
+});
+
+test('--fix rewrites the case and leaves everything else alone', () => {
+  const repo = repoWith({
+    'CLAUDE.md': 'Logo in `layouts/App.vue`, and a dead `config/gone.php`.\n',
+    'resources/js/Layouts/App.vue': '',
+  });
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  assert.equal(before.caseMismatch.length, 1);
+  assert.equal(before.missingPaths.length, 1);
+
+  const fixed = applyCaseFixes(before.caseMismatch, targets);
+  assert.equal(fixed.paths, 1);
+  assert.equal(fixed.files, 1);
+
+  const body = readFileSync(join(repo, 'CLAUDE.md'), 'utf8');
+  assert.match(body, /`resources\/js\/Layouts\/App\.vue`/);
+  assert.doesNotMatch(body, /`layouts\/App\.vue`/);
+  assert.match(body, /`config\/gone\.php`/, 'the missing path must be left untouched');
+
+  const after = analyze({ repo, targets });
+  assert.equal(after.caseMismatch.length, 0);
+  assert.equal(after.missingPaths.length, 1);
+});
+
+test('--fix skips a line that changed since the scan', () => {
+  const repo = repoWith({ 'CLAUDE.md': 'See `layouts/App.vue`.\n', 'resources/js/Layouts/App.vue': '' });
+  const targets = resolveTargets(repo, []);
+  const stale = [{ file: 'CLAUDE.md', line: 1, cited: 'layouts/NotThere.vue', actual: 'x/y.vue' }];
+  const fixed = applyCaseFixes(stale, targets);
+  assert.equal(fixed.paths, 0);
+  assert.equal(fixed.skipped[0].why, 'line changed since the scan');
+});
+
+test('a link inside backticks is a quotation, not a reference', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-notes-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'a.md'), [
+    'Write it as `[[some-example]]` when you mean to quote it.',
+    'A real one: [[also-missing]].',
+    'And `[quoted](nowhere.md)` versus [live](nowhere.md).',
+  ].join('\n'));
+
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, [dir]) });
+
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited).sort(), ['also-missing', 'nowhere.md']);
+});

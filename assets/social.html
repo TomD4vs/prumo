@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; }
+  body {
+    background: #0E1116;
+    color: #E6EAF0;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    display: grid;
+    grid-template-columns: 1fr 470px;
+    overflow: hidden;
+  }
+
+  .left {
+    padding: 70px 0 70px 92px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 15px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: #6E7C8C;
+  }
+
+  .mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 124px;
+    font-weight: 600;
+    letter-spacing: -.03em;
+    line-height: .9;
+    color: #F2F6FA;
+  }
+
+  .tag {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 41px;
+    line-height: 1.24;
+    color: #B9C4D0;
+    max-width: 19ch;
+  }
+
+  .cmd {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 23px;
+    color: #4FBDAE;
+    border: 1px solid #23504C;
+    background: #12211F;
+    border-radius: 5px;
+    padding: 13px 20px;
+    align-self: flex-start;
+    letter-spacing: .01em;
+  }
+  .cmd i { color: #4A5B69; font-style: normal; }
+
+  .right { position: relative; overflow: hidden; }
+
+  .wall {
+    position: absolute;
+    left: 56px; top: -80px;
+    width: 300px; height: 820px;
+    border-left: 3px solid #2B333D;
+    border-right: 3px solid #2B333D;
+    transform: rotate(5.2deg);
+    transform-origin: 50% 30%;
+  }
+  .brick {
+    position: absolute; left: 0; right: 0;
+    height: 3px; background: #222A33;
+  }
+
+  .line { position: absolute; left: 186px; top: 0; width: 3px; height: 452px; background: #4FBDAE; }
+  .bob {
+    position: absolute; left: 165px; top: 448px;
+    width: 45px; height: 96px;
+    background: #4FBDAE;
+    clip-path: polygon(50% 0%, 100% 22%, 50% 100%, 0% 22%);
+  }
+  .anchor { position: absolute; left: 173px; top: -9px; width: 29px; height: 18px; background: #4FBDAE; border-radius: 2px; }
+
+  .angle {
+    position: absolute; left: 212px; top: 168px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 20px; font-weight: 500;
+    color: #E4855C;
+    letter-spacing: .04em;
+  }
+  .angle::before {
+    content: ""; position: absolute; left: -30px; top: 8px;
+    width: 26px; height: 2px; background: #E4855C; opacity: .55;
+  }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="eyebrow">Context linter for coding agents</div>
+    <h1 class="mark">prumo</h1>
+    <p class="tag">Is your documentation still true?</p>
+    <div class="cmd"><i>$</i> npx prumo</div>
+  </div>
+
+  <div class="right">
+    <div class="wall">
+      <div class="brick" style="top:150px"></div>
+      <div class="brick" style="top:300px"></div>
+      <div class="brick" style="top:450px"></div>
+      <div class="brick" style="top:600px"></div>
+    </div>
+    <div class="anchor"></div>
+    <div class="line"></div>
+    <div class="bob"></div>
+    <div class="angle">out of true</div>
+  </div>
+</body>
+</html>

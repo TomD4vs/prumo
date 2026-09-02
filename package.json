@@ -1,0 +1,52 @@
+{
+  "name": "prumo",
+  "version": "0.2.0",
+  "description": "Is your documentation still true? Checks the context files your coding agent reads against the code. Three high-precision checks, zero dependencies.",
+  "type": "module",
+  "bin": {
+    "prumo": "bin/prumo.mjs"
+  },
+  "main": "src/check.mjs",
+  "exports": {
+    ".": "./src/check.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "README.pt-BR.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "Elyton",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TomD4vs/prumo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TomD4vs/prumo/issues"
+  },
+  "homepage": "https://github.com/TomD4vs/prumo#readme",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agents-md",
+    "claude-md",
+    "cursor",
+    "copilot",
+    "ai-agents",
+    "context",
+    "documentation",
+    "lint",
+    "linter",
+    "stale-docs",
+    "cli"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "prumo": "node bin/prumo.mjs"
+  }
+}
