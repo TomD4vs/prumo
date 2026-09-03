@@ -107,12 +107,21 @@ function readTextFile(path) {
   }
 }
 
+/**
+ * Every path git tracks, spelled the way git holds it. `core.quotepath` is on by default and
+ * returns a non-ASCII name quoted and octal-escaped, which would leave every accented path out
+ * of the index; `-z` keeps a name that contains a newline in one piece.
+ */
+function trackedFiles(repo) {
+  return execSync('git -c core.quotepath=false ls-files -z', { cwd: repo, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
+    .toString().split('\0').filter(Boolean);
+}
+
 /** The git index — the only source that knows a path's true letter case. */
 function buildIndex(repo) {
   let tracked;
   try {
-    tracked = execSync('git ls-files', { cwd: repo, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString().split('\n').map((s) => s.trim()).filter(Boolean);
+    tracked = trackedFiles(repo);
   } catch {
     return null;
   }
@@ -181,8 +190,7 @@ export function resolveTargets(repo, explicit = []) {
 
   let tracked = [];
   try {
-    tracked = execSync('git ls-files', { cwd: repo, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString().split('\n').map((s) => s.trim()).filter(Boolean);
+    tracked = trackedFiles(repo);
   } catch {
     tracked = [];
   }

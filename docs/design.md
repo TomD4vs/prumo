@@ -56,6 +56,8 @@ The git index is the only source that stores a path's true letter case. `existsS
 
 `resolvePath` in [src/check.mjs](../src/check.mjs) therefore tries, in this order: an exact match in the index; a case-insensitive match, which becomes a `CASE MISMATCH` finding; and only then `existsSync`, as a last resort for files git does not track. That order is not to be changed.
 
+The index has to be read the way git spells it. `git ls-files` runs with `core.quotepath` on by default, which returns a non-ASCII name quoted and octal-escaped, `"docs/A\303\247\303\243o.md"` for `docs/Ação.md`. Read that way, every accented path falls out of the index: the case check goes silent on it, and on Windows `existsSync` then accepts the wrong case without a word. A context file under an accented folder is not even detected. The call is therefore `git -c core.quotepath=false ls-files -z`, and the `-z` keeps a name that contains a newline in one piece. Any new call to `git ls-files` goes through `trackedFiles`.
+
 Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
 
 ---

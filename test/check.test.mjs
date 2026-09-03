@@ -491,3 +491,26 @@ test('a target named in .prumorc.json that does not exist stops the CLI with exi
   assert.equal(status, 2);
   assert.match(stderr, /^prumo: target not found: docs\/no-such-file\.md/m);
 });
+
+test('a path whose name has an accent is checked against the index like any other', () => {
+  const r = run({
+    'CLAUDE.md': 'O fluxo esta em `docs/ação.md`.\n\nA rotina esta em [fluxo](docs/AÇÃO.md).\n',
+    'docs/Ação.md': 'a\n',
+  });
+  assert.deepEqual(r.caseMismatch.map((c) => c.cited), ['docs/ação.md', 'docs/AÇÃO.md']);
+  assert.deepEqual([...new Set(r.caseMismatch.map((c) => c.actual))], ['docs/Ação.md']);
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a context file under a folder whose name has an accent is auto-detected', () => {
+  const repo = repoWith({
+    'AGENTS.md': '# raiz\n',
+    'serviços/AGENTS.md': 'O upload passa por `src/app.php`.\n',
+    'src/App.php': '',
+  });
+  const targets = resolveTargets(repo, []);
+  assert.deepEqual(targets.map((t) => t.label).sort(), ['AGENTS.md', 'serviços/AGENTS.md']);
+  const r = analyze({ repo, targets });
+  assert.equal(r.caseMismatch.length, 1);
+  assert.equal(r.caseMismatch[0].actual, 'src/App.php');
+});
