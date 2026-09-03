@@ -91,6 +91,8 @@ The result is the classic "works on my machine": fine locally, dead on Linux, in
 
 A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them, and a link that starts with `/` from the repository root, as GitHub renders it. A `%20` in the target is read as the space it stands for, and `--fix` writes it back encoded, so a corrected link still works.
 
+The target may be a markdown page, an image, a PDF or a source file, and the three ways markdown writes a link are all read: `[a](x.md)`, `[a](<a name with spaces.md>)` and a `[a][ref]` whose `[ref]:` definition is reported on its own line.
+
 Where prumo prints a `-> suggestion`, that is almost certainly the intended file; the two usually differ only in `-` versus `_`. With no suggestion, the target was renamed or deleted, so update the link or drop it.
 
 Hundreds of these usually share one systematic cause. In one measured run, every link was written in kebab-case while every file was named in snake_case, and renaming the files cleared 247 at once.

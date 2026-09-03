@@ -31,11 +31,17 @@ export const NESTED = new Set(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', 'AGE
 const ROOTS = /^(app|apps|src|lib|resources|routes|database|config|tests?|public|scripts|bootstrap|packages|components|pages|layouts|server|api|cmd|internal|docs|dist|build|backend|frontend|services|client|\.github|\.claude)\//i;
 const CODE_EXT = /\.(php|vue|js|mjs|cjs|ts|tsx|jsx|css|scss|json|ya?ml|blade\.php|py|go|rb|rs|java|kt|sql|sh|html|toml|md)$/i;
 const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:)/;
-const WILDCARD = /[<>{}*]|\.\.\.|…/;
+const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 /** `path/to/thing.js` is how a command example spells its argument, not a file in this repository. */
 const PLACEHOLDER_PATH = /(^|[/])path[/]to[/]/i;
 /** `@scope/package/file.css` is an npm import specifier. An `@/` alias keeps its slash right after the `@`, so it is not one. */
 const SCOPED_PACKAGE = /^@[^/]+\//;
+/** `report-YYYY-MM-DD.md` and `product/vX.Y.Z/` name a file to be created, not one that is here. */
+const TEMPLATE_TOKEN = /\bYYYY[-_]MM[-_]DD\b|\bv?X\.Y\.Z\b/i;
+/** `src/common/constants.hpp/.cpp` is two files written as one token, never a path. */
+const COMPOUND_EXT = /\.[a-z0-9]{1,5}\/\.[a-z0-9]{1,5}$/i;
+/** What a markdown link may point at besides code and markdown: the images and documents a note embeds. */
+const LINK_EXT = /\.(mdx|png|jpe?g|gif|svg|webp|avif|pdf|ico|txt|csv)$/i;
 
 const NEGATION = new RegExp(
   [
@@ -236,8 +242,10 @@ function extractPaths(line) {
       if (MOVES_OR_DELETES.test(t) || (first.includes('/') && !first.startsWith('./'))) continue;
       tokens = t.split(/\s+/).map((tok) => tok.replace(/^--?[\w-]+=/, '').replace(/^["']|["'.,;]+$/g, ''));
     }
-    for (const tok of tokens) {
+    for (const raw of tokens) {
+      const tok = raw.includes('\\') ? raw.split('\\').join('/') : raw;
       if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || PLACEHOLDER_PATH.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
+      if (TEMPLATE_TOKEN.test(tok) || COMPOUND_EXT.test(tok)) continue;
       if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
       found.push(tok.replace(/^\.\//, '').replace(/[:#]\d+$/, '').replace(/\/$/, ''));
     }
@@ -360,7 +368,7 @@ export function analyze({ repo, targets, config = null }) {
         }
       }
 
-      const prose = line.replace(/`[^`\n]*`/g, ' ');
+      const prose = line.replace(/`[^`\n]*`/g, ' ').replace(/^\[([^\]]+)\]:\s*(\S+)\s*$/, '[$1]($2)');
 
       for (const m of prose.matchAll(/\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g)) {
         const to = m[1].trim();
@@ -374,9 +382,10 @@ export function analyze({ repo, targets, config = null }) {
         });
       }
 
-      for (const m of prose.matchAll(/\]\(([^)\s#]+\.mdx?)(?:#[^)]*)?\)/gi)) {
-        const to = m[1];
-        if (WILDCARD.test(to)) continue;
+      for (const m of prose.matchAll(/\]\((?:<([^<>]+)>|([^)\s#]+)(?:#[^)]*)?)\)/gi)) {
+        const to = m[1] || m[2];
+        if (!CODE_EXT.test(to) && !LINK_EXT.test(to)) continue;
+        if (WILDCARD.test(to) || PLACEHOLDER_PATH.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
         const href = decodeLink(to);
         const abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(target.path), href);

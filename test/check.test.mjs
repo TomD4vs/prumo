@@ -672,3 +672,74 @@ test('a prefix that would leave a bare root filename is still reported', () => {
   assert.equal(r.missingPaths.length, 1);
   assert.equal(r.missingPaths[0].cited, 'evals/README.md');
 });
+
+test('a square bracket marks a placeholder, in a name or a dynamic route', () => {
+  const r = run({
+    'AGENTS.md': 'Create `.agents/commands/[name].md` and a page under `src/app/[lang]/page.tsx`.\n',
+    'src/app/index.tsx': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a date or version stencil in a name is a file to be created, not one that is here', () => {
+  const r = run({
+    'AGENTS.md': 'Save it as `reports/review-YYYY-MM-DD.md`, and link `product/vX.Y.Z/_index.md`.\n',
+    'reports/README.md': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('path/to/ is a placeholder inside a markdown link as well as in prose', () => {
+  const r = run({
+    'AGENTS.md': 'List them as [Page Title](path/to/page.md) in the wiki.\n',
+    'docs/real.md': '',
+  });
+  assert.equal(r.brokenLinks.length, 0);
+});
+
+test('two files written as one token are not a path, and a dotfile still is', () => {
+  const r = run({
+    'AGENTS.md': 'Add it to `src/common/constants.hpp/.cpp`. Secrets live in `config/.env`.\n',
+    'src/common/constants.hpp': '',
+    'config/app.json': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'config/.env');
+});
+
+test('a prose path written with backslashes is checked like any other', () => {
+  const r = run({
+    'AGENTS.md': 'The layout is `src\\layouts\\App.vue`.\n',
+    'src/Layouts/App.vue': '',
+  });
+  assert.equal(r.caseMismatch.length, 1);
+  assert.equal(r.caseMismatch[0].actual, 'src/Layouts/App.vue');
+});
+
+test('a link wrapped in angle brackets is checked, spaces and all', () => {
+  const r = run({
+    'AGENTS.md': 'Read [the note](<docs/Nota Que Sumiu.md>) first.\n',
+    'docs/outra.md': '',
+  });
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].cited, 'docs/Nota Que Sumiu.md');
+});
+
+test('a link to an image or to code is checked, not only one to markdown', () => {
+  const r = run({
+    'AGENTS.md': 'See [the diagram](docs/arquitetura.png) and [the parser](src/parser.ts).\n',
+    'docs/real.png': '',
+    'src/index.ts': '',
+  });
+  assert.equal(r.brokenLinks.length, 2);
+});
+
+test('a reference definition is a link, and is reported on its own line', () => {
+  const r = run({
+    'AGENTS.md': 'Look at [the sketch][ESQ].\n\n[ESQ]: assets/esquema-antigo.svg\n',
+    'assets/esquema.svg': '',
+  });
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].cited, 'assets/esquema-antigo.svg');
+  assert.equal(r.brokenLinks[0].line, 3);
+});
