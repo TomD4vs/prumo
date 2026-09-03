@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="README.pt-BR.md">🇧🇷 Leia em português</a>
+  <a href="LEIAME.md">🇧🇷 Leia em português</a>
 </p>
 
 ---

@@ -1,6 +1,6 @@
 # Design
 
-[← README](../README.pt-BR.md) · [Read in English](design.md)
+[← README](../LEIAME.md) · [Read in English](design.md)
 
 Por que o prumo checa tão pouco, o que custou descobrir isso, como um caminho é resolvido, e de onde vem o nome.
 

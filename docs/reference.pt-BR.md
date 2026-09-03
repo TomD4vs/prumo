@@ -1,6 +1,6 @@
 # Referência
 
-[← README](../README.pt-BR.md) · [Read in English](reference.md)
+[← README](../LEIAME.md) · [Read in English](reference.md)
 
 Todo argumento, opção e achado, mais como silenciar um e como o `--fix` decide o que tocar.
 

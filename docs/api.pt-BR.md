@@ -1,6 +1,6 @@
 # API e desenvolvimento
 
-[← README](../README.pt-BR.md) · [Read in English](api.md)
+[← README](../LEIAME.md) · [Read in English](api.md)
 
 ---
 

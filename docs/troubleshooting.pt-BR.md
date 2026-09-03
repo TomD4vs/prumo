@@ -1,6 +1,6 @@
 # Resolvendo problemas e perguntas
 
-[← README](../README.pt-BR.md) · [Read in English](troubleshooting.md)
+[← README](../LEIAME.md) · [Read in English](troubleshooting.md)
 
 ---
 
