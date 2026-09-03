@@ -354,3 +354,71 @@ test('config: a folder named without wildcards covers everything under it', () =
   });
   assert.deepEqual(r.missingPaths.map((m) => m.cited), ['public/index.php']);
 });
+
+test('a markdown link with the wrong case is a case mismatch, and --fix rewrites it relative to its file', () => {
+  const repo = repoWith({
+    'CLAUDE.md': '# x\n',
+    '.claude/skills/deploy/SKILL.md': '---\nname: d\ndescription: t\n---\n- [Setup](Steps/setup.md#top)\n- [Gone](steps/gone.md)\n',
+    '.claude/skills/deploy/steps/setup.md': '# setup\n',
+  });
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  assert.deepEqual(before.caseMismatch, [
+    { file: '.claude/skills/deploy/SKILL.md', line: 5, kind: 'link', cited: 'Steps/setup.md', actual: 'steps/setup.md' },
+  ]);
+  assert.equal(before.brokenLinks.length, 1);
+  assert.equal(before.brokenLinks[0].kind, 'link');
+  assert.equal(before.brokenLinks[0].cited, 'steps/gone.md');
+
+  const fixed = applyCaseFixes(before.caseMismatch, targets);
+  assert.equal(fixed.paths, 1);
+  const body = readFileSync(join(repo, '.claude/skills/deploy/SKILL.md'), 'utf8');
+  assert.match(body, /\[Setup\]\(steps\/setup\.md#top\)/, 'the link keeps its anchor and stays relative');
+  assert.equal(analyze({ repo, targets }).caseMismatch.length, 0);
+});
+
+test('a wikilink and a markdown link are told apart', () => {
+  const r = run({ 'CLAUDE.md': 'See [[missing-note]] and [guide](docs/missing.md).\n' });
+  assert.deepEqual(r.brokenLinks.map((l) => [l.kind, l.cited]), [['wikilink', 'missing-note'], ['link', 'docs/missing.md']]);
+});
+
+test('a path inside a command is checked; a move or delete command is not', () => {
+  const r = run({
+    'CLAUDE.md': [
+      'Seed with `python scripts/seed_db.py --force`.',
+      'Then `node scripts/build.js --out=dist/app.js`.',
+      'Old: `git mv src/old.py src/new.py` and `rm config/legacy.php`.',
+      'Deploy: `./scripts/deploy.sh --env prod`.',
+      'Logo: `public/img/LOGO WIDE.png` (a name with spaces is not a command).',
+      '',
+    ].join('\n'),
+    'scripts/build.js': '',
+    'scripts/deploy.sh': '',
+    'src/new.py': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['scripts/seed_db.py']);
+  assert.equal(r.caseMismatch.length, 0);
+});
+
+test('monorepo roots such as backend/ and frontend/ take part in the case check', () => {
+  const r = run({
+    'CLAUDE.md': 'Models in `backend/app/Models/`, views in `frontend/src/Components/`.\n',
+    'backend/app/models/ticket.py': '',
+    'frontend/src/components/List.tsx': '',
+  });
+  assert.deepEqual(r.caseMismatch.map((c) => [c.cited, c.actual]), [
+    ['backend/app/Models', 'backend/app/models'],
+    ['frontend/src/Components', 'frontend/src/components'],
+  ]);
+});
+
+test('the text report names the file and line of a broken link', () => {
+  const repo = repoWith({ 'CLAUDE.md': '# x\n\nSee [[gone-note]] and [g](docs/gone.md).\n' });
+  execSync('git -c user.email=t@t -c user.name=t commit -qm x', { cwd: repo, stdio: 'ignore' });
+  let out = '';
+  try { execSync('node ' + JSON.stringify(BIN) + ' ' + JSON.stringify(repo), { stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch (e) { out = e.stdout.toString(); assert.equal(e.status, 1); }
+  assert.match(out, /^  CLAUDE\.md:3  \[\[gone-note\]\]$/m);
+  assert.match(out, /^  CLAUDE\.md:3  docs\/gone\.md$/m);
+  assert.match(out, /, 1 file in the git index$/m);
+});

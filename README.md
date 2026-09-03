@@ -53,23 +53,23 @@ nothing to review.
 A run with findings, annotated:
 
 ```
-prumo — 3 context files, 412 files in the git index     ← what it read
-        1 historical entry exempt from path checks      ← what it skipped on purpose
+prumo — 3 context files, 412 files in the git index           ← what it read
+        1 historical entry exempt from path checks            ← what it skipped on purpose
 
 CASE MISMATCH  (1)   resolves on Windows and macOS, breaks on Linux and CI
-  CLAUDE.md:18                                          ← file and line
-      layouts/AppLayout.vue                             ← what the note says
-      ->  resources/js/Layouts/AppLayout.vue            ← what the repository has
+  CLAUDE.md:18                                                ← file and line
+      layouts/AppLayout.vue                                   ← what the note says
+      ->  resources/js/Layouts/AppLayout.vue                  ← what the repository has
 
 BROKEN LINK  (2)   1 with a likely destination
-  [[deploy-checklist]]   ->  deploy_checklist           ← the file it probably meant
-  [[old-architecture]]                                  ← no candidate: renamed or deleted
+  CLAUDE.md:21  [[deploy-checklist]]   ->  deploy_checklist   ← the file it probably meant
+  CLAUDE.md:30  [[old-architecture]]                          ← no candidate: renamed or deleted
 
 MISSING PATH  (1)   paths cited to say they are gone were filtered out
-  docs/setup.md:44  config/database.php                 ← file, line, dead path
-      Copy the template into `config/database.php`…     ← the sentence, so you can judge
+  docs/setup.md:44  config/database.php                       ← file, line, dead path
+      Copy the template into `config/database.php`…           ← the sentence, so you can judge
 
-4 to review                                             ← 1 + 2 + 1
+4 to review                                                   ← 1 + 2 + 1
 ```
 
 Every finding carries a file, a line number and the correction. Nothing is guessed and nothing is written. What each finding means, and what to do about it, is in the [reference](docs/reference.md#what-each-finding-means). If it flags a line you know is correct, [Silencing a finding](docs/reference.md#silencing-a-finding) covers the two ways to say so.
@@ -122,6 +122,23 @@ prumo is a plain CLI, so any agent with shell access can run it.
 ```
 
 The hook receives the tool call as JSON on stdin. The `node -e` filter reads `tool_input.file_path`, turns Windows backslashes into slashes, and exits non-zero unless the path is one prumo would detect on its own. The pattern mirrors the list in [src/check.mjs](src/check.mjs), so prumo runs only when a context file changed. It uses node rather than `jq` because anyone running prumo already has node. prumo's output lands in the transcript, so the agent sees the findings and can fix them in the same turn. The shape of those findings as data is in the [API](docs/api.md).
+
+On Windows, Claude Code runs hooks in Git Bash when it is installed and in PowerShell when it is not, and the command above is written for bash. Without Git Bash, use this hook instead. It declares its shell and does the same filtering in PowerShell:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "shell": "powershell",
+        "command": "$p = (ConvertFrom-Json ([Console]::In.ReadToEnd())).tool_input.file_path -replace '\\\\','/'; if ($p -match '(^|/)(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)\\.md|\\.(cursor|cline|windsurf)rules|copilot-instructions\\.md)$|(^|/)\\.(cursor|windsurf|roo)/rules/|(^|/)\\.github/instructions/|/SKILL\\.md$') { npx @tomd4vs/prumo }; exit 0"
+      }]
+    }]
+  }
+}
+```
 
 **Add a slash command.** A file at `.claude/commands/prumo.md` turns the check into `/prumo`:
 

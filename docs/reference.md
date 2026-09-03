@@ -15,7 +15,7 @@ prumo [repo] [target...] [options]
 | Argument | Meaning |
 | --- | --- |
 | `repo` | Path to a git repository. Defaults to the current folder. |
-| `target` | A markdown file, or a folder of them. Omit for auto-detection. |
+| `target` | A markdown file, or the markdown files directly inside a folder. Omit for auto-detection. |
 
 | Option | Meaning |
 | --- | --- |

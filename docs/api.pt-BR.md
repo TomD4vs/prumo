@@ -12,12 +12,14 @@ import { analyze, resolveTargets } from '@tomd4vs/prumo';
 const targets = resolveTargets('.', []);          // [] = detectar sozinho
 const result  = analyze({ repo: '.', targets });
 
-console.log(result.caseMismatch);   // [{ file, line, cited, actual }]
-console.log(result.brokenLinks);    // [{ file, line, cited, suggestion }]
+console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
+console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
 console.log(result.orphans);        // ['nota-que-ninguem-linka.md']
-console.log(result.stats);          // { tracked, targets, historical }
+console.log(result.stats);          // { tracked, targets, historical, suppressed }
 ```
+
+`kind` é `wikilink` ou `link`. Num case mismatch ele só aparece quando o caminho veio de um link markdown, e aí `actual` é relativo ao arquivo que contém o link, como o próprio link.
 
 ---
 
@@ -26,7 +28,7 @@ console.log(result.stats);          // { tracked, targets, historical }
 ```bash
 git clone https://github.com/TomD4vs/prumo.git
 cd prumo
-node --test          # 23 testes, sem dependências
+node --test          # 33 testes, sem dependências
 node bin/prumo.mjs . # rodar nele mesmo
 ```
 

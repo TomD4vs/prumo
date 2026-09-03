@@ -27,7 +27,7 @@ Não existe `CLAUDE.md`, `AGENTS.md` ou equivalente naquele repositório. Crie u
 
 ```bash
 prumo . docs/arquitetura.md    # um arquivo
-prumo . docs/                  # todo .md de uma pasta
+prumo . docs/                  # os .md que estão direto na pasta
 ```
 </details>
 

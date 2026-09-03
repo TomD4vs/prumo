@@ -53,23 +53,23 @@ nothing to review.
 Uma execução com achados, anotada:
 
 ```
-prumo — 3 context files, 412 files in the git index     ← o que ele leu
-        1 historical entry exempt from path checks      ← o que ele pulou de propósito
+prumo — 3 context files, 412 files in the git index           ← o que ele leu
+        1 historical entry exempt from path checks            ← o que ele pulou de propósito
 
 CASE MISMATCH  (1)   resolves on Windows and macOS, breaks on Linux and CI
-  CLAUDE.md:18                                          ← arquivo e linha
-      layouts/AppLayout.vue                             ← o que a nota diz
-      ->  resources/js/Layouts/AppLayout.vue            ← o que o repositório tem
+  CLAUDE.md:18                                                ← arquivo e linha
+      layouts/AppLayout.vue                                   ← o que a nota diz
+      ->  resources/js/Layouts/AppLayout.vue                  ← o que o repositório tem
 
 BROKEN LINK  (2)   1 with a likely destination
-  [[deploy-checklist]]   ->  deploy_checklist           ← o arquivo que provavelmente era
-  [[old-architecture]]                                  ← sem candidato: renomeado ou apagado
+  CLAUDE.md:21  [[deploy-checklist]]   ->  deploy_checklist   ← o arquivo que provavelmente era
+  CLAUDE.md:30  [[old-architecture]]                          ← sem candidato: renomeado ou apagado
 
 MISSING PATH  (1)   paths cited to say they are gone were filtered out
-  docs/setup.md:44  config/database.php                 ← arquivo, linha, caminho morto
-      Copie o modelo para `config/database.php`…        ← a frase, para você julgar
+  docs/setup.md:44  config/database.php                       ← arquivo, linha, caminho morto
+      Copie o modelo para `config/database.php`…              ← a frase, para você julgar
 
-4 to review                                             ← 1 + 2 + 1
+4 to review                                                   ← 1 + 2 + 1
 ```
 
 Todo achado traz arquivo, número da linha e a correção. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.
@@ -122,6 +122,23 @@ O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rod
 ```
 
 O hook recebe a chamada da ferramenta como JSON na entrada padrão. O filtro em `node -e` lê `tool_input.file_path`, troca as barras invertidas do Windows por barras normais e sai com código diferente de zero a menos que o caminho seja um que o prumo detectaria sozinho. O padrão espelha a lista em [src/check.mjs](src/check.mjs), então o prumo só roda quando um arquivo de contexto mudou. Usa node em vez de `jq` porque quem roda o prumo já tem node. A saída do prumo aparece na transcrição, então o agente vê os achados e pode corrigir na mesma rodada. O formato desses achados como dados está na [API](docs/api.pt-BR.md).
+
+No Windows, o Claude Code roda os hooks no Git Bash quando ele está instalado e no PowerShell quando não está, e o comando acima foi escrito para bash. Sem Git Bash, use este hook no lugar. Ele declara o shell e faz o mesmo filtro em PowerShell:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "shell": "powershell",
+        "command": "$p = (ConvertFrom-Json ([Console]::In.ReadToEnd())).tool_input.file_path -replace '\\\\','/'; if ($p -match '(^|/)(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)\\.md|\\.(cursor|cline|windsurf)rules|copilot-instructions\\.md)$|(^|/)\\.(cursor|windsurf|roo)/rules/|(^|/)\\.github/instructions/|/SKILL\\.md$') { npx @tomd4vs/prumo }; exit 0"
+      }]
+    }]
+  }
+}
+```
 
 **Crie um comando de barra.** Um arquivo em `.claude/commands/prumo.md` transforma a checagem em `/prumo`:
 

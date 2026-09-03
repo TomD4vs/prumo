@@ -27,7 +27,7 @@ There is no `CLAUDE.md`, `AGENTS.md` or equivalent in that repository. Create on
 
 ```bash
 prumo . docs/architecture.md    # one file
-prumo . docs/                   # every .md in a folder
+prumo . docs/                   # the .md files directly in a folder
 ```
 </details>
 

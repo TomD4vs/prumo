@@ -30,9 +30,10 @@ export function applyCaseFixes(findings, targets) {
     for (const item of items) {
       const i = item.line - 1;
       if (i < 0 || i >= lines.length) { skipped.push({ ...item, why: 'line out of range' }); continue; }
-      const needle = '`' + item.cited + '`';
+      const [open, close] = item.kind === 'link' ? ['](', ''] : ['`', '`'];
+      const needle = open + item.cited + close;
       if (!lines[i].includes(needle)) { skipped.push({ ...item, why: 'line changed since the scan' }); continue; }
-      lines[i] = lines[i].split(needle).join('`' + item.actual + '`');
+      lines[i] = lines[i].split(needle).join(open + item.actual + close);
       changes.push(item);
       touched = true;
     }

@@ -131,7 +131,7 @@ if (!QUIET && FORMAT === 'json') {
   const cap = (list) => (ALL ? list : list.slice(0, 25));
   const more = (list) => (!ALL && list.length > 25 ? `  … ${list.length - 25} more (use --all)\n` : '');
 
-  out.push(`prumo — ${plural(stats.targets, 'context file', 'context files')}, ${stats.tracked} files in the git index`);
+  out.push(`prumo — ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.tracked, 'file', 'files')} in the git index`);
   if (stats.historical) out.push(`        ${plural(stats.historical, 'historical entry', 'historical entries')} exempt from path checks`);
   if (stats.suppressed) out.push(`        ${plural(stats.suppressed, 'line or file', 'lines or files')} suppressed by a prumo-ignore marker`);
   out.push('');
@@ -152,16 +152,11 @@ if (!QUIET && FORMAT === 'json') {
   if (brokenLinks.length) {
     const withHint = brokenLinks.filter((l) => l.suggestion).length;
     out.push(`BROKEN LINK  (${brokenLinks.length})${withHint ? `   ${withHint} with a likely destination` : ''}`);
-    const counted = new Map();
-    for (const o of brokenLinks) {
-      const cur = counted.get(o.cited) || { n: 0, suggestion: o.suggestion };
-      cur.n++;
-      counted.set(o.cited, cur);
+    for (const o of cap(brokenLinks)) {
+      const shown = o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited;
+      out.push(`  ${o.file}:${o.line}  ${shown}${o.suggestion ? `   ->  ${o.suggestion}` : ''}`);
     }
-    for (const [cited, { n, suggestion }] of cap([...counted])) {
-      out.push(`  [[${cited}]]${n > 1 ? `  (${n}x)` : ''}${suggestion ? `   ->  ${suggestion}` : ''}`);
-    }
-    out.push(more([...counted]) + '');
+    out.push(more(brokenLinks) + '');
   }
 
   if (orphans.length) {

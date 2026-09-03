@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join, extname, relative, sep, isAbsolute, dirname } from 'node:path';
+import { join, extname, relative, sep, isAbsolute, dirname, posix } from 'node:path';
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -28,7 +28,7 @@ export const DEFAULT_DIRS = ['.cursor/rules', '.windsurf/rules', '.roo/rules', '
 
 const NESTED = new Set(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', 'AGENT.md', 'GEMINI.md', 'COPILOT.md', 'SKILL.md']);
 
-const ROOTS = /^(app|src|lib|resources|routes|database|config|tests?|public|scripts|bootstrap|packages|components|pages|layouts|server|api|cmd|internal|docs|dist|build|\.github|\.claude)\//i;
+const ROOTS = /^(app|apps|src|lib|resources|routes|database|config|tests?|public|scripts|bootstrap|packages|components|pages|layouts|server|api|cmd|internal|docs|dist|build|backend|frontend|services|client|\.github|\.claude)\//i;
 const CODE_EXT = /\.(php|vue|js|mjs|cjs|ts|tsx|jsx|css|scss|json|ya?ml|blade\.php|py|go|rb|rs|java|kt|sql|sh|html|toml|md)$/i;
 const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:)/;
 const WILDCARD = /[<>{}*]|\.\.\.|…/;
@@ -186,13 +186,29 @@ export function resolveTargets(repo, explicit = []) {
   return targets;
 }
 
+/** A command that moves or deletes names its old path on purpose. */
+const MOVES_OR_DELETES = /^(git\s+)?(mv|rm|del|rename)\b/i;
+
+/**
+ * Paths cited in backticks. A backtick span with spaces is read as a command,
+ * and each of its arguments is tried as a path: `python scripts/seed.py`.
+ */
 function extractPaths(line) {
   const found = [];
   for (const m of line.matchAll(/`([^`\n]{3,120})`/g)) {
     const t = m[1].trim();
-    if (WILDCARD.test(t) || /\s/.test(t) || OUTSIDE_REPO.test(t)) continue;
-    if (!(ROOTS.test(t) || (t.includes('/') && CODE_EXT.test(t)))) continue;
-    found.push(t.replace(/^\.\//, '').replace(/[:#]\d+$/, '').replace(/\/$/, ''));
+    if (OUTSIDE_REPO.test(t)) continue;
+    let tokens = [t];
+    if (/\s/.test(t)) {
+      const first = t.split(/\s+/)[0];
+      if (MOVES_OR_DELETES.test(t) || (first.includes('/') && !first.startsWith('./'))) continue;
+      tokens = t.split(/\s+/).map((tok) => tok.replace(/^--?[\w-]+=/, '').replace(/^["']|["'.,;]+$/g, ''));
+    }
+    for (const tok of tokens) {
+      if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok)) continue;
+      if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
+      found.push(tok.replace(/^\.\//, '').replace(/[:#]\d+$/, '').replace(/\/$/, ''));
+    }
   }
   return found;
 }
@@ -281,19 +297,36 @@ export function analyze({ repo, targets, config = null }) {
         brokenLinks.push({
           file: target.label,
           line: i + 1,
+          kind: 'wikilink',
           cited: to,
           suggestion: loose.get(to.toLowerCase().replace(/[_-]/g, '')) || null,
         });
       }
 
+      // A markdown link is relative to its file. Inside the repository the git
+      // index is the truth, so a wrong letter case is caught here as well; the
+      // filesystem alone would accept it on Windows and macOS.
       for (const m of prose.matchAll(/\]\(([^)\s#]+\.mdx?)(?:#[^)]*)?\)/gi)) {
         const to = m[1];
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
-        if (existsSync(join(dirname(target.path), to))) continue;
+        const abs = join(dirname(target.path), to);
+        const rel = relative(repo, abs).split(sep).join('/');
+        const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
+        if (inside && index.known.has(rel)) continue;
+        if (inside) {
+          const real = index.lower.get(rel.toLowerCase());
+          if (real) {
+            const fileDir = posix.dirname(relative(repo, target.path).split(sep).join('/'));
+            caseMismatch.push({ file: target.label, line: i + 1, kind: 'link', cited: to, actual: posix.relative(fileDir, real) });
+            continue;
+          }
+        }
+        if (existsSync(abs)) continue;
         const bare = to.slice(to.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
         brokenLinks.push({
           file: target.label,
           line: i + 1,
+          kind: 'link',
           cited: to,
           suggestion: loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null,
         });

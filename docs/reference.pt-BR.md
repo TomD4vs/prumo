@@ -15,7 +15,7 @@ prumo [repo] [alvo...] [opções]
 | Argumento | Significado |
 | --- | --- |
 | `repo` | Caminho de um repositório git. Padrão: a pasta atual. |
-| `alvo` | Um arquivo markdown, ou uma pasta deles. Omita para detecção automática. |
+| `alvo` | Um arquivo markdown, ou os arquivos markdown que estão direto numa pasta. Omita para detecção automática. |
 
 | Opção | Significado |
 | --- | --- |
