@@ -40,9 +40,12 @@ prumo [repo] [alvo...] [opções]
 | Windsurf | `.windsurfrules`, `.windsurf/rules/` |
 | Cline / Roo | `.clinerules`, `.roo/rules/` |
 | Aider | `CONVENTIONS.md` |
+| Agent Skills, qualquer host | `SKILL.md` em qualquer subpasta, como `.claude/skills/deploy/` |
 | Qualquer um | `MEMORY.md`, `COPILOT.md` |
 
-`CLAUDE.md` e `AGENTS.md` também são recolhidos de subpastas, então `packages/api/AGENTS.md` é lido igual ao da raiz.
+`CLAUDE.md`, `AGENTS.md` e `SKILL.md` também são recolhidos de subpastas, então `packages/api/AGENTS.md` e `.claude/skills/deploy/SKILL.md` são lidos igual a um arquivo da raiz.
+
+Um `SKILL.md` na raiz do repositório não é detectado automaticamente. Na raiz, um arquivo com esse nome costuma ser a instrução de uma ferramenta, não uma skill instalada, e os caminhos dentro dele são exemplos, não referências. Quando o repositório é ele mesmo uma skill, nomeie o arquivo: `prumo . SKILL.md`.
 
 ### Exemplos
 

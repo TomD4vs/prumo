@@ -285,3 +285,29 @@ test('a link inside backticks is a quotation, not a reference', () => {
 
   assert.deepEqual(r.brokenLinks.map((l) => l.cited).sort(), ['also-missing', 'nowhere.md']);
 });
+
+test('finds an installed SKILL.md, ignores one at the root, and reports a renamed supporting file', () => {
+  // An installed skill links its supporting files by relative path; one was renamed later.
+  const skill = [
+    '---', 'name: deploy', 'description: test', '---',
+    '- [Setup](steps/setup.md)',
+    '- [Rollout](steps/rollout.md)',
+    '',
+  ].join('\n');
+  const repo = repoWith({
+    'AGENTS.md': '# root\n',
+    // A root SKILL.md is not an installed skill; its paths are examples, not references.
+    'SKILL.md': 'Each step lives in `steps/<name>.md`.\n',
+    '.claude/skills/deploy/SKILL.md': skill,
+    '.claude/skills/deploy/steps/setup.md': '# setup\n',
+    '.claude/skills/deploy/steps/rollout-canary.md': '# rollout\n',
+  });
+
+  const labels = resolveTargets(repo, []).map((t) => t.label).sort();
+  assert.deepEqual(labels, ['.claude/skills/deploy/SKILL.md', 'AGENTS.md']);
+
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].file, '.claude/skills/deploy/SKILL.md');
+  assert.ok(r.brokenLinks[0].cited.endsWith('steps/rollout.md'));
+});

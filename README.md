@@ -36,7 +36,7 @@ From a terminal inside any git repository:
 npx @tomd4vs/prumo
 ```
 
-prumo locates your context files on its own: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `.github/copilot-instructions.md` and the rest. Every file and folder it looks for is in the [reference](docs/reference.md#files-found-automatically).
+prumo locates your context files on its own: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `.github/copilot-instructions.md`, installed skills in `.claude/skills/` and the rest. Every file and folder it looks for is in the [reference](docs/reference.md#files-found-automatically).
 
 ---
 
@@ -114,7 +114,7 @@ prumo is a plain CLI, so any agent with shell access can run it.
       "matcher": "Write|Edit",
       "hooks": [{
         "type": "command",
-        "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const p=((JSON.parse(d).tool_input||{}).file_path||\"\").split(\"\\\\\").join(\"/\");process.exit(/(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]/i.test(p)?0:1)})' && npx @tomd4vs/prumo || true"
+        "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const p=((JSON.parse(d).tool_input||{}).file_path||\"\").split(\"\\\\\").join(\"/\");process.exit(/(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]|[/]SKILL[.]md$/i.test(p)?0:1)})' && npx @tomd4vs/prumo || true"
       }]
     }]
   }

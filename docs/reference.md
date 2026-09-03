@@ -40,9 +40,12 @@ prumo [repo] [target...] [options]
 | Windsurf | `.windsurfrules`, `.windsurf/rules/` |
 | Cline / Roo | `.clinerules`, `.roo/rules/` |
 | Aider | `CONVENTIONS.md` |
+| Agent Skills, any host | `SKILL.md` inside any subfolder, such as `.claude/skills/deploy/` |
 | Any | `MEMORY.md`, `COPILOT.md` |
 
-`CLAUDE.md` and `AGENTS.md` are also collected from subfolders, so `packages/api/AGENTS.md` is read the same as the one at the root.
+`CLAUDE.md`, `AGENTS.md` and `SKILL.md` are also collected from subfolders, so `packages/api/AGENTS.md` and `.claude/skills/deploy/SKILL.md` are read the same as a file at the root.
+
+A `SKILL.md` at the repository root is not detected automatically. At the root, a file with that name is often a tool's own instructions rather than an installed skill, and the paths in it are examples rather than references. When the repository is itself a skill, name the file: `prumo . SKILL.md`.
 
 ### Examples
 
