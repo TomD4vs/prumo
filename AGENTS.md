@@ -5,10 +5,13 @@ still match the code. Node 18+, ESM, no build step.
 
 ## Layout
 
-- `bin/prumo.mjs` — CLI: argument parsing and the report. No analysis lives here.
+- `bin/prumo.mjs` — CLI: argument parsing, then the report. No analysis lives here.
+- `bin/prumo-mcp.mjs` — MCP server over stdio, two tools, same analysis and same report.
 - `src/check.mjs` — the three checks, exported as `analyze()` and `resolveTargets()`.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
+- `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server.
 - `test/check.test.mjs` — the suite. Every test builds a throwaway git repository.
+- `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `docs/design.md` — **read this before changing behaviour.** Why there are only three checks,
   what was measured and rejected, what each filter defends against, and the order in which a
   path is resolved. `docs/api.md` has the development recipes.
@@ -38,5 +41,7 @@ node bin/prumo.mjs . --all      # do not truncate
 
 ## Before publishing
 
+Run `npm run simulate` before a publish and `npm run simulate -- --registry` after it; the unit tests
+exercise `analyze()`, the simulation exercises what the docs promise through the CLI.
 Run it against a real repository with a large context file, not only against this one.
 `--json` output is the stable contract for anything consuming it programmatically.

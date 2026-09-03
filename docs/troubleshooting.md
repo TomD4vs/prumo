@@ -18,6 +18,14 @@ prumo
 # or point at it from anywhere
 prumo /path/to/your/project
 ```
+
+A skill installed under your home folder, such as `~/.claude/skills/<name>/`, is outside any repository, so prumo cannot read it there. Check it where it is published, or run `git init` inside the skill folder first.
+</details>
+
+<details>
+<summary><code>prumo: the git index is empty</code></summary>
+
+The repository has nothing committed or staged, so there is nothing to compare the notes against; every path would come out as missing. Run `git add` on the files first. The same message appears when a clone was cut short, for instance by a path too long for Windows.
 </details>
 
 <details>
@@ -40,7 +48,13 @@ Expected. prumo checks paths, letter case and links, which is what can be verifi
 <details>
 <summary>It flagged a line that is correct</summary>
 
-Read the sentence before changing anything. Two cases are already filtered automatically: a path named *because it is gone*, as in *"the project does not publish `config/dompdf.php`"*, and a historical note such as `phase-3-complete.md` whose whole subject is what got removed.
+Read the sentence before changing anything. Three cases are already filtered automatically: a path named *because it is gone*, as in *"the project does not publish `config/dompdf.php`"*; a historical note such as `phase-3-complete.md` whose whole subject is what got removed; and a path that `.gitignore` covers, which is absent on purpose.
+
+Three more are not, because they need judgement:
+
+- A recipe that tells the reader to create the file, as in *"copy the template into `config/database.php`"*. The path is correct and the file is meant not to exist yet. Add `<!-- prumo-ignore -->` to that line.
+- A `[[wikilink]]` to a note kept in another folder. Pass both folders in one run, `prumo . notes-a notes-b`, and the link resolves.
+- A page that a build step generates, such as a documentation site's landing page. List it under `ignore` in `.prumorc.json`, or add it to `.gitignore` if it is never meant to be tracked.
 
 If yours slipped through, a clearer sentence is usually the fix. The filter reads a paragraph of context, in English and Portuguese.
 </details>
@@ -86,7 +100,7 @@ No agent is required. prumo reads files, not agents, and the [reference](referen
 <details>
 <summary><b>Does it work outside JavaScript projects?</b></summary>
 
-Yes. It reads markdown and the git index, so it is language-agnostic. It was built and measured against two PHP and Vue codebases, and the path checks recognise the conventional roots of Python, Go, Rust, Ruby and Java projects.
+Yes. It reads markdown and the git index, so it is language-agnostic. It was built and measured against two PHP and Vue codebases, then checked against public repositories in Go, C++, Python and TypeScript, and the path checks recognise the conventional roots of Python, Go, Rust, Ruby and Java projects.
 </details>
 
 <details>

@@ -29,7 +29,20 @@ Mesma ferramenta, mesmos arquivos, com e sem os filtros:
 | Pasta de notas, projeto B | 66 | 251 | **10** |
 | `CLAUDE.md`, projeto B | 1 | 8 | **1** |
 
-Essas colunas contam alarmes falsos removidos; não são um número de precisão. A precisão do próprio prumo nunca foi medida num projeto antes de o prumo limpá-lo. Os dois projetos acima vêm sendo mantidos com o prumo desde então, então o que sobra neles é o que o prumo não consegue resolver, não uma amostra do que ele pega.
+Essas colunas contam alarmes falsos removidos; não são um número de precisão. Os dois projetos acima vêm sendo mantidos com o prumo desde então, então o que sobra neles é o que o prumo não consegue resolver, não uma amostra do que ele pega.
+
+A precisão em si foi medida depois, em repositórios públicos que têm um `AGENTS.md` na raiz, escolhidos numa busca de código do GitHub e nunca vistos pelo prumo antes:
+
+| Repositórios públicos, 2026-09-03 | |
+| --- | ---: |
+| Repositórios verificados | 14 |
+| Limpos | 8 |
+| Achados da versão daquele dia | 11 |
+| Reais | 8 |
+| Falsos | 3 |
+| Achados da versão seguinte | 8 |
+
+Os reais foram uma skill que promete guias que ela não traz, e um cabeçalho citado com um nome que nunca teve. Cada falso virou regra no mesmo dia: um link que começa com `/` resolve a partir da raiz do repositório, como o GitHub faz; um arquivo de contexto dentro de `vendor/` documenta uma dependência e não é alvo; e um índice do git vazio é erro, não uma parede de caminhos ausentes. A amostra é pequena, e o próximo repositório vai achar a próxima regra. O número está publicado para que o leitor saiba em que ele se apoia.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 

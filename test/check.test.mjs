@@ -422,3 +422,45 @@ test('the text report names the file and line of a broken link', () => {
   assert.match(out, /^  CLAUDE\.md:3  docs\/gone\.md$/m);
   assert.match(out, /, 1 file in the git index$/m);
 });
+
+test('a path that .gitignore covers is exempt and counted, not reported', () => {
+  const r = run({
+    '.gitignore': '/.claude\ndocs/guide.md\nsecurity/\n',
+    'CLAUDE.md': [
+      'Run `node .claude/skills/run/driver.mjs smoke`.',
+      'Read [the guide](docs/guide.md) and `security/findings.json`.',
+      'Still cited: `config/gone.php`.',
+      '',
+    ].join('\n'),
+    'docs/index.md': '# docs\n',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['config/gone.php']);
+  assert.equal(r.brokenLinks.length, 0);
+  assert.equal(r.stats.gitignored, 3);
+});
+
+test('a markdown link that starts with a slash resolves from the repository root', () => {
+  const r = run({
+    'AGENTS.md': '# root\n',
+    '.agents/skills/write/SKILL.md': '---\nname: w\ndescription: d\n---\nFollow [the rules](/AGENTS.md) and [old](/docs/gone.md).\n',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['/docs/gone.md']);
+});
+
+test('an empty git index is an error, not a wall of missing paths', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-empty-'));
+  made.push(dir);
+  writeFileSync(join(dir, 'CLAUDE.md'), 'See `src/app.js`.\n');
+  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
+  assert.throws(() => analyze({ repo: dir, targets: resolveTargets(dir, []) }), /git index is empty/);
+});
+
+test('a context file vendored with a dependency is not a target', () => {
+  const repo = repoWith({
+    'AGENTS.md': '# root\n',
+    'vendor/some/lib/AGENTS.md': 'Read `.github/copilot-instructions.md` first.\n',
+    'node_modules/pkg/CLAUDE.md': 'See `src/gone.js`.\n',
+    'packages/api/AGENTS.md': '# api\n',
+  });
+  assert.deepEqual(resolveTargets(repo, []).map((t) => t.label).sort(), ['AGENTS.md', 'packages/api/AGENTS.md']);
+});

@@ -140,6 +140,24 @@ No Windows, o Claude Code roda os hooks no Git Bash quando ele está instalado e
 }
 ```
 
+**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a caixa das letras. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados. No Claude Code:
+
+```bash
+claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp
+```
+
+Para qualquer outro cliente MCP, a configuração equivalente é:
+
+```json
+{
+  "mcpServers": {
+    "prumo": { "command": "npx", "args": ["-y", "-p", "@tomd4vs/prumo", "prumo-mcp"] }
+  }
+}
+```
+
+O servidor não faz chamadas de rede e não precisa de configuração; ele verifica o repositório que o cliente indicar, ou a pasta em que foi iniciado.
+
 **Crie um comando de barra.** Um arquivo em `.claude/commands/prumo.md` transforma a checagem em `/prumo`:
 
 ```markdown

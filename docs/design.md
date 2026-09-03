@@ -29,7 +29,20 @@ Same tool, same files, with and without the filters:
 | Notes folder, project B | 66 | 251 | **10** |
 | `CLAUDE.md`, project B | 1 | 8 | **1** |
 
-Those columns count false alarms removed; they are not a precision figure. prumo's own precision was never measured on a project before prumo cleaned it. The two projects above have been maintained with prumo since, so what is left in them is what prumo cannot resolve, not a sample of what it catches.
+Those columns count false alarms removed; they are not a precision figure. The two projects above have been maintained with prumo since, so what is left in them is what prumo cannot resolve, not a sample of what it catches.
+
+Precision itself was measured later, on public repositories that carry a root `AGENTS.md`, picked from a GitHub code search and never seen by prumo before:
+
+| Public repositories, 2026-09-03 | |
+| --- | ---: |
+| Repositories checked | 14 |
+| Clean | 8 |
+| Findings raised by the version of the day | 11 |
+| Real | 8 |
+| False | 3 |
+| Findings raised by the version that followed | 8 |
+
+The real ones were a skill that promises guide files it does not ship, and a header cited under a name it never had. Each false one became a rule the same day: a link that starts with `/` resolves from the repository root, as GitHub renders it; a context file under `vendor/` documents a dependency and is not a target; and an empty git index is an error rather than a wall of missing paths. The sample is small, and the next repository will find the next rule. The figure is published so the reader knows what it rests on.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 

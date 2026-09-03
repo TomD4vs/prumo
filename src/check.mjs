@@ -180,7 +180,7 @@ export function resolveTargets(repo, explicit = []) {
     tracked = [];
   }
   for (const p of tracked) {
-    if (p.includes('/') && NESTED.has(p.slice(p.lastIndexOf('/') + 1))) add(p, join(repo, p));
+    if (p.includes('/') && NESTED.has(p.slice(p.lastIndexOf('/') + 1)) && !TRANSIENT.test(p)) add(p, join(repo, p));
   }
 
   return targets;
@@ -213,6 +213,21 @@ function extractPaths(line) {
   return found;
 }
 
+/**
+ * Asks git which of these paths .gitignore covers. A path ignored on purpose is
+ * expected to be absent from the index and often from this machine, so its
+ * absence says nothing about the note. Returns the subset that is ignored.
+ */
+function gitIgnored(repo, paths) {
+  if (!paths.length) return new Set();
+  const parse = (buf) => new Set(String(buf || '').split('\0').map((s) => s.trim()).filter(Boolean));
+  try {
+    return parse(execSync('git check-ignore --stdin -z', { cwd: repo, input: paths.join('\0') + '\0', stdio: ['pipe', 'pipe', 'ignore'] }));
+  } catch (err) {
+    return parse(err.stdout);
+  }
+}
+
 /** Tries the literal path, then `@/` aliases, then omitted extensions. */
 function resolvePath(index, p) {
   const tries = [p];
@@ -238,6 +253,7 @@ function resolvePath(index, p) {
 export function analyze({ repo, targets, config = null }) {
   const index = buildIndex(repo);
   if (!index) throw new Error(`not a git repository: ${repo}`);
+  if (!index.tracked.length) throw new Error('the git index is empty, so nothing can be checked against it. Commit or "git add" the files first.');
 
   const settings = config ?? loadConfig(repo);
   const ignored = makeMatcher(settings.ignore);
@@ -259,6 +275,7 @@ export function analyze({ repo, targets, config = null }) {
 
   const caseMismatch = [], missingPaths = [], brokenLinks = [], orphans = [];
   let historical = 0, suppressed = 0;
+  const relOf = new Map();
 
   for (const target of checked) {
     const body = readTextFile(target.path);
@@ -303,13 +320,10 @@ export function analyze({ repo, targets, config = null }) {
         });
       }
 
-      // A markdown link is relative to its file. Inside the repository the git
-      // index is the truth, so a wrong letter case is caught here as well; the
-      // filesystem alone would accept it on Windows and macOS.
       for (const m of prose.matchAll(/\]\(([^)\s#]+\.mdx?)(?:#[^)]*)?\)/gi)) {
         const to = m[1];
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
-        const abs = join(dirname(target.path), to);
+        const abs = to.startsWith('/') ? join(repo, to.slice(1)) : join(dirname(target.path), to);
         const rel = relative(repo, abs).split(sep).join('/');
         const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
         if (inside && index.known.has(rel)) continue;
@@ -323,16 +337,31 @@ export function analyze({ repo, targets, config = null }) {
         }
         if (existsSync(abs)) continue;
         const bare = to.slice(to.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
-        brokenLinks.push({
+        const finding = {
           file: target.label,
           line: i + 1,
           kind: 'link',
           cited: to,
           suggestion: loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null,
-        });
+        };
+        if (inside) relOf.set(finding, rel);
+        brokenLinks.push(finding);
       }
     });
   }
+
+  for (const m of missingPaths) relOf.set(m, m.cited);
+  const candidates = [...new Set(relOf.values())];
+  const ignoredByGit = gitIgnored(repo, candidates);
+  let gitignored = 0;
+  const keep = (list) => list.filter((f) => {
+    const rel = relOf.get(f);
+    if (rel && ignoredByGit.has(rel)) { gitignored++; return false; }
+    return true;
+  });
+  const missingKept = keep(missingPaths), linksKept = keep(brokenLinks);
+  missingPaths.length = 0; missingPaths.push(...missingKept);
+  brokenLinks.length = 0; brokenLinks.push(...linksKept);
 
   const store = checked.find((t) => t.fromDir);
   const indexFile = checked.find((t) => /^MEMORY\.md$/i.test(t.label));
@@ -349,6 +378,6 @@ export function analyze({ repo, targets, config = null }) {
     brokenLinks,
     missingPaths,
     orphans,
-    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed },
+    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored },
   };
 }

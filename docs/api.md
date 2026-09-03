@@ -16,7 +16,7 @@ console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
 console.log(result.orphans);        // ['note-nobody-links-to.md']
-console.log(result.stats);          // { tracked, targets, historical, suppressed }
+console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored }
 ```
 
 `kind` is `wikilink` or `link`. On a case mismatch it is present only when the path came from a markdown link, and then `actual` is relative to the file that holds the link, as the link itself is.
@@ -28,9 +28,12 @@ console.log(result.stats);          // { tracked, targets, historical, suppresse
 ```bash
 git clone https://github.com/TomD4vs/prumo.git
 cd prumo
-node --test          # 33 tests, no dependencies
+node --test          # 37 tests, no dependencies
 node bin/prumo.mjs . # run it on itself
+npm run simulate     # a new user follows the README against the packed tarball
 ```
+
+The simulation packs the checkout the way `npm publish` would, installs the tarball into a throwaway project, and follows the README and these pages literally in one temporary git repository per scenario, comparing every output with what the documentation shows. It found bugs that the unit tests could not, because the tests exercise `analyze()` and the simulation exercises what the docs promise through the CLI. Run it before a publish, and again afterwards with `--registry` to test the published version. It also drives the MCP server over stdio.
 
 Inside this repository, run `node bin/prumo.mjs` rather than `npx @tomd4vs/prumo`: npx finds the local `package.json` and looks for a binary that isn't installed here.
 

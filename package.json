@@ -1,10 +1,11 @@
 {
   "name": "@tomd4vs/prumo",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Is your documentation still true? Checks the context files your coding agent reads against the code. Three high-precision checks, zero dependencies.",
   "type": "module",
   "bin": {
-    "prumo": "bin/prumo.mjs"
+    "prumo": "bin/prumo.mjs",
+    "prumo-mcp": "bin/prumo-mcp.mjs"
   },
   "main": "src/check.mjs",
   "exports": {
@@ -51,6 +52,7 @@
   ],
   "scripts": {
     "test": "node --test",
+    "simulate": "bash test/simulate-new-user.sh",
     "prumo": "node bin/prumo.mjs"
   }
 }

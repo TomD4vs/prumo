@@ -43,7 +43,7 @@ prumo [repo] [target...] [options]
 | Agent Skills, any host | `SKILL.md` inside any subfolder, such as `.claude/skills/deploy/` |
 | Any | `MEMORY.md`, `COPILOT.md` |
 
-`CLAUDE.md`, `AGENTS.md` and `SKILL.md` are also collected from subfolders, so `packages/api/AGENTS.md` and `.claude/skills/deploy/SKILL.md` are read the same as a file at the root.
+`CLAUDE.md`, `AGENTS.md` and `SKILL.md` are also collected from subfolders, so `packages/api/AGENTS.md` and `.claude/skills/deploy/SKILL.md` are read the same as a file at the root. Folders such as `vendor/` and `node_modules/` are left out, because a context file there documents a dependency.
 
 A `SKILL.md` at the repository root is not detected automatically. At the root, a file with that name is often a tool's own instructions rather than an installed skill, and the paths in it are examples rather than references. When the repository is itself a skill, name the file: `prumo . SKILL.md`.
 
@@ -68,7 +68,7 @@ prumo "C:/Users/me/My Project"
 | :---: | --- |
 | `0` | Nothing to review |
 | `1` | Findings to review |
-| `2` | Bad usage: not a git repo, no files found, unknown option |
+| `2` | Bad usage: not a git repo, empty git index, no files found, unknown option |
 
 ---
 
@@ -82,7 +82,7 @@ The result is the classic "works on my machine": fine locally, dead on Linux, in
 
 ### `BROKEN LINK`
 
-A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them.
+A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them, and a link that starts with `/` from the repository root, as GitHub renders it.
 
 Where prumo prints a `-> suggestion`, that is almost certainly the intended file; the two usually differ only in `-` versus `_`. With no suggestion, the target was renamed or deleted, so update the link or drop it.
 
@@ -91,6 +91,8 @@ Hundreds of these usually share one systematic cause. In one measured run, every
 ### `MISSING PATH`
 
 The note cites a file that no longer exists anywhere in the repository. Update the path, or rewrite the sentence if its point is that the file is gone. prumo recognises phrasing such as *"was removed"*, *"no longer exists"* and *"renamed to"*, and stays quiet when it finds it.
+
+A path that `.gitignore` covers is absent on purpose, so it is exempt from this check and from the broken-link check. The header counts these exemptions, so a repository that leans on them never reads as clean by accident.
 
 ### `NOT IN INDEX`
 
