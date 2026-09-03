@@ -538,3 +538,29 @@ test('a markdown link holding a template placeholder is not a broken link', () =
   });
   assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['chapters/ch02-real.md']);
 });
+
+test('inside a published skill, the no-context message names the root SKILL.md', () => {
+  const withSkill = repoWith({
+    'SKILL.md': '---\nname: s\ndescription: d\n---\n- [One](chapters/ch01.md)\n',
+    'chapters/ch01.md': '',
+  });
+  const without = repoWith({ 'src/a.js': '' });
+  const runCli = (repo) => {
+    try {
+      execSync('node ' + JSON.stringify(BIN) + ' ' + JSON.stringify(repo), { stdio: ['ignore', 'pipe', 'pipe'] });
+      return { status: 0, stderr: '' };
+    } catch (e) {
+      return { status: e.status, stderr: e.stderr.toString() };
+    }
+  };
+
+  const a = runCli(withSkill);
+  assert.equal(a.status, 2);
+  assert.match(a.stderr, /SKILL.md at the root/);
+  assert.match(a.stderr, /prumo . SKILL.md/);
+
+  const b = runCli(without);
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, /Pass one explicitly/);
+  assert.equal(/SKILL.md at the root/.test(b.stderr), false);
+});

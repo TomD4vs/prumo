@@ -7,7 +7,7 @@
 
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
+import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 import { renderText } from '../src/report.mjs';
 
@@ -54,7 +54,9 @@ function run(name, { repo = '.', targets: explicit = [] } = {}) {
   const config = loadConfig(repo);
   const wanted = explicit.length ? explicit : (config.targets || []);
   const targets = resolveTargets(repo, wanted);
-  if (!targets.length) throw new Error('no context files found. Pass targets, or create a CLAUDE.md / AGENTS.md.');
+  if (!targets.length) throw new Error(hasRootSkill(repo)
+    ? 'no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Pass targets ["SKILL.md"] to check it.'
+    : 'no context files found. Pass targets, or create a CLAUDE.md / AGENTS.md.');
 
   let result = analyze({ repo, targets, config });
   let fixed = null;

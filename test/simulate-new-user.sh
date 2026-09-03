@@ -197,7 +197,9 @@ printf -- '---\nname: deploy\ndescription: d\n---\n- [Setup](steps/setup.md)\n- 
 echo s > .claude/skills/deploy/steps/setup.md; echo r > .claude/skills/deploy/steps/rollout-canary.md; ci
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "2 context files" && echo "$OUT" | grep -q "^  .claude/skills/deploy/SKILL.md:6  steps/rollout.md" && ok "installed skill detected; broken link named with file and line" || bad "skill: $(echo "$OUT" | grep rollout)"
 mk skillrepo; mkdir steps; printf -- '---\nname: s\ndescription: d\n---\n- [A](steps/a.md)\n' > SKILL.md; echo a > steps/b.md; ci
-$PR 2>&1 | grep -q "no context files found" && ok "a root SKILL.md is not auto-detected" || bad "root SKILL.md"
+OUT=$($PR 2>&1)
+echo "$OUT" | grep -q "no context files found" && ok "a root SKILL.md is not auto-detected" || bad "root SKILL.md"
+echo "$OUT" | grep -q "SKILL.md at the root" && ok "and the message says why, and names the command that checks it" || bad "no hint about the root SKILL.md: $OUT"
 $PR . SKILL.md 2>&1 | grep -q "steps/a.md" && ok "'prumo . SKILL.md' checks it explicitly" || bad "explicit SKILL.md"
 
 echo; echo "########## J. Troubleshooting"

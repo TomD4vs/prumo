@@ -5,7 +5,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
+import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 import { renderText, renderGithub } from '../src/report.mjs';
 import { createRequire } from 'node:module';
@@ -98,7 +98,9 @@ try {
   catch { console.error(`prumo: not a git repository: ${repo}`); process.exit(2); }
   targets = resolveTargets(repo, explicit);
   if (!targets.length) {
-    console.error('prumo: no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');
+    console.error(hasRootSkill(repo)
+      ? 'prumo: no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Check it with "prumo . SKILL.md".'
+      : 'prumo: no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');
     process.exit(2);
   }
   result = analyze({ repo, targets, config });

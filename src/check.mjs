@@ -120,6 +120,16 @@ function trackedFiles(repo) {
     .toString().split('\0').filter(Boolean);
 }
 
+/**
+ * True when the repository is itself a skill. Auto-detection leaves a root `SKILL.md` out, so a run
+ * inside a published skill finds nothing, which reads like a broken tool unless the message says why.
+ */
+export function hasRootSkill(repo) {
+  let tracked = [];
+  try { tracked = trackedFiles(repo); } catch { tracked = []; }
+  return tracked.includes('SKILL.md');
+}
+
 /** The git index — the only source that knows a path's true letter case. */
 function buildIndex(repo) {
   let tracked;

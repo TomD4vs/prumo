@@ -49,6 +49,12 @@ Não existe `CLAUDE.md`, `AGENTS.md` ou equivalente naquele repositório. Crie u
 prumo . docs/arquitetura.md    # um arquivo
 prumo . docs/                  # os .md que estão direto na pasta
 ```
+
+Se o repositório for ele mesmo uma skill, a mensagem avisa: um `SKILL.md` na raiz não é detectado automaticamente, porque na raiz esse nome costuma ser a instrução da própria ferramenta, e não uma skill instalada. Nomeie o arquivo e ele é checado como qualquer outro:
+
+```bash
+prumo . SKILL.md
+```
 </details>
 
 <details>

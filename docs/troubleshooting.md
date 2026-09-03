@@ -49,6 +49,12 @@ There is no `CLAUDE.md`, `AGENTS.md` or equivalent in that repository. Create on
 prumo . docs/architecture.md    # one file
 prumo . docs/                   # the .md files directly in a folder
 ```
+
+If the repository is itself a skill, the message says so: a `SKILL.md` at the root is not detected automatically, because at the root that name is usually a tool's own instructions rather than an installed skill. Name it and it is checked like any other file:
+
+```bash
+prumo . SKILL.md
+```
 </details>
 
 <details>
