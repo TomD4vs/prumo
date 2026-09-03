@@ -15,6 +15,7 @@ still match the code. Node 18+, ESM, no build step.
 - `docs/design.md` — **read this before changing behaviour.** Why there are only three checks,
   what was measured and rejected, what each filter defends against, and the order in which a
   path is resolved. `docs/api.md` has the development recipes.
+- `CONTRIBUTING.md` — the bar an outside change has to clear, in both languages.
 - `assets/social.html` — source of `assets/social.png`, rendered headless at 1280x640.
 
 ## Running it
