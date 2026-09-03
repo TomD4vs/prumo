@@ -158,20 +158,20 @@ OUT=$($PR . notes 2>&1)
 echo "$OUT" | grep -q "1 historical entry exempt from path checks" && ok "historical note exempt" || bad "historical"
 echo "$OUT" | grep -q "NOT IN INDEX" && echo "$OUT" | grep -q "loose.md" && ok "NOT IN INDEX: a note the MEMORY.md never mentions" || bad "NOT IN INDEX"
 
-mk acentos; mkdir -p docs src "servicos-acentuados"; mv "servicos-acentuados" "serviços"
-printf '# raiz
-
-O fluxo esta em `docs/ação.md`.
-' > CLAUDE.md
+mk acentos; mkdir -p docs src "serviços"
+printf '# raiz\n\nO fluxo esta em `docs/ação.md`.\n' > CLAUDE.md
 echo a > "docs/Ação.md"; echo x > src/App.php
-printf '# api
-
-O upload passa por `src/app.php`.
-' > "serviços/AGENTS.md"; ci
+printf '# api\n\nO upload passa por `src/app.php`.\n' > "serviços/AGENTS.md"; ci
 OUT=$($PR 2>&1)
 echo "$OUT" | grep -q "2 context files" && ok "a folder whose name has an accent holds a context file, and it is detected" || bad "accented folder: $OUT"
 echo "$OUT" | grep -q -- "->  docs/Ação.md" && ok "an accented path with the wrong case is a case mismatch, with the spelling git holds" || bad "accented case: $OUT"
 echo "$OUT" | grep -q -- "->  src/App.php" && ok "the context file under the accented folder is really checked" || bad "accented nested: $OUT"
+
+mk nomesolto; printf '# raiz\n\nO texto A esta em `politica.md`.\n\nO texto B esta em [politica](politica.md).\n' > CLAUDE.md
+echo p > Politica.md; ci
+OUT=$($PR 2>&1)
+echo "$OUT" | grep -q "CLAUDE.md:5" && ok "a bare file name is checked when it is a markdown link" || bad "bare name as link: $OUT"
+if echo "$OUT" | grep -q "CLAUDE.md:3"; then bad "a bare name in prose should be left alone: $OUT"; else ok "the same bare name in prose is left alone, as the reference says"; fi
 
 echo; echo "########## H. Monorepo, folder targets, spaces, truncation"
 mk mono; mkdir -p packages/api docs/deep; printf '# root\n' > AGENTS.md; printf 'See `src/gone.php`.\n' > packages/api/AGENTS.md; printf 'Doc `x/y.php`.\n' > docs/a.md; printf 'Deep `x/z.php`.\n' > docs/deep/b.md; ci

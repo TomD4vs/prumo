@@ -74,6 +74,13 @@ prumo "C:/Users/eu/Meu Projeto"
 
 ## O que cada achado significa
 
+**O que o prumo lê como caminho.** Na prosa, só é checada a citação que nomeia uma pasta: a que
+começa por uma pasta de primeiro nível conhecida (`app/`, `src/`, `docs/`, `packages/`, `tests/` e
+as demais), ou a que tem uma `/` e termina numa extensão conhecida. Um nome de arquivo solto, sem
+pasta na frente, como `politica.md`, fica de fora, porque as notas mencionam nomes de arquivo de
+passagem muito mais do que os citam como caminho. Escreva `docs/politica.md`, ou use um link
+markdown `[politica](politica.md)`, e ele passa a ser checado como qualquer outro.
+
 ### `CASE MISMATCH`
 
 Um caminho escrito com capitalização diferente da que o repositório usa. O prumo compara contra o índice do git, que é o único lugar que guarda a grafia real. O sistema de arquivos não conta essa verdade no Windows nem no macOS.

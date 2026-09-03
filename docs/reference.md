@@ -74,6 +74,13 @@ prumo "C:/Users/me/My Project"
 
 ## What each finding means
 
+**What prumo reads as a path.** In prose, only a citation that names a folder is checked: one that
+starts with a usual top-level folder (`app/`, `src/`, `docs/`, `packages/`, `tests/` and the rest),
+or that contains a `/` and ends in a known extension. A bare file name with no folder in front of
+it, `politica.md`, is left alone, because notes mention file names in passing far more often than
+they cite them as paths. Write it as `docs/politica.md`, or as a markdown link
+`[politica](politica.md)`, and it is checked like any other.
+
 ### `CASE MISMATCH`
 
 A path is spelled with different capitalisation than the repository uses. prumo compares against the git index, which is the only place that stores the real spelling; the filesystem won't tell you the truth about this on Windows or macOS.
