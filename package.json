@@ -15,6 +15,7 @@
     "src",
     "README.md",
     "README.pt-BR.md",
+    "docs",
     "LICENSE"
   ],
   "engines": {

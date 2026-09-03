@@ -9,9 +9,9 @@ still match the code. Node 18+, ESM, no build step.
 - `src/check.mjs` — the three checks, exported as `analyze()` and `resolveTargets()`.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
 - `test/check.test.mjs` — the suite. Every test builds a throwaway git repository.
-- `memory/` — **read this before changing behaviour.** Design decisions the code cannot state
-  on its own: why there are only three checks, what was measured and rejected, and what each
-  filter defends against. Start at `memory/MEMORY.md`.
+- `docs/design.md` — **read this before changing behaviour.** Why there are only three checks,
+  what was measured and rejected, what each filter defends against, and the order in which a
+  path is resolved. `docs/api.md` has the development recipes.
 - `assets/social.html` — source of `assets/social.png`, rendered headless at 1280x640.
 
 ## Running it

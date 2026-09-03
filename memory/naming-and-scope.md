@@ -16,6 +16,10 @@ metadata:
 
 **Check availability at `https://registry.npmjs.org/<name>`** — a 404 means the name is free. An *unpublished* package (`bitrot`) is not reusable, so treat it as taken.
 
+**But a 404 is necessary, not sufficient.** `prumo` was free — and npm refused it anyway. `npm publish` answers with E403, *"Package name too similar to existing package pump"*: an anti-typosquatting filter that runs at publish time, never at name-check time. A name can look available for months and only fail at the moment you ship it.
+
+So the tool went out as **`@tomd4vs/prumo`** on 2026-09-02, using the personal scope every npm account gets for free — no organisation involved. The metaphor survives whole, and the command does too: `bin` is unscoped, so users still type `prumo .`. Only the install line carries the scope, as `npx @tomd4vs/prumo`. Winning the bare name back means a ticket at npmjs.com/support, argued in front of a human, over days.
+
 ## Out of scope, deliberately
 
 - **Judging claims.** *"This flag does X"* needs a model, and that is a different product — see [[three-checks-and-the-two-percent]].
