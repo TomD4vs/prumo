@@ -18,6 +18,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
 | Alias e caminho curto resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. |
+| Marcador de posição e identificador | `path/to/test.js` num exemplo de comando, `chapters/ch01-<slug>.md` num template e `server/discover` ao lado de `tools/list` não são arquivos. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
 | Algo que só o autor sabe estar certo | `.prumorc.json` e os marcadores `prumo-ignore`. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
 
 Mesma ferramenta, mesmos arquivos, com e sem os filtros:
@@ -43,6 +44,24 @@ A precisão em si foi medida depois, em repositórios públicos que têm um `AGE
 | Achados da versão seguinte | 8 |
 
 Os reais foram uma skill que promete guias que ela não traz, e um cabeçalho citado com um nome que nunca teve. Cada falso virou regra no mesmo dia: um link que começa com `/` resolve a partir da raiz do repositório, como o GitHub faz; um arquivo de contexto dentro de `vendor/` documenta uma dependência e não é alvo; e um índice do git vazio é erro, não uma parede de caminhos ausentes. A amostra é pequena, e o próximo repositório vai achar a próxima regra. O número está publicado para que o leitor saiba em que ele se apoia.
+
+Uma segunda passagem no mesmo dia, em repositórios nunca checados antes e nenhum deles da primeira lista:
+
+| Repositórios públicos, segunda passagem | |
+| --- | ---: |
+| Repositórios checados | 16 |
+| Limpos | 12 |
+| Achados levantados pela versão do dia | 6 |
+| Reais | 3 |
+| Falsos | 3 |
+| Achados levantados pela versão seguinte | 3 |
+| As duas listas juntas, antes das regras novas | 14 |
+| As duas listas juntas, depois delas | 11 |
+
+Os reais eram dois documentos que tinham mudado para uma subpasta e uma página de referência convertida para
+outro formato enquanto a nota ainda nomeava o arquivo antigo. Os falsos viraram a linha de marcador de posição
+e identificador da tabela de filtros. Nada real se perdeu: os achados que somem entre as duas últimas linhas
+são exatamente os falsos.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 

@@ -514,3 +514,27 @@ test('a context file under a folder whose name has an accent is auto-detected', 
   assert.equal(r.caseMismatch.length, 1);
   assert.equal(r.caseMismatch[0].actual, 'src/App.php');
 });
+
+test('path/to/ is how an example spells its argument, not a file', () => {
+  const r = run({
+    'AGENTS.md': 'Run one test with `npm test -- path/to/test.js`.\n\nThe real one is `tests/unit/date.test.js`.\n',
+    'tests/unit/date.test.js': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), []);
+});
+
+test('an extensionless name whose first segment is no folder here is an identifier, not a path', () => {
+  const r = run({
+    'AGENTS.md': 'Support `server/discover` and `tools/list`.\n\nThe helper lives in `src/discover`.\n\nThe old one was in `src/legacy`.\n',
+    'src/discover.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/legacy']);
+});
+
+test('a markdown link holding a template placeholder is not a broken link', () => {
+  const r = run({
+    'CLAUDE.md': '- [One](chapters/ch01-<slug>.md)\n- [Two](chapters/ch02-real.md)\n',
+    'chapters/ch01-intro.md': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['chapters/ch02-real.md']);
+});

@@ -32,6 +32,8 @@ const ROOTS = /^(app|apps|src|lib|resources|routes|database|config|tests?|public
 const CODE_EXT = /\.(php|vue|js|mjs|cjs|ts|tsx|jsx|css|scss|json|ya?ml|blade\.php|py|go|rb|rs|java|kt|sql|sh|html|toml|md)$/i;
 const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:)/;
 const WILDCARD = /[<>{}*]|\.\.\.|…/;
+/** `path/to/thing.js` is how a command example spells its argument, not a file in this repository. */
+const PLACEHOLDER_PATH = /(^|[/])path[/]to[/]/i;
 
 const NEGATION = new RegExp(
   [
@@ -74,9 +76,10 @@ function globToRegExp(glob) {
   return new RegExp(`^${out}$`, 'i');
 }
 
+/** Builds the test for one config list. A pattern with no wildcard that names a folder
+ *  covers everything under it, so `public/dist` reaches `public/dist/app.js`. */
 function makeMatcher(patterns = []) {
   const res = patterns.map(globToRegExp);
-  // A pattern with no wildcard that names a folder covers everything under it.
   const folders = patterns.filter((p) => !/[*?]/.test(p)).map((p) => p.replace(/\/+$/, '').toLowerCase() + '/');
   return (value) => res.some((re) => re.test(value)) || folders.some((f) => value.toLowerCase().startsWith(f));
 }
@@ -220,7 +223,7 @@ function extractPaths(line) {
       tokens = t.split(/\s+/).map((tok) => tok.replace(/^--?[\w-]+=/, '').replace(/^["']|["'.,;]+$/g, ''));
     }
     for (const tok of tokens) {
-      if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok)) continue;
+      if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || PLACEHOLDER_PATH.test(tok)) continue;
       if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
       found.push(tok.replace(/^\.\//, '').replace(/[:#]\d+$/, '').replace(/\/$/, ''));
     }
@@ -262,7 +265,8 @@ function resolvePath(index, p) {
 }
 
 /**
- * Runs the three checks.
+ * Runs the three checks. A wikilink may point at any markdown file git tracks,
+ * not only at the notes being checked, so `linkable` is built from the whole index.
  * @returns {{caseMismatch:[], brokenLinks:[], missingPaths:[], orphans:[], stats:{}}}
  */
 export function analyze({ repo, targets, config = null }) {
@@ -277,7 +281,6 @@ export function analyze({ repo, targets, config = null }) {
   const checked = targets.filter((t) => !excluded(t.label));
 
   const names = new Set(checked.map((t) => t.label.replace(/\.(md|mdc)$/i, '')));
-  // Wikilinks may point at any markdown file git tracks, not only at the notes being checked.
   const linkable = new Set(names);
   for (const p of index.tracked) {
     if (!/.(md|mdc)$/i.test(p)) continue;
@@ -307,6 +310,7 @@ export function analyze({ repo, targets, config = null }) {
         for (const p of extractPaths(line)) {
           if (seen.has(p) || TRANSIENT.test(p) || extraTransient(p) || ignored(p)) continue;
           seen.add(p);
+          if (!CODE_EXT.test(p) && !index.known.has(p.split('/')[0])) continue;
 
           const r = resolvePath(index, p);
           if (r.state === 'ok') continue;
@@ -337,6 +341,7 @@ export function analyze({ repo, targets, config = null }) {
 
       for (const m of prose.matchAll(/\]\(([^)\s#]+\.mdx?)(?:#[^)]*)?\)/gi)) {
         const to = m[1];
+        if (WILDCARD.test(to)) continue;
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
         const abs = to.startsWith('/') ? join(repo, to.slice(1)) : join(dirname(target.path), to);
         const rel = relative(repo, abs).split(sep).join('/');

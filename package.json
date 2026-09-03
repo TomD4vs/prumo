@@ -1,6 +1,6 @@
 {
   "name": "@tomd4vs/prumo",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Is your documentation still true? Checks the context files your coding agent reads against the code. Three high-precision checks, zero dependencies.",
   "type": "module",
   "bin": {

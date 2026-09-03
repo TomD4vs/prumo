@@ -18,6 +18,7 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | Historical notes exempt | An entry titled *phase 3 complete* cites what was later removed. That is its subject, not a defect. |
 | Transient artifacts ignored | `public/build`, `.vite`, `node_modules`, `dist` are born and die outside git. |
 | Aliases and short paths resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. |
+| Placeholders and identifiers | `path/to/test.js` in a command example, `chapters/ch01-<slug>.md` in a template, and `server/discover` beside `tools/list` are not files. A name with no extension is a path only when the folder it starts with exists here. |
 | Anything only the author knows is fine | `.prumorc.json` and the `prumo-ignore` markers. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
 
 Same tool, same files, with and without the filters:
@@ -43,6 +44,24 @@ Precision itself was measured later, on public repositories that carry a root `A
 | Findings raised by the version that followed | 8 |
 
 The real ones were a skill that promises guide files it does not ship, and a header cited under a name it never had. Each false one became a rule the same day: a link that starts with `/` resolves from the repository root, as GitHub renders it; a context file under `vendor/` documents a dependency and is not a target; and an empty git index is an error rather than a wall of missing paths. The sample is small, and the next repository will find the next rule. The figure is published so the reader knows what it rests on.
+
+A second pass the same day, on repositories never checked before and none of them from the first list:
+
+| Public repositories, second pass | |
+| --- | ---: |
+| Repositories checked | 16 |
+| Clean | 12 |
+| Findings raised by the version of the day | 6 |
+| Real | 3 |
+| False | 3 |
+| Findings raised by the version that followed | 3 |
+| Both lists together, before the new rules | 14 |
+| Both lists together, after them | 11 |
+
+The real ones were two documents that had moved into a subfolder and a reference page converted to another
+format while the note still named the old file. The false ones became the placeholder and identifier row of
+the filter table. Nothing real was lost: the findings that disappear between the last two rows are exactly
+the false ones.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 

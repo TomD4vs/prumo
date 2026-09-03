@@ -173,6 +173,15 @@ OUT=$($PR 2>&1)
 echo "$OUT" | grep -q "CLAUDE.md:5" && ok "a bare file name is checked when it is a markdown link" || bad "bare name as link: $OUT"
 if echo "$OUT" | grep -q "CLAUDE.md:3"; then bad "a bare name in prose should be left alone: $OUT"; else ok "the same bare name in prose is left alone, as the reference says"; fi
 
+mk marcadores; mkdir -p src chapters
+printf '# raiz\n\nRode um teste com `npm test -- path/to/test.js`.\n\nSuporte `server/discover` e `tools/list`.\n\nO ajudante fica em `src/discover`.\n\n- [Um](chapters/ch01-<slug>.md)\n- [Dois](chapters/ch02-real.md)\n- [Tres](chapters/ch01-intro.md)\n' > CLAUDE.md
+echo d > src/discover.ts; echo i > chapters/ch01-intro.md; ci
+OUT=$($PR --all 2>&1)
+if echo "$OUT" | grep -q "path/to"; then bad "path/to in an example is a placeholder: $OUT"; else ok "path/to in a command example is not reported"; fi
+if echo "$OUT" | grep -q "server/discover"; then bad "an extensionless identifier is not a path: $OUT"; else ok "server/discover beside tools/list is not reported"; fi
+if echo "$OUT" | grep -q -- "<slug>"; then bad "a template placeholder in a link is not a link: $OUT"; else ok "a markdown link holding <slug> is not reported"; fi
+echo "$OUT" | grep -q "chapters/ch02-real.md" && ok "the real broken link beside them is still reported" || bad "real link lost: $OUT"
+
 echo; echo "########## H. Monorepo, folder targets, spaces, truncation"
 mk mono; mkdir -p packages/api docs/deep; printf '# root\n' > AGENTS.md; printf 'See `src/gone.php`.\n' > packages/api/AGENTS.md; printf 'Doc `x/y.php`.\n' > docs/a.md; printf 'Deep `x/z.php`.\n' > docs/deep/b.md; ci
 $PR 2>&1 | grep -q "packages/api/AGENTS.md" && ok "nested AGENTS.md read" || bad "nested"
