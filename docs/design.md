@@ -65,6 +65,52 @@ format while the note still named the old file. The false ones became the placeh
 the filter table. Nothing real was lost: the findings that disappear between the last two rows are exactly
 the false ones.
 
+A third pass, on forty repositories on neither list, and searched by `CLAUDE.md` as well as `AGENTS.md` for
+the first time:
+
+| Public repositories, third pass | |
+| --- | ---: |
+| Repositories checked | 40 |
+| Clean | 28 |
+| Findings raised by the version of the day | 35 |
+| Real | 15 |
+| False | 20 |
+| Findings raised by the version that followed | 19 |
+
+Four filters came out of it and shipped together: an `@/` alias tried against the repository root, a scoped
+package specifier read as an npm import rather than a path, the TypeScript source behind an emitted `.js`, and
+a project name spelled in front of a real path. The same fifteen real findings survive all four.
+
+That last row is not a precision figure, for the same reason the first table is not: those four filters were
+built out of the very findings that measured them. So a fourth pass ran on forty-five repositories none of
+this had touched, with the published version, and with no filter allowed to change whatever came out:
+
+| Public repositories, fourth pass | |
+| --- | ---: |
+| Repositories checked | 45 |
+| Clean | 30 |
+| With at least one real finding | 9 |
+| Where every finding was false | 6 |
+| Findings | 61 |
+| Real | 32 |
+| False | 29 |
+| Precision across all findings | **52%** |
+| Precision on the nine that had something real | **76%** |
+
+Read the two precision rows together, because they answer different questions. Two of every three
+repositories got `nothing to review`. On the nine where prumo did find something real, three findings in four
+were right. And the false ones are not spread thin across the sample: nineteen of the twenty-nine sit in six
+repositories where nothing at all was real, and most of those six document a codebase that lives somewhere
+else. One is a skill whose paths belong to the public repository it names two lines above them; another is a
+folder of agent configuration written for the projects it gets copied into.
+
+**52% is the figure this project stands behind** as the honest one across every finding, and it is the first
+measured on material that shaped no rule. The nine families behind the twenty-nine false ones are known and
+written down. After a path that belongs to another repository, they are small: brackets in `[name].md`, a
+`YYYY-MM-DD` in a filename yet to be created, a hostname read as a folder, a negation written in a third
+language. They are held on purpose. Fixing them makes the figure fitted again, and the one after it has to be
+measured on repositories none of the fixes were built from.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.

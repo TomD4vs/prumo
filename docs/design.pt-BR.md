@@ -65,6 +65,54 @@ outro formato enquanto a nota ainda nomeava o arquivo antigo. Os falsos viraram 
 e identificador da tabela de filtros. Nada real se perdeu: os achados que somem entre as duas últimas linhas
 são exatamente os falsos.
 
+Uma terceira passagem, em quarenta repositórios que não estavam em nenhuma das duas listas, e buscados pelo
+`CLAUDE.md` além do `AGENTS.md` pela primeira vez:
+
+| Repositórios públicos, terceira passagem | |
+| --- | ---: |
+| Repositórios checados | 40 |
+| Limpos | 28 |
+| Achados levantados pela versão do dia | 35 |
+| Reais | 15 |
+| Falsos | 20 |
+| Achados levantados pela versão seguinte | 19 |
+
+Saíram dela quatro filtros, publicados juntos: um alias `@/` testado contra a raiz do repositório, um
+especificador de pacote com escopo lido como import do npm e não como caminho, a fonte TypeScript por trás de
+um `.js` emitido, e o nome do projeto escrito na frente de um caminho real. Os mesmos quinze achados reais
+sobrevivem aos quatro.
+
+Essa última linha não é uma medida de precisão, pelo mesmo motivo que a primeira tabela não é: os quatro
+filtros foram construídos a partir dos próprios achados que os mediram. Então uma quarta passagem correu em
+quarenta e cinco repositórios que nada disso havia tocado, com a versão publicada, e sem permissão de mexer
+em filtro nenhum, desse no que desse:
+
+| Repositórios públicos, quarta passagem | |
+| --- | ---: |
+| Repositórios checados | 45 |
+| Limpos | 30 |
+| Com pelo menos um achado real | 9 |
+| Onde todo achado era falso | 6 |
+| Achados | 61 |
+| Reais | 32 |
+| Falsos | 29 |
+| Precisão sobre todos os achados | **52%** |
+| Precisão nos nove que tinham algo real | **76%** |
+
+Leia as duas linhas de precisão juntas, porque elas respondem a perguntas diferentes. Dois de cada três
+repositórios receberam `nothing to review`. Nos nove em que o prumo achou algo real, três achados em quatro
+estavam certos. E os falsos não estão espalhados pela amostra: dezenove dos vinte e nove ficam em seis
+repositórios onde nada era real, e a maioria desses seis documenta um código que mora em outro lugar. Um é uma
+skill cujos caminhos pertencem ao repositório público que ela nomeia duas linhas acima; outro é uma pasta de
+configuração de agente escrita para os projetos em que ela é copiada.
+
+**52% é o número que este projeto assume** como o honesto sobre todos os achados, e é o primeiro medido em
+material que não moldou regra nenhuma. As nove famílias por trás dos vinte e nove falsos são conhecidas e
+estão anotadas. Depois do caminho que pertence a outro repositório, elas são pequenas: colchetes em
+`[name].md`, um `YYYY-MM-DD` num nome de arquivo ainda a criar, um nome de domínio lido como pasta, uma
+negação escrita num terceiro idioma. Elas ficam de propósito. Consertá-las torna o número ajustado de novo, e
+o seguinte teria de ser medido em repositórios que nenhum dos consertos usou.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.
