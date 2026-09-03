@@ -94,13 +94,17 @@ $PR --json >/dev/null 2>&1; chk "$?" "2" "--json without a path: exit 2"
 $PR --bogus >/dev/null 2>&1; chk "$?" "2" "unknown option: exit 2"
 cd "$U"; $PR "$U/tickets" --quiet; chk "$?" "1" "'prumo <path>' from elsewhere"; cd "$U/tickets"
 
-echo; echo "########## C. The README hook, bash and PowerShell"
+echo; echo "########## C. The hook from docs/agents.md, bash and PowerShell"
 node -e "
-const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');
-const blocks=[...t.matchAll(/\`\`\`json\n([\s\S]*?PostToolUse[\s\S]*?)\`\`\`/g)].map(m=>JSON.parse(m[1]).hooks.PostToolUse[0].hooks[0]);
-fs.writeFileSync('hook-bash.txt',blocks.find(h=>!h.shell).command);
-fs.writeFileSync('hook-ps1.ps1',blocks.find(h=>h.shell==='powershell').command);
-" "$HERE/README.md" && ok "both hook blocks in the README parse as JSON" || bad "hook JSON"
+const fs=require('fs');
+const hooks=(f)=>[...fs.readFileSync(f,'utf8').matchAll(/\`\`\`json\n([\s\S]*?)\`\`\`/g)]
+  .map(m=>JSON.parse(m[1])).filter(j=>j.hooks&&j.hooks.PostToolUse).map(j=>j.hooks.PostToolUse[0].hooks[0]);
+const en=hooks(process.argv[1]), pt=hooks(process.argv[2]);
+if(en.length!==2) throw new Error('expected 2 hook blocks, found '+en.length);
+if(JSON.stringify(en)!==JSON.stringify(pt)) throw new Error('the translated hooks drifted from the English ones');
+fs.writeFileSync('hook-bash.txt',en.find(h=>!h.shell).command);
+fs.writeFileSync('hook-ps1.ps1',en.find(h=>h.shell==='powershell').command);
+" "$HERE/docs/agents.md" "$HERE/docs/agents.pt-BR.md" && ok "every json block in docs/agents.md parses, and both pages carry the same two hooks" || bad "hook JSON"
 HC=$(cat hook-bash.txt)
 P1='{"tool_name":"Write","tool_input":{"file_path":"C:\\Users\\me\\tickets\\CLAUDE.md"}}'
 P2='{"tool_name":"Edit","tool_input":{"file_path":"C:\\Users\\me\\tickets\\backend\\app\\main.py"}}'

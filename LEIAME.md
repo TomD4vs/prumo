@@ -105,64 +105,21 @@ O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rod
 
 **Peça ao agente para rodar.** `npx @tomd4vs/prumo` funciona em qualquer repositório git, e cobre sozinho as skills instaladas em `.claude/skills/`. Para um repositório que é ele mesmo uma skill, nomeie o arquivo: `npx @tomd4vs/prumo . SKILL.md`. A saída em texto traz arquivo, linha e correção, o que basta para um agente agir sem precisar interpretar nada. `--format json` devolve os mesmos achados como dados estruturados.
 
-**Rode automaticamente depois de cada edição.** No Claude Code, um hook `PostToolUse` em `.claude/settings.json` dispara depois que o agente grava um arquivo. Este só roda o prumo quando o arquivo era de contexto:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [{
-      "matcher": "Write|Edit",
-      "hooks": [{
-        "type": "command",
-        "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const p=((JSON.parse(d).tool_input||{}).file_path||\"\").split(\"\\\\\").join(\"/\");process.exit(/(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]|[/]SKILL[.]md$/i.test(p)?0:1)})' && npx @tomd4vs/prumo || true"
-      }]
-    }]
-  }
-}
-```
-
-O hook recebe a chamada da ferramenta como JSON na entrada padrão. O filtro em `node -e` lê `tool_input.file_path`, troca as barras invertidas do Windows por barras normais e sai com código diferente de zero a menos que o caminho seja um que o prumo detectaria sozinho. O padrão espelha a lista em [src/check.mjs](src/check.mjs), então o prumo só roda quando um arquivo de contexto mudou. Usa node em vez de `jq` porque quem roda o prumo já tem node. A saída do prumo aparece na transcrição, então o agente vê os achados e pode corrigir na mesma rodada. O formato desses achados como dados está na [API](docs/api.pt-BR.md).
-
-No Windows, o Claude Code roda os hooks no Git Bash quando ele está instalado e no PowerShell quando não está, e o comando acima foi escrito para bash. Sem Git Bash, use este hook no lugar. Ele declara o shell e faz o mesmo filtro em PowerShell:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [{
-      "matcher": "Write|Edit",
-      "hooks": [{
-        "type": "command",
-        "shell": "powershell",
-        "command": "$p = (ConvertFrom-Json ([Console]::In.ReadToEnd())).tool_input.file_path -replace '\\\\','/'; if ($p -match '(^|/)(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)\\.md|\\.(cursor|cline|windsurf)rules|copilot-instructions\\.md)$|(^|/)\\.(cursor|windsurf|roo)/rules/|(^|/)\\.github/instructions/|/SKILL\\.md$') { npx @tomd4vs/prumo }; exit 0"
-      }]
-    }]
-  }
-}
-```
-
-**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a caixa das letras. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados. No Claude Code:
+**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a caixa das letras. No Claude Code:
 
 ```bash
 claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp
 ```
 
-Para qualquer outro cliente MCP, a configuração equivalente é:
-
-```json
-{
-  "mcpServers": {
-    "prumo": { "command": "npx", "args": ["-y", "-p", "@tomd4vs/prumo", "prumo-mcp"] }
-  }
-}
-```
-
-O servidor não faz chamadas de rede e não precisa de configuração; ele verifica o repositório que o cliente indicar, ou a pasta em que foi iniciado.
+A configuração para qualquer outro cliente MCP está em [Agentes](docs/agents.pt-BR.md#exponha-como-ferramenta).
 
 **Crie um comando de barra.** Um arquivo em `.claude/commands/prumo.md` transforma a checagem em `/prumo`:
 
 ```markdown
 Rode `npx @tomd4vs/prumo` e corrija todos os achados que ele reportar.
 ```
+
+**Rode depois de cada edição.** Um hook `PostToolUse` roda o prumo sempre que o agente grava um arquivo de contexto, então os achados caem na transcrição e ele corrige na mesma rodada. O hook, em bash e em PowerShell, está em [Agentes](docs/agents.pt-BR.md#rode-automaticamente-depois-de-cada-edição).
 
 ---
 
@@ -193,6 +150,7 @@ Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um ch
 | Página | O que responde |
 | --- | --- |
 | [Referência](docs/reference.pt-BR.md) | Toda opção e código de saída, o que cada achado significa, como silenciar um, o que o `--fix` toca |
+| [Agentes](docs/agents.pt-BR.md) | Cada integração por inteiro: o servidor MCP, o hook `PostToolUse` em bash e PowerShell, o comando de barra |
 | [Design](docs/design.pt-BR.md) | Por que só três checagens: a medição que removeu a quarta, e os filtros que mantêm as outras caladas |
 | [Resolvendo problemas](docs/troubleshooting.pt-BR.md) | Mensagens de erro, e as perguntas que as pessoas fazem antes de adotar |
 | [API](docs/api.pt-BR.md) | Chamar a partir de código, e rodar a suíte de testes |
