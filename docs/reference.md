@@ -89,7 +89,7 @@ The result is the classic "works on my machine": fine locally, dead on Linux, in
 
 ### `BROKEN LINK`
 
-A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them, and a link that starts with `/` from the repository root, as GitHub renders it.
+A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them, and a link that starts with `/` from the repository root, as GitHub renders it. A `%20` in the target is read as the space it stands for, and `--fix` writes it back encoded, so a corrected link still works.
 
 Where prumo prints a `-> suggestion`, that is almost certainly the intended file; the two usually differ only in `-` versus `_`. With no suggestion, the target was renamed or deleted, so update the link or drop it.
 

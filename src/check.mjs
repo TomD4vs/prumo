@@ -256,6 +256,14 @@ function gitIgnored(repo, paths) {
   }
 }
 
+/**
+ * A markdown link writes a space as `%20`, so the target has to be decoded before it is resolved and
+ * re-encoded before it is written back, or a fix would turn a working link into a broken one.
+ */
+function decodeLink(to) {
+  try { return decodeURIComponent(to); } catch { return to; }
+}
+
 /** Tries the literal path, then `@/` aliases, then omitted extensions. */
 function resolvePath(index, p) {
   const tries = [p];
@@ -353,7 +361,8 @@ export function analyze({ repo, targets, config = null }) {
         const to = m[1];
         if (WILDCARD.test(to)) continue;
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
-        const abs = to.startsWith('/') ? join(repo, to.slice(1)) : join(dirname(target.path), to);
+        const href = decodeLink(to);
+        const abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(target.path), href);
         const rel = relative(repo, abs).split(sep).join('/');
         const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
         if (inside && index.known.has(rel)) continue;
@@ -361,12 +370,13 @@ export function analyze({ repo, targets, config = null }) {
           const real = index.lower.get(rel.toLowerCase());
           if (real) {
             const fileDir = posix.dirname(relative(repo, target.path).split(sep).join('/'));
-            caseMismatch.push({ file: target.label, line: i + 1, kind: 'link', cited: to, actual: posix.relative(fileDir, real) });
+            const fixed = posix.relative(fileDir, real);
+            caseMismatch.push({ file: target.label, line: i + 1, kind: 'link', cited: to, actual: href === to ? fixed : fixed.split(' ').join('%20') });
             continue;
           }
         }
         if (existsSync(abs)) continue;
-        const bare = to.slice(to.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
+        const bare = href.slice(href.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
         const finding = {
           file: target.label,
           line: i + 1,

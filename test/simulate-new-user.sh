@@ -147,6 +147,15 @@ OUT=$($PR 2>&1); echo "$OUT" | grep -q "^CASE MISMATCH  (2)" && echo "$OUT" | gr
 $PR --fix >/dev/null 2>&1; grep -q "(checklist.md)" .claude/skills/release/SKILL.md && ok "--fix rewrote the link" || bad "link not rewritten"
 git reset -q --hard HEAD~1
 
+mk espaco; mkdir -p docs; echo z > "docs/Nota Longa.md"
+printf '# x\n\nCerto: [a](docs/Nota%%20Longa.md).\n\nCaixa: [b](docs/nota%%20longa.md).\n\nSumiu: [c](docs/Outra%%20Nota.md).\n' > CLAUDE.md
+ci
+OUT=$($PR --all 2>&1)
+if echo "$OUT" | grep -q "CLAUDE.md:3"; then bad "a correct %20 link must resolve: $OUT"; else ok "a link that writes a space as %20 resolves"; fi
+echo "$OUT" | grep -q -- "->  docs/Nota%20Longa.md" && ok "the wrong case in it is a case mismatch, suggested still encoded" || bad "encoded case: $OUT"
+echo "$OUT" | grep -q "docs/Outra%20Nota.md" && ok "and a %20 link that really is gone is still reported" || bad "encoded missing: $OUT"
+$PR --fix >/dev/null 2>&1
+grep -q "(docs/Nota%20Longa.md)" CLAUDE.md && ok "--fix writes the link back encoded, so it still works" || bad "fix broke the link: $(sed -n 5p CLAUDE.md)"
 echo; echo "########## G. Filters the docs describe"
 mk filters; mkdir -p resources/js/utils tests/Concerns notes security; echo x > resources/js/utils/foo.js; echo x > tests/Concerns/ReadsPdf.php
 printf '/.claude\nsecurity/\n' > .gitignore

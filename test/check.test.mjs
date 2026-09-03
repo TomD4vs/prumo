@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -563,4 +563,31 @@ test('inside a published skill, the no-context message names the root SKILL.md',
   assert.equal(b.status, 2);
   assert.match(b.stderr, /Pass one explicitly/);
   assert.equal(/SKILL.md at the root/.test(b.stderr), false);
+});
+
+test('a markdown link writes a space as %20, and that link resolves', () => {
+  const r = run({
+    'CLAUDE.md': 'Certo: [a](docs/Nota%20Longa.md).\n\nCaixa: [b](docs/nota%20longa.md).\n\nSumiu: [c](docs/Outra%20Nota.md).\n',
+    'docs/Nota Longa.md': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['docs/Outra%20Nota.md']);
+  assert.equal(r.caseMismatch.length, 1);
+  assert.equal(r.caseMismatch[0].cited, 'docs/nota%20longa.md');
+  assert.equal(r.caseMismatch[0].actual, 'docs/Nota%20Longa.md');
+});
+
+test('--fix keeps a link encoded, so a corrected link still works', () => {
+  const repo = repoWith({
+    'CLAUDE.md': 'Veja [b](docs/nota%20longa.md).\n',
+    'docs/Nota Longa.md': '',
+  });
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  applyCaseFixes(before.caseMismatch, targets);
+
+  const line = readFileSync(join(repo, 'CLAUDE.md'), 'utf8').split('\n')[0];
+  assert.match(line, /\(docs\/Nota%20Longa\.md\)/);
+  const href = line.match(/\]\(([^)]+)\)/)[1];
+  assert.equal(existsSync(join(repo, decodeURIComponent(href))), true);
+  assert.equal(analyze({ repo, targets: resolveTargets(repo, []) }).caseMismatch.length, 0);
 });
