@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
+import { analyze, resolveTargets, loadConfig, DEFAULT_TARGETS, DEFAULT_DIRS, NESTED } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 
 const made = [];
@@ -590,4 +590,32 @@ test('--fix keeps a link encoded, so a corrected link still works', () => {
   const href = line.match(/\]\(([^)]+)\)/)[1];
   assert.equal(existsSync(join(repo, decodeURIComponent(href))), true);
   assert.equal(analyze({ repo, targets: resolveTargets(repo, []) }).caseMismatch.length, 0);
+});
+
+/** Pulls the two PostToolUse hooks out of an integration page, bash first. */
+function hooksFrom(page) {
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', page), 'utf8');
+  return [...src.matchAll(/```json\n([\s\S]*?)```/g)]
+    .map((m) => JSON.parse(m[1]))
+    .filter((j) => j.hooks?.PostToolUse)
+    .map((j) => j.hooks.PostToolUse[0].hooks[0]);
+}
+
+test('the hook in docs/agents.md fires for every file prumo auto-detects', () => {
+  const hooks = hooksFrom('agents.md');
+  assert.equal(hooks.length, 2);
+  const bash = hooks.find((h) => !h.shell).command.match(/process\.exit\(\/(.+)\/i\.test\(p\)/)[1];
+  const ps = hooks.find((h) => h.shell === 'powershell').command.match(/-match\s+'(.+?)'\)/)[1];
+
+  const covered = [
+    ...DEFAULT_TARGETS,
+    ...DEFAULT_DIRS.map((d) => `${d}/rule.md`),
+    ...[...NESTED].filter((n) => n !== 'SKILL.md').map((n) => `packages/api/${n}`),
+    '.claude/skills/release/SKILL.md',
+  ];
+  for (const re of [new RegExp(bash, 'i'), new RegExp(ps, 'i')]) {
+    for (const path of covered) assert.ok(re.test(path), `the hook ignores ${path}`);
+    assert.ok(!re.test('src/main.py'), 'the hook fires on a code file');
+    assert.ok(!re.test('SKILL.md'), 'the hook fires on a root SKILL.md, which prumo does not auto-detect');
+  }
 });
