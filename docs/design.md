@@ -8,9 +8,9 @@ Why prumo checks so little, what that cost to find out, how a path is resolved, 
 
 ## Why so few checks
 
-The obvious feature is checking every symbol in the notes against the codebase. An early prototype did exactly that. Run against two production repositories, it raised roughly **512 alerts, of which ten were real**: about 2% precision, measured against ground truth from seven audits of the same corpus, six of them by hand. That checker was removed. A detector that is wrong 98% of the time is one nobody runs twice, because reading the noise costs more than the rot.
+The obvious feature is checking every symbol in the notes against the codebase. An early prototype did exactly that. Run against two production repositories, it raised roughly **512 alerts, of which ten were real**. That is about 2% precision, checked against what seven reviews of the same material had found, six of them done by hand. That checker was removed. A detector that is wrong 98% of the time is one nobody runs twice, because reading the false alarms costs more than the stale documentation they were meant to catch.
 
-What shipped is the opposite bet: only the checks that are almost always right, with most of the code spent on suppression:
+What shipped does the opposite: only the checks that are almost always right, with most of the code spent on keeping them quiet:
 
 | Filter | Why it exists |
 | --- | --- |
@@ -29,11 +29,11 @@ Same tool, same files, with and without the filters:
 | Notes folder, project B | 66 | 251 | **10** |
 | `CLAUDE.md`, project B | 1 | 8 | **1** |
 
-Those columns measure noise removed, not precision. prumo's own precision was never tabulated on a corpus before its first cleanup, and the corpora available today have already been maintained with it, so what remains there is the residue it cannot resolve rather than a sample of what it catches.
+Those columns count false alarms removed; they are not a precision figure. prumo's own precision was never measured on a project before prumo cleaned it. The two projects above have been maintained with prumo since, so what is left in them is what prumo cannot resolve, not a sample of what it catches.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 
-Two rules follow from the measurement. No check is added without its precision measured on a real corpus first; recall is cheap here and precision is the entire product, and a check that fires on something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it belongs behind a separate opt-in command with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
+Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
 
 ---
 
@@ -43,7 +43,7 @@ The git index is the only source that stores a path's true letter case. `existsS
 
 `resolvePath` in [src/check.mjs](../src/check.mjs) therefore tries, in this order: an exact match in the index; a case-insensitive match, which becomes a `CASE MISMATCH` finding; and only then `existsSync`, as a last resort for files git does not track. That order is not to be changed.
 
-Two consequences follow. Paths are matched by suffix, not prefix, because notes cite them in relative form (`pages/Auth/Login.vue`) far more often than in full; a prefix search from `resources/js/pages/` misses every one of them, which is how four wrong paths survived six hand-run audits, one of them for two months. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test differs per filesystem, so a green run on one platform proves nothing about the others.
+Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
 
 ---
 

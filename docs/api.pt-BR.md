@@ -32,13 +32,13 @@ node bin/prumo.mjs . # rodar nele mesmo
 
 Dentro deste repositório, rode `node bin/prumo.mjs` em vez de `npx @tomd4vs/prumo`: o npx encontra o `package.json` local e procura um binário que não está instalado aqui.
 
-Cada teste monta um repositório git descartável, então a suíte não versiona fixture nenhuma e não deixa resíduo. O CI roda no Linux, Windows e macOS contra Node 18, 20 e 22, já que a checagem de capitalização se comporta diferente em cada plataforma.
+Cada teste monta um repositório git descartável, então a suíte não versiona fixture nenhuma e não deixa nada para trás. O CI roda no Linux, Windows e macOS contra Node 18, 20 e 22, já que a checagem de capitalização se comporta diferente em cada plataforma.
 
 ### O que custou tempo uma vez
 
 `node --test test/` falha no Git Bash do Windows: o argumento de caminho é mutilado e o Node tenta carregar um módulo chamado literalmente `test`. Rode `node --test` sem argumento e deixe-o descobrir `**/*.test.mjs`, que é o que o `npm test` faz.
 
-Teste a CLI a partir de um diretório diferente do repositório sendo checado. Um off-by-one de argumento chegou a ser lançado e passou no primeiro teste por acidente: filtrar os valores de flag com `i !== jsonAt + 1` descartava o `argv[0]` sempre que `--json` estava ausente, porque `jsonAt` era `-1`, e o teste só passou porque o argumento do repositório caiu no padrão `.` enquanto o shell por acaso estava no lugar certo. Rodar de dentro do alvo esconde exatamente essa classe de defeito.
+Teste a CLI a partir de um diretório diferente do repositório sendo checado. Um erro de um-a-mais na leitura dos argumentos chegou a ser lançado e passou no primeiro teste por acidente. Filtrar os valores de flag com `i !== jsonAt + 1` descartava o `argv[0]` sempre que `--json` estava ausente, porque `jsonAt` era `-1`; o teste só passou porque o argumento do repositório caiu no padrão `.` enquanto o shell por acaso estava no lugar certo. Rodar de dentro do alvo esconde exatamente esse tipo de defeito.
 
 O card social é renderizado, não desenhado. O `assets/social.html` é fotografado em modo headless a 1280×640:
 

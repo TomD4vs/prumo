@@ -81,7 +81,7 @@ Todo achado traz arquivo, número da linha e a correção. Nada é adivinhado e 
 Três limites, escolhidos de propósito e explicados em [Design](docs/design.pt-BR.md):
 
 - Não julga afirmações. Saber se *"esta flag desliga o cache"* continua verdade exige um modelo, e isso é outra ferramenta.
-- Não edita além da capitalização. A sugestão de link é heurística, e um caminho ausente pode estar ausente de propósito.
+- Não edita além da capitalização. A sugestão de link é um palpite bem informado, e um caminho ausente pode estar ausente de propósito.
 - Não faz chamada de rede. Sem telemetria, sem conta, sem modelo.
 
 ---
@@ -103,7 +103,7 @@ Nos dois casos o comando é `prumo`. Node 18 ou mais novo, `git` no `PATH`, zero
 
 O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rodá-lo.
 
-**Peça ao agente para rodar.** `npx @tomd4vs/prumo` funciona em qualquer repositório git. A saída em texto traz arquivo, linha e correção, o que basta para um agente agir sem precisar interpretar nada. `--format json` devolve os mesmos achados como dados estruturados.
+**Peça ao agente para rodar.** `npx @tomd4vs/prumo` funciona em qualquer repositório git, e cobre sozinho as skills instaladas em `.claude/skills/`. Para um repositório que é ele mesmo uma skill, nomeie o arquivo: `npx @tomd4vs/prumo . SKILL.md`. A saída em texto traz arquivo, linha e correção, o que basta para um agente agir sem precisar interpretar nada. `--format json` devolve os mesmos achados como dados estruturados.
 
 **Rode automaticamente depois de cada edição.** No Claude Code, um hook `PostToolUse` em `.claude/settings.json` dispara depois que o agente grava um arquivo. Este só roda o prumo quando o arquivo era de contexto:
 
@@ -121,7 +121,7 @@ O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rod
 }
 ```
 
-O hook recebe a chamada da ferramenta como JSON na entrada padrão. O filtro em `node -e` lê `tool_input.file_path`, normaliza as barras do Windows e sai com código diferente de zero a menos que o caminho seja um que o prumo detectaria sozinho; o padrão espelha a lista em [src/check.mjs](src/check.mjs), então o prumo só roda quando um arquivo de contexto mudou. Usa node em vez de `jq` porque quem roda o prumo já tem node. A saída do prumo aparece na transcrição, então o agente vê os achados e pode corrigir na mesma rodada. O formato desses achados como dados está na [API](docs/api.pt-BR.md).
+O hook recebe a chamada da ferramenta como JSON na entrada padrão. O filtro em `node -e` lê `tool_input.file_path`, troca as barras invertidas do Windows por barras normais e sai com código diferente de zero a menos que o caminho seja um que o prumo detectaria sozinho. O padrão espelha a lista em [src/check.mjs](src/check.mjs), então o prumo só roda quando um arquivo de contexto mudou. Usa node em vez de `jq` porque quem roda o prumo já tem node. A saída do prumo aparece na transcrição, então o agente vê os achados e pode corrigir na mesma rodada. O formato desses achados como dados está na [API](docs/api.pt-BR.md).
 
 **Crie um comando de barra.** Um arquivo em `.claude/commands/prumo.md` transforma a checagem em `/prumo`:
 

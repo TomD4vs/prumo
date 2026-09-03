@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
@@ -310,4 +311,46 @@ test('finds an installed SKILL.md, ignores one at the root, and reports a rename
   assert.equal(r.brokenLinks.length, 1);
   assert.equal(r.brokenLinks[0].file, '.claude/skills/deploy/SKILL.md');
   assert.ok(r.brokenLinks[0].cited.endsWith('steps/rollout.md'));
+});
+
+test('a wikilink resolves against any markdown file git tracks, and suggests from it', () => {
+  const r = run({
+    'CLAUDE.md': 'See [[deploy_checklist]], [[deploy-checklist]] and [[old-architecture]].\n',
+    'deploy_checklist.md': 'body\n',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited).sort(), ['deploy-checklist', 'old-architecture']);
+  assert.equal(r.brokenLinks.find((l) => l.cited === 'deploy-checklist').suggestion, 'deploy_checklist');
+  assert.equal(r.brokenLinks.find((l) => l.cited === 'old-architecture').suggestion, null);
+});
+
+const BIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'prumo.mjs');
+
+test('--version reports the version in package.json', () => {
+  const expected = JSON.parse(readFileSync(join(dirname(BIN), '..', 'package.json'), 'utf8')).version;
+  const out = execSync('node ' + JSON.stringify(BIN) + ' --version').toString().trim();
+  assert.equal(out, expected);
+});
+
+test('outside a git repository the CLI says so and exits 2', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prumo-nogit-'));
+  made.push(dir);
+  let status = 0;
+  let stderr = '';
+  try {
+    execSync('node ' + JSON.stringify(BIN) + ' .', { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    status = e.status;
+    stderr = e.stderr.toString();
+  }
+  assert.equal(status, 2);
+  assert.match(stderr, /not a git repository/);
+});
+
+test('config: a folder named without wildcards covers everything under it', () => {
+  const r = run({
+    'CLAUDE.md': 'Build in `public/dist/app.js` and `coverage-html/index.html`, keep `public/index.php`.\n',
+    '.prumorc.json': JSON.stringify({ transient: ['public/dist'], ignore: ['coverage-html'] }),
+    'src/a.js': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['public/index.php']);
 });

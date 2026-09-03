@@ -7,8 +7,10 @@
 import { writeFileSync } from 'node:fs';
 import { analyze, resolveTargets, loadConfig } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
+import { createRequire } from 'node:module';
+import { execSync } from 'node:child_process';
 
-const VERSION = '0.2.0';
+const VERSION = createRequire(import.meta.url)('../package.json').version;
 
 const HELP = `
 prumo ${VERSION} — is your documentation still true?
@@ -91,6 +93,8 @@ let result, targets, config;
 try {
   config = argv.includes('--no-config') ? {} : loadConfig(repo);
   const explicit = positional.slice(1).length ? positional.slice(1) : (config.targets || []);
+  try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); }
+  catch { console.error(`prumo: not a git repository: ${repo}`); process.exit(2); }
   targets = resolveTargets(repo, explicit);
   if (!targets.length) {
     console.error('prumo: no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');

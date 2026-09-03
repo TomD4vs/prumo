@@ -76,7 +76,9 @@ function globToRegExp(glob) {
 
 function makeMatcher(patterns = []) {
   const res = patterns.map(globToRegExp);
-  return (value) => res.some((re) => re.test(value));
+  // A pattern with no wildcard that names a folder covers everything under it.
+  const folders = patterns.filter((p) => !/[*?]/.test(p)).map((p) => p.replace(/\/+$/, '').toLowerCase() + '/');
+  return (value) => res.some((re) => re.test(value)) || folders.some((f) => value.toLowerCase().startsWith(f));
 }
 
 /** Reads `.prumorc.json` from the repository root. Absent or invalid means no config. */
@@ -228,8 +230,16 @@ export function analyze({ repo, targets, config = null }) {
   const checked = targets.filter((t) => !excluded(t.label));
 
   const names = new Set(checked.map((t) => t.label.replace(/\.(md|mdc)$/i, '')));
+  // Wikilinks may point at any markdown file git tracks, not only at the notes being checked.
+  const linkable = new Set(names);
+  for (const p of index.tracked) {
+    if (!/.(md|mdc)$/i.test(p)) continue;
+    const bare = p.replace(/.(md|mdc)$/i, '');
+    linkable.add(bare);
+    linkable.add(bare.slice(bare.lastIndexOf('/') + 1));
+  }
   const loose = new Map();
-  for (const n of names) loose.set(n.toLowerCase().replace(/[_-]/g, ''), n);
+  for (const n of linkable) loose.set(n.toLowerCase().replace(/[_-]/g, ''), n);
 
   const caseMismatch = [], missingPaths = [], brokenLinks = [], orphans = [];
   let historical = 0, suppressed = 0;
@@ -267,7 +277,7 @@ export function analyze({ repo, targets, config = null }) {
 
       for (const m of prose.matchAll(/\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g)) {
         const to = m[1].trim();
-        if (names.has(to) || ignored(to)) continue;
+        if (linkable.has(to) || ignored(to)) continue;
         brokenLinks.push({
           file: target.label,
           line: i + 1,

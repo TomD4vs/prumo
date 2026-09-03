@@ -80,7 +80,7 @@ Only with `--fix`, and then only case mismatches. By default it reads and prints
 <details>
 <summary><b>Do I need Claude Code? Does it work with my agent?</b></summary>
 
-No agent is required. prumo reads files, not agents, and the [reference](reference.md#files-found-automatically) lists every file and folder it detects automatically. Engineering notes kept in `docs/` rot the same way, so point it there too.
+No agent is required. prumo reads files, not agents, and the [reference](reference.md#files-found-automatically) lists every file and folder it detects automatically. Engineering notes kept in `docs/` go stale the same way, so point it there too.
 </details>
 
 <details>
@@ -98,5 +98,5 @@ Those check a document against itself: syntax, style, links between pages. prumo
 <details>
 <summary><b>How often should I run it?</b></summary>
 
-Once per pull request in CI is the cheapest answer, since it takes seconds and needs no configuration. Otherwise run it after renames and large refactors, when documentation drifts fastest.
+Once per pull request in CI is the cheapest answer, since it takes seconds and needs no configuration. Otherwise run it after renames and large refactors, when documentation goes stale fastest.
 </details>

@@ -38,7 +38,7 @@ Each test builds a throwaway git repository, so the suite checks in no fixtures 
 
 `node --test test/` fails under Git Bash on Windows: the path argument is mangled and Node tries to load a module literally named `test`. Run `node --test` with no argument and let it discover `**/*.test.mjs`, which is what `npm test` does.
 
-Test the CLI from a directory other than the repository being checked. An argument off-by-one once shipped and passed its first test by accident: filtering flag values with `i !== jsonAt + 1` dropped `argv[0]` whenever `--json` was absent, because `jsonAt` was `-1`, and the test passed only because the repository argument fell back to `.` while the shell happened to be in the right place. Running from inside the target hides exactly that class of defect.
+Test the CLI from a directory other than the repository being checked. An off-by-one in the argument parsing once shipped and passed its first test by accident. Filtering flag values with `i !== jsonAt + 1` dropped `argv[0]` whenever `--json` was absent, because `jsonAt` was `-1`; the test passed only because the repository argument fell back to `.` while the shell happened to be in the right place. Running from inside the target hides exactly that kind of defect.
 
 The social card is rendered, not drawn. `assets/social.html` is screenshotted headless at 1280×640:
 

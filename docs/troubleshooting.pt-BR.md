@@ -80,7 +80,7 @@ Só com `--fix`, e mesmo assim apenas a capitalização. Por padrão ele lê e i
 <details>
 <summary><b>Preciso do Claude Code? Funciona com o meu agente?</b></summary>
 
-Nenhum agente é necessário. O prumo lê arquivos, não agentes, e a [referência](reference.pt-BR.md#arquivos-encontrados-automaticamente) lista todos os arquivos e pastas que ele detecta sozinho. Notas de engenharia guardadas em `docs/` apodrecem igual, então aponte para lá também.
+Nenhum agente é necessário. O prumo lê arquivos, não agentes, e a [referência](reference.pt-BR.md#arquivos-encontrados-automaticamente) lista todos os arquivos e pastas que ele detecta sozinho. Notas de engenharia guardadas em `docs/` ficam desatualizadas do mesmo jeito, então aponte para lá também.
 </details>
 
 <details>
@@ -98,5 +98,5 @@ Esses conferem um documento contra ele mesmo: sintaxe, estilo, links entre pági
 <details>
 <summary><b>Com que frequência devo rodar?</b></summary>
 
-Uma vez por pull request no CI é a resposta mais barata, já que leva segundos e não pede configuração. Fora isso, rode depois de renomeações e refatorações grandes, quando a documentação se afasta mais rápido.
+Uma vez por pull request no CI é a resposta mais barata, já que leva segundos e não pede configuração. Fora isso, rode depois de renomeações e refatorações grandes, quando a documentação fica desatualizada mais rápido.
 </details>

@@ -56,6 +56,7 @@ prumo . docs/notes                     # also sweep a folder of markdown
 prumo ~/work/api                       # a repository somewhere else
 prumo . --all                          # do not truncate the list
 prumo . --json findings.json           # save the findings as JSON
+prumo . SKILL.md                       # a repository that is itself a skill
 
 # Windows: quote any path containing spaces
 prumo "C:/Users/me/My Project"
@@ -81,7 +82,7 @@ The result is the classic "works on my machine": fine locally, dead on Linux, in
 
 ### `BROKEN LINK`
 
-A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so.
+A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at a file that isn't there. An agent following it finds nothing and carries on without saying so. Wikilinks are matched by name against the notes being checked and against every markdown file git tracks; markdown links are resolved relative to the file that contains them.
 
 Where prumo prints a `-> suggestion`, that is almost certainly the intended file; the two usually differ only in `-` versus `_`. With no suggestion, the target was renamed or deleted, so update the link or drop it.
 
@@ -123,7 +124,7 @@ Another about `config/older.php`.
 }
 ```
 
-`ignore`, `exclude` and `transient` accept globs (`*`, `**`, `?`). `--no-config` bypasses the file for one run. Suppressions are counted in the header, so a silenced repository never reads as a clean one.
+`ignore`, `exclude` and `transient` accept globs (`*`, `**`, `?`); a pattern with no wildcard that names a folder covers everything under it. `--no-config` bypasses the file for one run. Suppressions are counted in the header, so a silenced repository never reads as a clean one.
 
 ---
 
@@ -138,6 +139,6 @@ FIXED  1 path in 1 file
   CLAUDE.md:18   layouts/AppLayout.vue  ->  resources/js/Layouts/AppLayout.vue
 ```
 
-Only case mismatches are rewritten, because only they have a correct value that can be read from the git index rather than inferred. Broken links and missing paths are left alone: a link suggestion is a heuristic, and a missing path may be missing deliberately.
+Only case mismatches are rewritten, because only they have a correct value that can be read from the git index rather than guessed. Broken links and missing paths are left alone: a link suggestion is an educated guess, and a missing path may be missing on purpose.
 
 Lines that changed since the scan are reported and skipped rather than rewritten.

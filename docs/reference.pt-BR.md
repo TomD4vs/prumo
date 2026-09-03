@@ -56,6 +56,7 @@ prumo . docs/notas                     # varre também uma pasta de markdown
 prumo ~/trabalho/api                   # um repositório em outro lugar
 prumo . --all                          # não truncar a lista
 prumo . --json findings.json           # salvar os achados como JSON
+prumo . SKILL.md                       # um repositório que é ele mesmo uma skill
 
 # Windows: use aspas em caminhos com espaço
 prumo "C:/Users/eu/Meu Projeto"
@@ -81,7 +82,7 @@ O resultado é o clássico "na minha máquina funciona": passa localmente e morr
 
 ### `BROKEN LINK`
 
-Um `[[wikilink]]`, ou um link markdown como `[Setup](docs/setup.md)`, aponta para um arquivo que não está lá. O agente que segue esse link não encontra nada e segue adiante sem avisar.
+Um `[[wikilink]]`, ou um link markdown como `[Setup](docs/setup.md)`, aponta para um arquivo que não está lá. O agente que segue esse link não encontra nada e segue adiante sem avisar. Wikilinks são casados pelo nome contra as notas sendo checadas e contra todo arquivo markdown rastreado pelo git; links markdown são resolvidos relativos ao arquivo que os contém.
 
 Quando o prumo imprime `-> sugestão`, aquele é quase certamente o arquivo pretendido; os dois costumam divergir só em `-` contra `_`. Sem sugestão, o destino foi renomeado ou apagado, então atualize ou remova o link.
 
@@ -123,7 +124,7 @@ Outra sobre `config/older.php`.
 }
 ```
 
-`ignore`, `exclude` e `transient` aceitam globs (`*`, `**`, `?`). O `--no-config` ignora o arquivo por uma execução. As supressões são contadas no cabeçalho, então um repositório silenciado nunca se parece com um limpo.
+`ignore`, `exclude` e `transient` aceitam globs (`*`, `**`, `?`); um padrão sem curinga que nomeia uma pasta cobre tudo o que está dentro dela. O `--no-config` ignora o arquivo por uma execução. As supressões são contadas no cabeçalho, então um repositório silenciado nunca se parece com um limpo.
 
 ---
 
@@ -138,6 +139,6 @@ FIXED  1 path in 1 file
   CLAUDE.md:18   layouts/AppLayout.vue  ->  resources/js/Layouts/AppLayout.vue
 ```
 
-Só a capitalização é reescrita, porque só nela o valor correto pode ser lido do índice do git em vez de deduzido. Links quebrados e caminhos ausentes ficam intocados: a sugestão de link é heurística, e um caminho ausente pode estar ausente de propósito.
+Só a capitalização é reescrita, porque só nela o valor correto pode ser lido do índice do git em vez de adivinhado. Links quebrados e caminhos ausentes ficam intocados: a sugestão de link é um palpite bem informado, e um caminho ausente pode estar ausente de propósito.
 
 Linhas que mudaram desde a varredura são reportadas e puladas, não reescritas.

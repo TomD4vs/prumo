@@ -81,7 +81,7 @@ Every finding carries a file, a line number and the correction. Nothing is guess
 Three limits, chosen on purpose and explained in [Design](docs/design.md):
 
 - It does not judge claims. Whether *"this flag disables caching"* is still true needs a model, and that is a different tool.
-- It does not edit beyond letter case. A link suggestion is a heuristic, and a missing path may be missing deliberately.
+- It does not edit beyond letter case. A link suggestion is an educated guess, and a missing path may be missing on purpose.
 - It makes no network calls. No telemetry, no account, no model.
 
 ---
@@ -103,7 +103,7 @@ Either way the command is `prumo`. Node 18 or newer, `git` on the `PATH`, zero d
 
 prumo is a plain CLI, so any agent with shell access can run it.
 
-**Ask the agent to run it.** `npx @tomd4vs/prumo` works in any git repository. The text output names the file, the line and the correction, which is enough for an agent to act on without parsing. `--format json` returns the same findings as structured data.
+**Ask the agent to run it.** `npx @tomd4vs/prumo` works in any git repository, and covers skills installed under `.claude/skills/` on its own. For a repository that is itself a skill, name the file: `npx @tomd4vs/prumo . SKILL.md`. The text output names the file, the line and the correction, which is enough for an agent to act on without parsing. `--format json` returns the same findings as structured data.
 
 **Run it automatically after edits.** In Claude Code, a `PostToolUse` hook in `.claude/settings.json` fires after the agent writes a file. This one runs prumo only when the file was a context file:
 
@@ -121,7 +121,7 @@ prumo is a plain CLI, so any agent with shell access can run it.
 }
 ```
 
-The hook receives the tool call as JSON on stdin. The `node -e` filter reads `tool_input.file_path`, normalises Windows separators, and exits non-zero unless the path is one prumo would detect on its own; the pattern mirrors the list in [src/check.mjs](src/check.mjs), so prumo only runs when a context file changed. It uses node rather than `jq` because anyone running prumo already has node. prumo's output lands in the transcript, so the agent sees the findings and can fix them in the same turn. The shape of those findings as data is in the [API](docs/api.md).
+The hook receives the tool call as JSON on stdin. The `node -e` filter reads `tool_input.file_path`, turns Windows backslashes into slashes, and exits non-zero unless the path is one prumo would detect on its own. The pattern mirrors the list in [src/check.mjs](src/check.mjs), so prumo runs only when a context file changed. It uses node rather than `jq` because anyone running prumo already has node. prumo's output lands in the transcript, so the agent sees the findings and can fix them in the same turn. The shape of those findings as data is in the [API](docs/api.md).
 
 **Add a slash command.** A file at `.claude/commands/prumo.md` turns the check into `/prumo`:
 
