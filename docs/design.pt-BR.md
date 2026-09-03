@@ -17,8 +17,10 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. |
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
-| Alias e caminho curto resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. |
+| Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. |
 | Marcador de posição e identificador | `path/to/test.js` num exemplo de comando, `chapters/ch01-<slug>.md` num template e `server/discover` ao lado de `tools/list` não são arquivos. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
+| Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
+| Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
 | Algo que só o autor sabe estar certo | `.prumorc.json` e os marcadores `prumo-ignore`. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
 
 Mesma ferramenta, mesmos arquivos, com e sem os filtros:

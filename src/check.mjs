@@ -34,6 +34,8 @@ const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:)/;
 const WILDCARD = /[<>{}*]|\.\.\.|…/;
 /** `path/to/thing.js` is how a command example spells its argument, not a file in this repository. */
 const PLACEHOLDER_PATH = /(^|[/])path[/]to[/]/i;
+/** `@scope/package/file.css` is an npm import specifier. An `@/` alias keeps its slash right after the `@`, so it is not one. */
+const SCOPED_PACKAGE = /^@[^/]+\//;
 
 const NEGATION = new RegExp(
   [
@@ -61,6 +63,8 @@ const IGNORE_FILE = /<!--\s*prumo-ignore-file\s*-->/;
 
 const TRY_EXT = ['.php', '.vue', '.js', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.rb', '.blade.php'];
 const ALIAS_ROOTS = ['resources/js', 'src', 'app', 'lib'];
+/** A TypeScript project imports `./x.js` and tracks `x.ts`; the text carries the extension the bundler emits. */
+const TS_FOR = { js: ['.ts', '.tsx'], jsx: ['.tsx'], mjs: ['.mts'], cjs: ['.cts'] };
 
 /** Turns a glob (`*`, `**`, `?`) into an anchored regular expression. */
 function globToRegExp(glob) {
@@ -233,7 +237,7 @@ function extractPaths(line) {
       tokens = t.split(/\s+/).map((tok) => tok.replace(/^--?[\w-]+=/, '').replace(/^["']|["'.,;]+$/g, ''));
     }
     for (const tok of tokens) {
-      if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || PLACEHOLDER_PATH.test(tok)) continue;
+      if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || PLACEHOLDER_PATH.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
       if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
       found.push(tok.replace(/^\.\//, '').replace(/[:#]\d+$/, '').replace(/\/$/, ''));
     }
@@ -264,10 +268,23 @@ function decodeLink(to) {
   try { return decodeURIComponent(to); } catch { return to; }
 }
 
-/** Tries the literal path, then `@/` aliases, then omitted extensions. */
+/**
+ * Tries the literal path, then `@/` aliases, then the path without a first segment that names
+ * no folder here, which is how a note spells the project name in front of a real path, then the
+ * TypeScript source behind an emitted `.js`, then omitted extensions. The prefix step demands an
+ * exact nested match, so a wrongly cased first segment stays a case mismatch.
+ */
 function resolvePath(index, p) {
   const tries = [p];
-  if (p.startsWith('@/')) for (const r of ALIAS_ROOTS) tries.push(r + '/' + p.slice(2));
+  if (p.startsWith('@/')) {
+    tries.push(p.slice(2));
+    for (const r of ALIAS_ROOTS) tries.push(r + '/' + p.slice(2));
+  }
+  const head = p.includes('/') ? p.slice(0, p.indexOf('/')) : '';
+  const rest = head ? p.slice(head.length + 1) : '';
+  if (head && rest.includes('/') && !index.known.has(head) && index.known.has(rest)) tries.push(rest);
+  const js = p.match(/\.(js|jsx|mjs|cjs)$/i);
+  if (js) for (const base of [...tries]) for (const e of TS_FOR[js[1].toLowerCase()]) tries.push(base.slice(0, -js[0].length) + e);
   if (!/\.[a-z0-9]{2,5}$/i.test(p)) {
     for (const base of [...tries]) for (const e of TRY_EXT) tries.push(base + e);
   }

@@ -619,3 +619,56 @@ test('the hook in docs/agents.md fires for every file prumo auto-detects', () =>
     assert.ok(!re.test('SKILL.md'), 'the hook fires on a root SKILL.md, which prumo does not auto-detect');
   }
 });
+
+test('an @/ alias resolves against the repository root, not only against src and app', () => {
+  const r = run({
+    'CLAUDE.md': 'The toast types live in `@/app/types/toast.ts`.\n',
+    'app/types/toast.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a scoped package specifier is an import, not a path in this repository', () => {
+  const r = run({
+    'CLAUDE.md': 'It exports its CSS separately (`@acme/viewer/style.css`).\n',
+    'src/index.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a TypeScript project cites the .js the bundler emits, and git holds the .ts', () => {
+  const r = run({
+    'AGENTS.md': 'Use the logger from `./logger.js`, and the model from `src/model/style.js`.\n',
+    'logger.ts': '',
+    'src/model/style.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a .js that no .ts stands behind is still reported', () => {
+  const r = run({
+    'AGENTS.md': 'Use the helper in `src/gone.js`.\n',
+    'src/index.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'src/gone.js');
+});
+
+test('a note that spells the project name in front of a real path still resolves', () => {
+  const r = run({
+    'AGENTS.md': 'The proxy lives in `myapp/app/api/proxy/route.ts`.\n',
+    'app/api/proxy/route.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.caseMismatch.length, 0);
+});
+
+test('a prefix that would leave a bare root filename is still reported', () => {
+  const r = run({
+    'AGENTS.md': 'See `evals/README.md` for the evaluation framework.\n',
+    'README.md': '',
+    'src/index.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'evals/README.md');
+});

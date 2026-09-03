@@ -17,8 +17,10 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | Negation, read across a paragraph | *"the project does not publish `config/x.php`"* names a file that must **not** exist. A grep sees a dead path; a reader sees a correct sentence. |
 | Historical notes exempt | An entry titled *phase 3 complete* cites what was later removed. That is its subject, not a defect. |
 | Transient artifacts ignored | `public/build`, `.vite`, `node_modules`, `dist` are born and die outside git. |
-| Aliases and short paths resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. |
+| Aliases, short paths and the emitted extension resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. `@/` is tried against the repository root as well as `src`, `app` and the others, and a TypeScript project that writes `./logger.js` for the `logger.ts` git holds is matched to its source. |
 | Placeholders and identifiers | `path/to/test.js` in a command example, `chapters/ch01-<slug>.md` in a template, and `server/discover` beside `tools/list` are not files. A name with no extension is a path only when the folder it starts with exists here. |
+| A project-name prefix resolved | `myapp/app/api/route.ts` when the repository holds `app/api/route.ts` and has no `myapp/` folder. Only an exact nested match counts, so a wrongly cased first segment is still a case mismatch. |
+| A package import is not a path | `@scope/package/style.css` is something npm resolves, not a file here. An `@/` alias keeps its slash right after the `@`, so it is still checked. |
 | Anything only the author knows is fine | `.prumorc.json` and the `prumo-ignore` markers. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
 
 Same tool, same files, with and without the filters:
