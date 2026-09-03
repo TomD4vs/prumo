@@ -124,8 +124,8 @@ $PR --quiet; chk "$?" "1" "the CI step would fail on this state"
 $PR --format github 2>/dev/null | head -1 | grep -q "^::error file=CLAUDE.md,line=3::Case mismatch" && ok "annotation on the exact line" || bad "annotation"
 
 echo; echo "########## E. Silencing: three markers, four config keys, --no-config"
-sed -i 's#^The list view is.*$#& <!-- prumo-ignore -->#' CLAUDE.md
-sed -i 's#^Seed the database#<!-- prumo-ignore-next-line -->\nSeed the database#' CLAUDE.md
+sed 's#^The list view is.*$#& <!-- prumo-ignore -->#' CLAUDE.md > C.tmp && mv C.tmp CLAUDE.md
+awk '/^Seed the database/{print "<!-- prumo-ignore-next-line -->"}1' CLAUDE.md > C.tmp && mv C.tmp CLAUDE.md
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "2 lines or files suppressed by a prumo-ignore marker" && ok "header counts two suppressions" || bad "suppressions"
 echo "$OUT" | grep -q "^2 to review" && ok "2 to review: the case and the link" || bad "what remains: $(echo "$OUT" | tail -1)"
 printf '<!-- prumo-ignore-file -->\n' | cat - AGENTS.md > A.tmp && mv A.tmp AGENTS.md
@@ -146,7 +146,7 @@ echo; echo "########## F. --fix: prose paths and markdown links, nothing else"
 OUT=$($PR --fix 2>&1); echo "$OUT" | grep -q "^FIXED  1 path in 1 file" && ok "FIXED 1 path in 1 file" || bad "FIXED"
 chk "$(git diff --numstat | tr '\t' ' ')" "1 1 CLAUDE.md" "one line changed in one file"
 git checkout -q -- CLAUDE.md
-sed -i 's#(checklist.md)#(Checklist.md)#' .claude/skills/release/SKILL.md; ci
+sed 's#(checklist.md)#(Checklist.md)#' .claude/skills/release/SKILL.md > S.tmp && mv S.tmp .claude/skills/release/SKILL.md; ci
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "^CASE MISMATCH  (2)" && echo "$OUT" | grep -q "Checklist.md" && ok "a markdown link with the wrong case is a case mismatch" || bad "link case: $(echo "$OUT" | grep -A3 CASE | tr '\n' '|')"
 $PR --fix >/dev/null 2>&1; grep -q "(checklist.md)" .claude/skills/release/SKILL.md && ok "--fix rewrote the link" || bad "link not rewritten"
 git reset -q --hard HEAD~1

@@ -21,3 +21,19 @@ jobs:
       - run: node --test
       - name: prumo checks its own context files
         run: node bin/prumo.mjs .
+
+  simulate:
+    name: new-user simulation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: pack the tarball and follow the docs through the CLI
+        run: bash test/simulate-new-user.sh
+        shell: bash
