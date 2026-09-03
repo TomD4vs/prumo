@@ -182,6 +182,18 @@ echo "$OUT" | grep -q "^prumo: not a git repository" && chk "$RC" "2" "outside g
 mk empty; echo x > a.txt; ci; OUT=$($PR 2>&1); RC=$?
 echo "$OUT" | grep -q "^prumo: no context files found" && chk "$RC" "2" "no context files: message and exit 2" || bad "no context files"
 
+mk typo; printf 'See `src/a.py`.
+' > AGENTS.md; mkdir src; echo x > src/a.py; ci
+OUT=$($PR . no-such-file.md 2>&1); RC=$?
+echo "$OUT" | grep -q "^prumo: target not found: no-such-file.md" && chk "$RC" "2" "a target that does not exist: message and exit 2" || bad "missing target: $OUT"
+OUT=$($PR . AGENTS.md no-such-file.md 2>&1); RC=$?
+echo "$OUT" | grep -q "^prumo: target not found: no-such-file.md" && chk "$RC" "2" "a typo among valid targets is not dropped in silence" || bad "typo among targets: $OUT"
+printf '{"targets":["docs/no-such-file.md"]}
+' > .prumorc.json
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^prumo: target not found: docs/no-such-file.md" && chk "$RC" "2" "a targets typo in .prumorc.json: message and exit 2" || bad "config target: $OUT"
+rm .prumorc.json
+
 echo; echo "########## K. The API from docs/api.md, imported from the installed package"
 cd "$U/consumer"
 node --input-type=module -e "import { analyze, resolveTargets } from '@tomd4vs/prumo'; const repo=process.argv[1]; const r=analyze({ repo, targets: resolveTargets(repo, []) }); process.exit(r.caseMismatch.length===1 && r.brokenLinks.length===1 && r.missingPaths.length===2 && r.stats.targets===6 ? 0 : 1)" -- "$U/tickets" && ok "ESM: analyze + resolveTargets" || bad "ESM"
@@ -193,6 +205,9 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 grep -q '"serverInfo":{"name":"prumo"' mcp.out && ok "initialize answered" || bad "initialize"
 grep -q '"name":"prumo_check"' mcp.out && grep -q '"name":"prumo_fix"' mcp.out && ok "tools/list: prumo_check and prumo_fix" || bad "tools/list"
 grep -q '"total":4' mcp.out && grep -q '4 to review' mcp.out && ok "tools/call prumo_check: text report and structured findings" || bad "tools/call"
+printf '%s
+' "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"prumo_check\",\"arguments\":{\"repo\":\"$U/tickets\",\"targets\":[\"no-such-file.md\"]}}}"   | node "$U/consumer/node_modules/@tomd4vs/prumo/bin/prumo-mcp.mjs" > mcp-target.out 2>/dev/null
+grep -q '"isError":true' mcp-target.out && grep -q 'prumo: target not found: no-such-file.md' mcp-target.out && ok "tools/call with a target that does not exist: isError, not a report about another file" || bad "mcp missing target: $(cat mcp-target.out)"
 rm -f mcp.out
 
 if [ "$GLOBAL" = 1 ]; then

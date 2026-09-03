@@ -464,3 +464,30 @@ test('a context file vendored with a dependency is not a target', () => {
   });
   assert.deepEqual(resolveTargets(repo, []).map((t) => t.label).sort(), ['AGENTS.md', 'packages/api/AGENTS.md']);
 });
+
+test('a target that does not exist is an error, never a silent fall back to auto-detection', () => {
+  const repo = repoWith({
+    'AGENTS.md': 'See `src/gone.py`.\n',
+    'src/a.py': '',
+  });
+  assert.throws(() => resolveTargets(repo, ['no-such-file.md']), /target not found: no-such-file\.md/);
+  assert.throws(() => resolveTargets(repo, ['AGENTS.md', 'no-such-file.md']), /target not found: no-such-file\.md/);
+  assert.deepEqual(resolveTargets(repo, []).map((t) => t.label), ['AGENTS.md']);
+});
+
+test('a target named in .prumorc.json that does not exist stops the CLI with exit 2', () => {
+  const repo = repoWith({
+    'AGENTS.md': '# root\n',
+    '.prumorc.json': JSON.stringify({ targets: ['docs/no-such-file.md'] }),
+  });
+  let status = 0;
+  let stderr = '';
+  try {
+    execSync('node ' + JSON.stringify(BIN) + ' ' + JSON.stringify(repo), { stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    status = e.status;
+    stderr = e.stderr.toString();
+  }
+  assert.equal(status, 2);
+  assert.match(stderr, /^prumo: target not found: docs\/no-such-file\.md/m);
+});

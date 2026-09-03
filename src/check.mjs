@@ -152,10 +152,17 @@ function expandTarget(repo, target) {
   return [{ label: relative(repo, abs).split(sep).join('/') || target, path: abs, fromDir: false }];
 }
 
-/** Auto-detects the context files of every agent we know, including nested ones. */
+/**
+ * Auto-detects the context files of every agent we know, including nested ones.
+ * A target that was asked for explicitly must exist: falling back to auto-detection
+ * would answer about a different file than the one named.
+ */
 export function resolveTargets(repo, explicit = []) {
-  const explicitTargets = explicit.flatMap((t) => expandTarget(repo, t));
-  if (explicitTargets.length) return explicitTargets;
+  if (explicit.length) {
+    const missing = explicit.filter((t) => !existsSync(isAbsolute(t) ? t : join(repo, t)));
+    if (missing.length) throw new Error(`target not found: ${missing.join(', ')}`);
+    return explicit.flatMap((t) => expandTarget(repo, t));
+  }
 
   const targets = [];
   const seen = new Set();

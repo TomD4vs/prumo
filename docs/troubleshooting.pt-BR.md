@@ -29,6 +29,18 @@ O repositório não tem nada commitado nem preparado, então não há com o que 
 </details>
 
 <details>
+<summary><code>prumo: target not found</code></summary>
+
+Um arquivo ou pasta que você nomeou na linha de comando, ou colocou em `targets` no `.prumorc.json`, não está lá. O prumo para em vez de checar outra coisa, para que um erro de digitação nunca volte como um relatório limpo sobre outro arquivo:
+
+```bash
+prumo . docs/arquitetura.md    # o nome precisa existir
+```
+
+O caminho é lido a partir da pasta do repositório, não de onde você está, a menos que você escreva o caminho absoluto.
+</details>
+
+<details>
 <summary><code>prumo: no context files found</code></summary>
 
 Não existe `CLAUDE.md`, `AGENTS.md` ou equivalente naquele repositório. Crie um, ou diga o que ler:

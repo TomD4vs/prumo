@@ -29,6 +29,18 @@ The repository has nothing committed or staged, so there is nothing to compare t
 </details>
 
 <details>
+<summary><code>prumo: target not found</code></summary>
+
+A file or folder named on the command line, or under `targets` in `.prumorc.json`, is not there. prumo stops instead of checking something else, so a typo never comes back as a clean report about a different file:
+
+```bash
+prumo . docs/architecture.md    # the name has to exist
+```
+
+The path is read from the repository folder, not from where you are standing, unless you write it absolute.
+</details>
+
+<details>
 <summary><code>prumo: no context files found</code></summary>
 
 There is no `CLAUDE.md`, `AGENTS.md` or equivalent in that repository. Create one, or name what to read:
