@@ -88,7 +88,9 @@ Até ele saber distinguir, nomeie as pastas em que a skill escreve:
 { "ignore": ["docs/gtm/**", "planning/**"] }
 ```
 
-O cabeçalho continua contando o que foi silenciado, então uma rodada montada assim nunca parece limpa por acidente.
+Um gerador é o mesmo problema numa segunda forma. As notas dele descrevem a skill que ele produz, não uma pasta em que ele escreve: uma lista de **arquivos de apoio** citando `glossary.md` e `cheatsheet.md`, ou uma lista numerada de todo lugar em que uma skill pode ser instalada. Nenhum deles existe ali, e todos estão certos. Vale saber porque a mensagem que aparece dentro de uma skill publicada entrega o `prumo . SKILL.md`, e num gerador esse é justamente o comando que traz esses achados à tona.
+
+O cabeçalho continua contando o que foi silenciado, então uma rodada montada assim nunca parece limpa por acidente. E uma skill já gerada é outra história: rode o prumo na saída, onde um capítulo renomeado aparece sim como link quebrado.
 </details>
 
 <details>

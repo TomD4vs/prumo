@@ -88,7 +88,9 @@ Until it can tell them apart, name the folders the skill writes into:
 { "ignore": ["docs/gtm/**", "planning/**"] }
 ```
 
-The header still counts what was silenced, so a run set up this way never reads as clean by accident.
+A generator is the same problem in a second shape. Its notes describe the skill it produces rather than a folder it writes: a **Supporting Files** list naming `glossary.md` and `cheatsheet.md`, or a numbered list of every place a skill can be installed. None of those exist here, and all of them are correct. Worth knowing because the message you get inside a published skill hands you `prumo . SKILL.md`, and on a generator that is the command that surfaces them.
+
+The header still counts what was silenced, so a run set up this way never reads as clean by accident. And a generated skill is a different matter: run prumo on the output, where a renamed chapter does show up as a broken link.
 </details>
 
 <details>
