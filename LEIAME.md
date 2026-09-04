@@ -28,7 +28,7 @@ Essa linha sobreviveu a seis auditorias feitas à mão nos mesmos arquivos. O pr
 
 ## Começando
 
-Você precisa de [Node.js 18+](https://nodejs.org) e `git`. Não há nada para instalar, configurar ou cadastrar.
+Se você já tem [Node.js 18+](https://nodejs.org) e `git`, está pronto. Nada para instalar, nada para configurar, nenhuma conta para criar.
 
 Num terminal, dentro de qualquer repositório git:
 
@@ -41,6 +41,10 @@ O prumo localiza seus arquivos de contexto sozinho: `CLAUDE.md`, `AGENTS.md`, `.
 ---
 
 ## Lendo o resultado
+
+<p align="center">
+  <img src="assets/report.png" alt="prumo no terminal, apontando uma capitalização errada, dois links quebrados e um caminho ausente" width="820">
+</p>
 
 Execução limpa:
 

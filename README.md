@@ -28,7 +28,7 @@ That line survived six hand-run audits of the same files. prumo found it in four
 
 ## Quick start
 
-You need [Node.js 18+](https://nodejs.org) and `git`. There is nothing to install, configure or sign up for.
+If you already have [Node.js 18+](https://nodejs.org) and `git`, you are ready. Nothing to install, nothing to configure, no account to create.
 
 From a terminal inside any git repository:
 
@@ -41,6 +41,10 @@ prumo locates your context files on its own: `CLAUDE.md`, `AGENTS.md`, `.cursor/
 ---
 
 ## Reading the result
+
+<p align="center">
+  <img src="assets/report.png" alt="prumo in a terminal, reporting a case mismatch, two broken links and a missing path" width="820">
+</p>
 
 A clean run:
 
