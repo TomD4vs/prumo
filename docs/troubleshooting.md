@@ -78,6 +78,20 @@ If yours slipped through, a clearer sentence is usually the fix. The filter read
 </details>
 
 <details>
+<summary>I ran it inside a skill and nearly everything it found is wrong</summary>
+
+A skill whose job is to write files describes its own output: *"Output: `docs/gtm/strategy.md`"*, *"Save to `planning/milestone-notes.md`"*, a table mapping each mode to the file it produces. Those paths are correct, and the files do not exist because nothing has run yet. prumo does not yet tell an output apart from a path that went stale, so on this kind of repository most of what it reports is wrong. That is measured rather than guessed, and the figure is in [Design](design.md).
+
+Until it can tell them apart, name the folders the skill writes into:
+
+```json
+{ "ignore": ["docs/gtm/**", "planning/**"] }
+```
+
+The header still counts what was silenced, so a run set up this way never reads as clean by accident.
+</details>
+
+<details>
 <summary>Node version errors, or <code>Unexpected token</code></summary>
 
 You are on a Node older than 18. Check with `node --version` and upgrade at [nodejs.org](https://nodejs.org).

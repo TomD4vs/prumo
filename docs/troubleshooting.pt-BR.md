@@ -78,6 +78,20 @@ Se o seu escapou, uma frase mais clara costuma resolver. O filtro lê um parágr
 </details>
 
 <details>
+<summary>Rodei dentro de uma skill e quase tudo que ele achou está errado</summary>
+
+Uma skill cujo trabalho é escrever arquivos descreve a própria saída: *"Output: `docs/gtm/strategy.md`"*, *"Save to `planning/milestone-notes.md`"*, uma tabela ligando cada modo ao arquivo que ele produz. Esses caminhos estão certos, e os arquivos não existem porque nada rodou ainda. O prumo ainda não distingue uma saída de um caminho que ficou desatualizado, então nesse tipo de repositório a maior parte do que ele reporta está errada. Isso foi medido, não estimado, e o número está no [Design](design.pt-BR.md).
+
+Até ele saber distinguir, nomeie as pastas em que a skill escreve:
+
+```json
+{ "ignore": ["docs/gtm/**", "planning/**"] }
+```
+
+O cabeçalho continua contando o que foi silenciado, então uma rodada montada assim nunca parece limpa por acidente.
+</details>
+
+<details>
 <summary>Erro de versão do Node, ou <code>Unexpected token</code></summary>
 
 Você está num Node anterior ao 18. Confira com `node --version` e atualize em [nodejs.org](https://nodejs.org).

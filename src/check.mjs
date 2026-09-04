@@ -169,7 +169,7 @@ function buildIndex(repo) {
   const lower = new Map();
   for (const p of known) lower.set(p.toLowerCase(), p);
 
-  return { tracked, known, suffix, suffixLower, lower };
+  return { tracked, known, suffix, suffixLower, lower, aliasRoot: ALIAS_ROOTS.some((r) => known.has(r)) };
 }
 
 function expandTarget(repo, target) {
@@ -276,6 +276,24 @@ function decodeLink(to) {
   try { return decodeURIComponent(to); } catch { return to; }
 }
 
+/** The `owner/name` this repository pushes to, so a link naming a different one can be told apart. */
+function originRepo(repo) {
+  try {
+    const url = execSync('git remote get-url origin', { cwd: repo, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    const m = url.match(/(?:github|gitlab)\.com[:/]([\w.-]+\/[\w.-]+)/i);
+    return m ? m[1].replace(/\.git$/, '').toLowerCase() : '';
+  } catch { return ''; }
+}
+
+/** True when the lines around a citation name another repository, which is whose path it is. */
+function namesAnotherRepo(window, own) {
+  if (!own) return false;
+  for (const m of window.matchAll(/(?:github|gitlab)\.com[:/]([\w.-]+\/[\w.-]+)/gi)) {
+    if (m[1].replace(/\.git$/, '').toLowerCase() !== own) return true;
+  }
+  return false;
+}
+
 /**
  * Tries the literal path, then `@/` aliases, then the path without a first segment that names
  * no folder here, which is how a note spells the project name in front of a real path, then the
@@ -317,6 +335,7 @@ export function analyze({ repo, targets, config = null }) {
   if (!index) throw new Error(`not a git repository: ${repo}`);
   if (!index.tracked.length) throw new Error('the git index is empty, so nothing can be checked against it. Commit or "git add" the files first.');
 
+  const own = originRepo(repo);
   const settings = config ?? loadConfig(repo);
   const ignored = makeMatcher(settings.ignore);
   const excluded = makeMatcher(settings.exclude);
@@ -354,11 +373,13 @@ export function analyze({ repo, targets, config = null }) {
           if (seen.has(p) || TRANSIENT.test(p) || extraTransient(p) || ignored(p)) continue;
           seen.add(p);
           if (!CODE_EXT.test(p) && !index.known.has(p.split('/')[0])) continue;
+          if (p.startsWith('@/') && !index.aliasRoot) continue;
 
           const r = resolvePath(index, p);
           if (r.state === 'ok') continue;
           const paragraph = lines.slice(Math.max(0, i - 2), i + 3).join(' ');
           if (NEGATION.test(paragraph)) continue;
+          if (namesAnotherRepo(lines.slice(Math.max(0, i - 6), i + 2).join(' '), own)) continue;
 
           if (r.state === 'case') {
             caseMismatch.push({ file: target.label, line: i + 1, cited: p, actual: r.real });
@@ -373,6 +394,7 @@ export function analyze({ repo, targets, config = null }) {
       for (const m of prose.matchAll(/\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g)) {
         const to = m[1].trim();
         if (linkable.has(to) || ignored(to)) continue;
+        if (to.startsWith('@/') && !index.aliasRoot) continue;
         brokenLinks.push({
           file: target.label,
           line: i + 1,

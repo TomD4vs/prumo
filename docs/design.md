@@ -20,6 +20,7 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | Aliases, short paths and the emitted extension resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. `@/` is tried against the repository root as well as `src`, `app` and the others, and a TypeScript project that writes `./logger.js` for the `logger.ts` git holds is matched to its source. |
 | Placeholders and identifiers | `path/to/test.js` in a command example, `chapters/ch01-<slug>.md` and `.agents/commands/[name].md` in a template, `reports/review-YYYY-MM-DD.md` for a file yet to be written, and `server/discover` beside `tools/list` are not files. Neither is `constants.hpp/.cpp`, which is two files in one token. A name with no extension is a path only when the folder it starts with exists here. |
 | A project-name prefix resolved | `myapp/app/api/route.ts` when the repository holds `app/api/route.ts` and has no `myapp/` folder. Only an exact nested match counts, so a wrongly cased first segment is still a case mismatch. |
+| A path that belongs to another repository | A note that names `github.com/other/project` a few lines above the path, and an `@/` alias in a repository holding none of the folders an alias resolves against. Both describe code that lives somewhere else. |
 | A package import is not a path | `@scope/package/style.css` is something npm resolves, not a file here. An `@/` alias keeps its slash right after the `@`, so it is still checked. |
 | Anything only the author knows is fine | `.prumorc.json` and the `prumo-ignore` markers. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
 
@@ -104,12 +105,37 @@ repositories where nothing at all was real, and most of those six document a cod
 else. One is a skill whose paths belong to the public repository it names two lines above them; another is a
 folder of agent configuration written for the projects it gets copied into.
 
-**52% is the figure this project stands behind** as the honest one across every finding, and it is the first
-measured on material that shaped no rule. The nine families behind the twenty-nine false ones are known and
+**52% is what this project measured there**, across every finding, and it was the first figure taken on material that shaped no rule. The pass after it says how far that number
+travels. The nine families behind the twenty-nine false ones are known and
 written down. After a path that belongs to another repository, they are small: brackets in `[name].md`, a
 `YYYY-MM-DD` in a filename yet to be created, a hostname read as a folder, a negation written in a third
 language. They are held on purpose. Fixing them makes the figure fitted again, and the one after it has to be
 measured on repositories none of the fixes were built from.
+
+A fifth pass, on thirty-five more repositories on none of the earlier lists, says something the fourth
+could not, because this time the search included `SKILL.md` and reached a kind of project the earlier
+samples barely held: a skill whose whole purpose is to write files.
+
+| Public repositories, fifth pass | |
+| --- | ---: |
+| Repositories checked | 35 |
+| Clean | 26 |
+| Findings | 40 |
+| Real | 5 |
+| False | 35 |
+| Precision | 13% |
+
+Thirty of those thirty-five false findings are one family. The notes say *"Output:
+`docs/gtm/strategy.md`"*, *"Save to `planning/milestone_X_tasks.md`"*, *"Location:
+`context/session-XXX.md`"*, and prumo reads a path that is not there, because the file has not been
+generated yet. One repository alone accounts for nineteen of them.
+
+Set against the fourth pass, that is not a version getting worse. The same published version raises
+64% on the fourth material and 13% on the fifth, so what changed is the material and not the tool.
+The honest statement is conditional, and it is the limit worth knowing before installing: **on a
+repository that documents code which exists, most of what prumo says is right; on one that documents
+code a generator will write, most of it is not.** Telling those two apart is the next thing to build,
+and it will be measured on repositories none of it was built from.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 

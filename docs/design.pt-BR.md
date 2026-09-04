@@ -20,6 +20,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. |
 | Marcador de posição e identificador | `path/to/test.js` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
+| Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
 | Algo que só o autor sabe estar certo | `.prumorc.json` e os marcadores `prumo-ignore`. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
 
@@ -106,12 +107,38 @@ repositórios onde nada era real, e a maioria desses seis documenta um código q
 skill cujos caminhos pertencem ao repositório público que ela nomeia duas linhas acima; outro é uma pasta de
 configuração de agente escrita para os projetos em que ela é copiada.
 
-**52% é o número que este projeto assume** como o honesto sobre todos os achados, e é o primeiro medido em
-material que não moldou regra nenhuma. As nove famílias por trás dos vinte e nove falsos são conhecidas e
+**52% foi o que este projeto mediu ali**, sobre todos os achados, e foi o primeiro número tirado de material que não moldou regra nenhuma. A passagem seguinte diz até onde esse
+número viaja. As nove famílias por trás dos vinte e nove falsos são conhecidas e
 estão anotadas. Depois do caminho que pertence a outro repositório, elas são pequenas: colchetes em
 `[name].md`, um `YYYY-MM-DD` num nome de arquivo ainda a criar, um nome de domínio lido como pasta, uma
 negação escrita num terceiro idioma. Elas ficam de propósito. Consertá-las torna o número ajustado de novo, e
 o seguinte teria de ser medido em repositórios que nenhum dos consertos usou.
+
+Uma quinta passagem, em mais trinta e cinco repositórios que não estavam em nenhuma lista anterior,
+diz algo que a quarta não podia dizer, porque desta vez a busca incluiu `SKILL.md` e alcançou um tipo
+de projeto que as amostras anteriores quase não tinham: uma skill cujo propósito inteiro é escrever
+arquivos.
+
+| Repositórios públicos, quinta passagem | |
+| --- | ---: |
+| Repositórios checados | 35 |
+| Limpos | 26 |
+| Achados | 40 |
+| Reais | 5 |
+| Falsos | 35 |
+| Precisão | 13% |
+
+Trinta desses trinta e cinco falsos são uma família só. As notas dizem *"Output:
+`docs/gtm/strategy.md`"*, *"Save to `planning/milestone_X_tasks.md`"*, *"Location:
+`context/session-XXX.md`"*, e o prumo lê um caminho que não está lá, porque o arquivo ainda não foi
+gerado. Um repositório sozinho responde por dezenove deles.
+
+Posta ao lado da quarta passagem, essa não é uma versão piorando. A mesma versão publicada levanta
+64% no material da quarta e 13% no da quinta, então o que mudou foi o material, não a ferramenta. A
+afirmação honesta é condicional, e é o limite que vale conhecer antes de instalar: **num repositório
+que documenta código que existe, a maior parte do que o prumo diz está certa; num que documenta
+código que um gerador vai escrever, a maior parte não está.** Distinguir os dois é a próxima coisa a
+construir, e será medida em repositórios que nada disso usou.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 

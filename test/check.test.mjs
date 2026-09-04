@@ -743,3 +743,40 @@ test('a reference definition is a link, and is reported on its own line', () => 
   assert.equal(r.brokenLinks[0].cited, 'assets/esquema-antigo.svg');
   assert.equal(r.brokenLinks[0].line, 3);
 });
+
+test('a path beside a link to another repository belongs to that repository', () => {
+  const repo = repoWith({
+    'AGENTS.md': 'Reference code lives in https://github.com/other/toolkit\n\nCopy the shape of `api/lambda/index.js` from there.\n\n\n\n\n\n\n\nOur own entry is `src/main.ts`.\n',
+    'src/index.ts': '',
+  });
+  execSync('git remote add origin https://github.com/mine/project.git', { cwd: repo, stdio: 'ignore' });
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.deepEqual(r.missingPaths.map((x) => x.cited), ['src/main.ts']);
+});
+
+test('a link to this same repository does not excuse the path beside it', () => {
+  const repo = repoWith({
+    'AGENTS.md': 'The project lives at https://github.com/mine/project\n\nThe entry is `src/main.ts`.\n',
+    'src/index.ts': '',
+  });
+  execSync('git remote add origin https://github.com/mine/project.git', { cwd: repo, stdio: 'ignore' });
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.deepEqual(r.missingPaths.map((x) => x.cited), ['src/main.ts']);
+});
+
+test('an alias in a repository holding no alias root belongs to another project', () => {
+  const r = run({
+    'CLAUDE.md': 'Use the card in `@/components/ui/card.tsx`.\n',
+    '.claude/agents/reviewer.md': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('the same alias is still checked where an alias root exists', () => {
+  const r = run({
+    'CLAUDE.md': 'Use the card in `@/components/ui/card.tsx`.\n',
+    'src/index.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, '@/components/ui/card.tsx');
+});
