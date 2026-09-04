@@ -137,6 +137,36 @@ repository that documents code which exists, most of what prumo says is right; o
 code a generator will write, most of it is not.** Telling those two apart is the next thing to build,
 and it will be measured on repositories none of it was built from.
 
+A sixth pass followed, on fifty further repositories, with the code frozen before it ran and no filter
+allowed to change whatever it showed:
+
+| Public repositories, sixth pass | |
+| --- | ---: |
+| Repositories checked | 36 |
+| Clean | 26 |
+| Findings | 25 |
+| Real | 8 |
+| False | 17 |
+| Precision | 32% |
+| Precision on the three that had something real | 100% |
+
+Two passes reported at different figures invite one wrong reading, so it is worth closing off: a
+percentage compared across passes compares populations, not versions. Only a fixed corpus compares
+versions, and on a fixed corpus every release has removed false findings and kept every real one:
+
+| Measured on the same material | fourth pass, 45 repositories | sixth pass, 50 repositories |
+| --- | ---: | ---: |
+| 0.4.7 | 52% | 30% |
+| 0.4.10 | 86% | 32% |
+
+Read down a column and the tool improved. Read across a row and the material differs. Both are true,
+and only the columns answer whether a release helped.
+
+The distance between 86% and 32% is what fitting costs. The filters in the left column were built out
+of that same material; measured where nothing was fitted, the newest of them is worth one finding in
+twenty-six. That is why both figures are published here, and why none of them is worth quoting without
+the material it came from.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.

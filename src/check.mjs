@@ -36,6 +36,8 @@ const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 const PLACEHOLDER_PATH = /(^|[/])path[/]to[/]/i;
 /** `@scope/package/file.css` is an npm import specifier. An `@/` alias keeps its slash right after the `@`, so it is not one. */
 const SCOPED_PACKAGE = /^@[^/]+\//;
+/** A sentence that tells the agent to write the file: its path is an output, not a claim that it is here. */
+const WRITES_IT = /\b(outputs?|writes?|writing|written|saves?|saved|saving|creates?|creating|created|generates?|generating|generated|emits?|emitting|maintains?|maintaining|add to|put it in|location)\b/i;
 /** `report-YYYY-MM-DD.md` and `product/vX.Y.Z/` name a file to be created, not one that is here. */
 const TEMPLATE_TOKEN = /\bYYYY[-_]MM[-_]DD\b|\bv?X\.Y\.Z\b/i;
 /** `src/common/constants.hpp/.cpp` is two files written as one token, never a path. */
@@ -46,14 +48,14 @@ const LINK_EXT = /\.(mdx|png|jpe?g|gif|svg|webp|avif|pdf|ico|txt|csv)$/i;
 const NEGATION = new RegExp(
   [
     '(does|do|did|is|are|was|were|has|have|will) ?n.?t ',
-    'no longer', 'never', 'used to', 'formerly', 'replaced by', 'deprecated',
+    'no longer', '\\bnever', 'used to', 'formerly', 'replaced by', 'deprecated',
     'was removed', 'were removed', 'has been removed', 'deleted', 'renamed',
     'historical', 'reverted', 'superseded', 'not published', 'not exist',
     'n[ãa]o (existe|publica|h[áa]|tem)', 'n[ãa]o [ée] ', 'removid', 'apagad', 'deletad',
-    'exclu[ií]d', 'sumi', 'deixou de', 'foi renomead', 'virou', 'passou a ser',
+    'exclu[ií]d', '\\bsumi', 'deixou de', 'foi renomead', 'virou', 'passou a ser',
     'hist[óo]ric', 'obsolet', 'superad', 'revertid', 'substitu[íi]d',
-    'antes (era|fazia|chamava)', 'errad', 'min[úu]scul', 'mai[úu]scul', 'caixa',
-    'citad', 'exemplo', 'placeholder', 'example',
+    'antes (era|fazia|chamava)', '\\berrad', 'min[úu]scul', 'mai[úu]scul', 'caixa',
+    '\\bcitad', 'exemplo', 'placeholder', 'example',
   ].join('|'),
   'i'
 );
@@ -379,6 +381,8 @@ export function analyze({ repo, targets, config = null }) {
           if (r.state === 'ok') continue;
           const paragraph = lines.slice(Math.max(0, i - 2), i + 3).join(' ');
           if (NEGATION.test(paragraph)) continue;
+          const parent = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
+          if (r.state !== 'case' && parent && !index.known.has(parent) && WRITES_IT.test(paragraph)) continue;
           if (namesAnotherRepo(lines.slice(Math.max(0, i - 6), i + 2).join(' '), own)) continue;
 
           if (r.state === 'case') {

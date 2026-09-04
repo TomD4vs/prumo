@@ -20,7 +20,7 @@ A saída em texto traz arquivo, linha e correção, o que basta para um agente a
 
 ## Exponha como ferramenta
 
-O pacote traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a caixa das letras. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados.
+O pacote traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a capitalização. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados.
 
 No Claude Code:
 

@@ -780,3 +780,45 @@ test('the same alias is still checked where an alias root exists', () => {
   assert.equal(r.missingPaths.length, 1);
   assert.equal(r.missingPaths[0].cited, '@/components/ui/card.tsx');
 });
+
+test('a path a sentence tells the agent to write is an output, not a dead path', () => {
+  const r = run({
+    'AGENTS.md': 'Output: `docs/reports/summary.md`, one per run.\n',
+    'docs/README.md': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a path simply gone is still reported when nothing says it gets written', () => {
+  const r = run({
+    'AGENTS.md': 'The parser is `lib/parsing/reader.js`.\n',
+    'src/index.js': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'lib/parsing/reader.js');
+});
+
+test('a write verb does not excuse a path whose folder is right here', () => {
+  const r = run({
+    'AGENTS.md': 'Update `docs/testing-overview.md` after a coverage change.\n',
+    'docs/testing-guide.md': '',
+  });
+  assert.equal(r.missingPaths.length, 1);
+  assert.equal(r.missingPaths[0].cited, 'docs/testing-overview.md');
+});
+
+test('a negation word inside a longer word does not silence the line', () => {
+  const r = run({
+    'AGENTS.md': 'Read `lib/parsing/reader.js` whenever the grammar changes.\nO time solicitado revisa `lib/parsing/writer.js`.\n',
+    'src/index.js': '',
+  });
+  assert.deepEqual(r.missingPaths.map((x) => x.cited).sort(), ['lib/parsing/reader.js', 'lib/parsing/writer.js']);
+});
+
+test('the same words on their own still silence it', () => {
+  const r = run({
+    'AGENTS.md': 'We never shipped `lib/parsing/reader.js`.\nO `lib/parsing/writer.js` sumiu na limpeza.\n',
+    'src/index.js': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});

@@ -41,11 +41,11 @@ Cada teste monta um repositório git descartável, então a suíte não versiona
 
 ### O que custou tempo uma vez
 
-`node --test test/` falha no Git Bash do Windows: o argumento de caminho é mutilado e o Node tenta carregar um módulo chamado literalmente `test`. Rode `node --test` sem argumento e deixe-o descobrir `**/*.test.mjs`, que é o que o `npm test` faz.
+`node --test test/` falha no Git Bash do Windows: o argumento de caminho chega corrompido e o Node tenta carregar um módulo chamado literalmente `test`. Rode `node --test` sem argumento e deixe-o descobrir `**/*.test.mjs`, que é o que o `npm test` faz.
 
-Teste a CLI a partir de um diretório diferente do repositório sendo checado. Um erro de um-a-mais na leitura dos argumentos chegou a ser lançado e passou no primeiro teste por acidente. Filtrar os valores de flag com `i !== jsonAt + 1` descartava o `argv[0]` sempre que `--json` estava ausente, porque `jsonAt` era `-1`; o teste só passou porque o argumento do repositório caiu no padrão `.` enquanto o shell por acaso estava no lugar certo. Rodar de dentro do alvo esconde exatamente esse tipo de defeito.
+Teste a CLI a partir de um diretório diferente do repositório sendo checado. Um erro de índice na leitura dos argumentos chegou a ser lançado e passou no primeiro teste por acidente. Filtrar os valores de flag com `i !== jsonAt + 1` descartava o `argv[0]` sempre que `--json` estava ausente, porque `jsonAt` era `-1`; o teste só passou porque o argumento do repositório caiu no padrão `.` enquanto o shell por acaso estava no lugar certo. Rodar de dentro do alvo esconde exatamente esse tipo de defeito.
 
-O card social é renderizado, não desenhado. O `assets/social.html` é fotografado em modo headless a 1280×640:
+O card social é renderizado, não desenhado. O `assets/social.html` é capturado em modo headless a 1280×640:
 
 ```bash
 msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \

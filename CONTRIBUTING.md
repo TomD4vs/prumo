@@ -19,6 +19,11 @@ after. Clone a handful of projects nobody has checked before, run your branch ag
 classify every finding by hand as real or false. Bring those numbers with the pull request. If a
 check cannot be measured that way yet, say so and open an issue instead.
 
+And measure twice, on two sets. A rule built out of the findings that measure it reports a number
+nobody can act on. This project has watched a filter go from nineteen findings removed on the
+material it was designed against to one on material it had never seen. So say which set each figure
+came from, and treat only the untouched one as the result.
+
 **A false positive is the worst bug this tool can have.** Someone who reads two wrong findings
 stops reading the third. A missed finding costs nothing by comparison, which is why the filters
 are most of `src/check.mjs`.

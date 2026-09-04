@@ -140,6 +140,36 @@ que documenta código que existe, a maior parte do que o prumo diz está certa; 
 código que um gerador vai escrever, a maior parte não está.** Distinguir os dois é a próxima coisa a
 construir, e será medida em repositórios que nada disso usou.
 
+Veio então uma sexta passagem, em mais cinquenta repositórios, com o código congelado antes de rodar e
+sem permissão de mexer em filtro, desse no que desse:
+
+| Repositórios públicos, sexta passagem | |
+| --- | ---: |
+| Repositórios checados | 36 |
+| Limpos | 26 |
+| Achados | 25 |
+| Reais | 8 |
+| Falsos | 17 |
+| Precisão | 32% |
+| Precisão nos três que tinham algo real | 100% |
+
+Duas passagens com números diferentes convidam a uma leitura errada, então vale fechar essa porta: uma
+porcentagem comparada entre passagens compara populações, não versões. Só um acervo fixo compara
+versões, e em acervo fixo toda release removeu achado falso e manteve todos os reais:
+
+| Medido no mesmo material | quarta passagem, 45 repos | sexta passagem, 50 repos |
+| --- | ---: | ---: |
+| 0.4.7 | 52% | 30% |
+| 0.4.10 | 86% | 32% |
+
+Lendo uma coluna, a ferramenta melhorou. Lendo uma linha, o material é outro. As duas coisas são
+verdade, e só as colunas respondem se uma release ajudou.
+
+A distância entre 86% e 32% é o que o ajuste custa. Os filtros da coluna da esquerda foram construídos
+a partir daquele mesmo material; medido onde nada foi ajustado, o mais novo deles vale um achado em
+vinte e seis. É por isso que os dois números estão publicados aqui, e por que nenhum deles vale ser
+citado sem o material de onde saiu.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.
@@ -152,7 +182,7 @@ O índice do git é a única fonte que guarda a capitalização real de um camin
 
 O `resolvePath` em [src/check.mjs](../src/check.mjs) tenta, nesta ordem: correspondência exata no índice; correspondência sem distinção de caixa, que vira um achado `CASE MISMATCH`; e só então `existsSync`, como último recurso para arquivos que o git não rastreia. Essa ordem não deve ser alterada.
 
-O índice precisa ser lido como o git escreve. O `git ls-files` roda com o `core.quotepath` ligado por padrão, e isso devolve um nome não-ASCII entre aspas e com escape octal: `"docs/A\303\247\303\243o.md"` no lugar de `docs/Ação.md`. Lido assim, todo caminho acentuado fica de fora do índice: a checagem de capitalização emudece nele e, no Windows, o `existsSync` aceita a caixa errada sem dizer nada. Um arquivo de contexto dentro de uma pasta acentuada nem chega a ser detectado. Por isso a chamada é `git -c core.quotepath=false ls-files -z`, e o `-z` mantém inteiro um nome que contenha quebra de linha. Toda chamada nova a `git ls-files` passa pelo `trackedFiles`.
+O índice precisa ser lido como o git escreve. O `git ls-files` roda com o `core.quotepath` ligado por padrão, e isso devolve um nome não-ASCII entre aspas e com escape octal: `"docs/A\303\247\303\243o.md"` no lugar de `docs/Ação.md`. Lido assim, todo caminho acentuado fica de fora do índice: a checagem de capitalização fica em silêncio nele e, no Windows, o `existsSync` aceita a caixa errada sem dizer nada. Um arquivo de contexto dentro de uma pasta acentuada nem chega a ser detectado. Por isso a chamada é `git -c core.quotepath=false ls-files -z`, e o `-z` mantém inteiro um nome que contenha quebra de linha. Toda chamada nova a `git ls-files` passa pelo `trackedFiles`.
 
 Duas consequências. Um caminho citado é comparado pelo final, não pelo começo, porque as notas escrevem caminhos em forma curta e relativa (`pages/Auth/Login.vue`) muito mais do que por inteiro. Uma busca que parte de `resources/js/pages/` perde todos eles; foi assim que quatro caminhos errados sobreviveram a seis auditorias feitas à mão, um deles por dois meses. E o CI roda no Linux, Windows e macOS só por esse motivo: o comportamento sob teste muda conforme o sistema de arquivos, então uma execução verde numa plataforma não prova nada sobre as outras.
 

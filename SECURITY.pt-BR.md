@@ -28,13 +28,13 @@ A maior parte da resposta é que há muito pouco ao alcance.
   entregues ao `git check-ignore` entram pela entrada padrão. Uma pasta cujo nome tem caracteres de
   shell é só um nome de pasta.
 - **Ele lê, e quase não escreve.** Lê os seus arquivos de contexto e o índice do git. A única
-  escrita é o `--fix`, ou o `prumo_fix` pelo MCP, e ela só reescreve a caixa das letras nas linhas
+  escrita é o `--fix`, ou o `prumo_fix` pelo MCP, e ela só reescreve a capitalização nas linhas
   que ele já reportou, para a grafia que o índice guarda.
 
 ## O servidor MCP
 
 O `prumo-mcp` fala JSON-RPC pela entrada e pela saída padrão e não escuta em porta nenhuma. Ele
 recebe um caminho de repositório e uma lista de alvos do agente que o iniciou, então consegue ler
-qualquer repositório que esse agente já consiga ler, e o `prumo_fix` consegue reescrever a caixa em
+qualquer repositório que esse agente já consiga ler, e o `prumo_fix` consegue reescrever a capitalização em
 arquivos que esse agente já consiga escrever. Inicie o servidor só a partir de um agente em que
 você confia com aquela pasta.

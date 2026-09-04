@@ -83,7 +83,7 @@ they cite them as paths. Write it as `docs/politica.md`, or as a markdown link
 
 ### `CASE MISMATCH`
 
-A path is spelled with different capitalisation than the repository uses. prumo compares against the git index, which is the only place that stores the real spelling; the filesystem won't tell you the truth about this on Windows or macOS.
+A path is spelled with different letter case than the repository uses. prumo compares against the git index, which is the only place that stores the real spelling; the filesystem won't tell you the truth about this on Windows or macOS.
 
 The result is the classic "works on my machine": fine locally, dead on Linux, in CI and in Docker. Copy the path shown after the `->`.
 

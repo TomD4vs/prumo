@@ -19,6 +19,11 @@ não depois. Clone alguns projetos que ninguém checou ainda, rode a sua branch 
 cada achado na mão, real ou falso. Traga esses números junto com o pull request. Se a checagem
 ainda não puder ser medida assim, diga isso e abra uma issue no lugar.
 
+E meça duas vezes, em dois conjuntos. Uma regra construída a partir dos achados que a medem devolve
+um número em que ninguém pode se apoiar. Este projeto já viu um filtro sair de dezenove achados
+removidos no material contra o qual foi desenhado para um só em material que ele nunca tinha visto.
+Então diga de que conjunto veio cada número, e trate como resultado apenas o intocado.
+
 **Um alarme falso é o pior defeito que esta ferramenta pode ter.** Quem lê dois achados errados
 para de ler o terceiro. Um achado que passou batido custa pouco perto disso, e é por isso que os
 filtros ocupam a maior parte do `src/check.mjs`.
