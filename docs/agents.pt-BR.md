@@ -63,7 +63,7 @@ No Claude Code, um hook `PostToolUse` em `.claude/settings.json` dispara depois 
       "matcher": "Write|Edit",
       "hooks": [{
         "type": "command",
-        "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const p=((JSON.parse(d).tool_input||{}).file_path||\"\").split(\"\\\\\").join(\"/\");process.exit(/(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]|[/]SKILL[.]md$/i.test(p)?0:1)})' && npx @tomd4vs/prumo || true"
+        "command": "node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const p=((JSON.parse(d).tool_input||{}).file_path||\"\").split(\"\\\\\").join(\"/\");process.exit(/(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]|(^|[/])[.]claude[/]commands[/]|[/]SKILL[.]md$/i.test(p)?0:1)})' && npx @tomd4vs/prumo || true"
       }]
     }]
   }
@@ -82,7 +82,7 @@ No Windows, o Claude Code roda os hooks no Git Bash quando ele está instalado e
       "hooks": [{
         "type": "command",
         "shell": "powershell",
-        "command": "$p = (ConvertFrom-Json ([Console]::In.ReadToEnd())).tool_input.file_path -replace '\\\\','/'; if ($p -match '(^|/)(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)\\.md|\\.(cursor|cline|windsurf)rules|copilot-instructions\\.md)$|(^|/)\\.(cursor|windsurf|roo)/rules/|(^|/)\\.github/instructions/|/SKILL\\.md$') { npx @tomd4vs/prumo }; exit 0"
+        "command": "$p = (ConvertFrom-Json ([Console]::In.ReadToEnd())).tool_input.file_path -replace '\\\\','/'; if ($p -match '(^|/)(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)\\.md|\\.(cursor|cline|windsurf)rules|copilot-instructions\\.md)$|(^|/)\\.(cursor|windsurf|roo)/rules/|(^|/)\\.github/instructions/|(^|/)\\.claude/commands/|/SKILL\\.md$') { npx @tomd4vs/prumo }; exit 0"
       }]
     }]
   }

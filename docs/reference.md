@@ -28,11 +28,19 @@ prumo [repo] [target...] [options]
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
+In a terminal, the report opens with the name drawn large, the version and the GitHub page. Each section title becomes a coloured label, the path the note cites is painted apart from the one the repository holds, and the last line counts the findings by kind. When the output goes to a pipe, a file, CI or an agent, nothing comes before the header line and no colour is used, so what those read is exactly what this page shows.
+
+| Variable | Meaning |
+| --- | --- |
+| `PRUMO_BANNER=0` | No name above the report, even in a terminal; `=1` shows it even in a pipe |
+| `NO_COLOR=1` | Plain text in a terminal |
+| `FORCE_COLOR=1` | Colour even in a pipe |
+
 ### Files found automatically
 
 | Agent | Files |
 | --- | --- |
-| Claude Code | `CLAUDE.md`, `CLAUDE.local.md`, `.claude/MEMORY.md` |
+| Claude Code | `CLAUDE.md`, `CLAUDE.local.md`, `.claude/MEMORY.md`, `.claude/commands/` |
 | Codex, Amp, and the AGENTS.md convention | `AGENTS.md`, `AGENT.md` |
 | Cursor | `.cursorrules`, `.cursor/rules/` |
 | GitHub Copilot | `.github/copilot-instructions.md`, `.github/instructions/` |
@@ -40,10 +48,12 @@ prumo [repo] [target...] [options]
 | Windsurf | `.windsurfrules`, `.windsurf/rules/` |
 | Cline / Roo | `.clinerules`, `.roo/rules/` |
 | Aider | `CONVENTIONS.md` |
-| Agent Skills, any host | `SKILL.md` inside any subfolder, such as `.claude/skills/deploy/` |
+| Agent Skills, any host | `SKILL.md` inside any subfolder, such as `.claude/skills/deploy/`, whether git tracks it or not |
 | Any | `MEMORY.md`, `COPILOT.md` |
 
 `CLAUDE.md`, `AGENTS.md` and `SKILL.md` are also collected from subfolders, so `packages/api/AGENTS.md` and `.claude/skills/deploy/SKILL.md` are read the same as a file at the root. Folders such as `vendor/` and `node_modules/` are left out, because a context file there documents a dependency.
+
+A skill under `.claude/skills/` or `.agents/skills/` is read even when git does not track it, as an installed skill often is not. The header counts the files read that way. The files beside such a skill are looked up on disk, since the index does not hold them, so a wrong letter case in one of those goes unnoticed.
 
 A `SKILL.md` at the repository root is not detected automatically. At the root, a file with that name is often a tool's own instructions rather than an installed skill, and the paths in it are examples rather than references. When the repository is itself a skill, name the file: `prumo . SKILL.md`.
 
@@ -80,6 +90,13 @@ or that contains a `/` and ends in a known extension. A bare file name with no f
 it, `politica.md`, is left alone, because notes mention file names in passing far more often than
 they cite them as paths. Write it as `docs/politica.md`, or as a markdown link
 `[politica](politica.md)`, and it is checked like any other.
+
+**A fenced code block is read as code.** Every line inside a ```` ``` ```` block is read as a
+command or as an entry in a file tree, so `node scripts/seed.py` and `src/components/Button.tsx`
+are checked there without backticks, and the sentence that introduces the block counts as its
+context. A block marked `markdown` is an example of syntax, and so is anything inside an HTML
+comment, so neither is read. A link inside a fenced block is only being quoted, so it is left alone.
+A path cited on several lines is reported on each of them.
 
 ### `CASE MISMATCH`
 
@@ -124,6 +141,8 @@ Another about `config/older.php`.
 <!-- prumo-ignore-file -->
 ```
 
+Placed on the line before a fenced block, `<!-- prumo-ignore-next-line -->` silences the whole block, counted once.
+
 `.prumorc.json` at the repository root, for a pattern:
 
 ```jsonc
@@ -152,4 +171,6 @@ FIXED  1 path in 1 file
 
 Only case mismatches are rewritten, because only they have a correct value that can be read from the git index rather than guessed. Broken links and missing paths are left alone: a link suggestion is an educated guess, and a missing path may be missing on purpose.
 
-Lines that changed since the scan are reported and skipped rather than rewritten.
+Every way a path can be cited is rewritten where it stands: in backticks, inside a command, inside a fenced block, spelled with backslashes, followed by a line number, and in a link written as `[a](x)`, `[a](<x>)` or `[ref]: x`. A path cited on several lines is corrected on all of them in one pass.
+
+If a line changed between the scan and the fix, prumo leaves that line as it is and says so in the report.

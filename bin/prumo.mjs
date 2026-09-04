@@ -8,10 +8,13 @@ import { writeFileSync } from 'node:fs';
 import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 import { renderText, renderGithub } from '../src/report.mjs';
+import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 
-const VERSION = createRequire(import.meta.url)('../package.json').version;
+const PKG = createRequire(import.meta.url)('../package.json');
+const VERSION = PKG.version;
+const GITHUB = (String((PKG.repository && PKG.repository.url) || PKG.homepage || '').match(/github\.com[/:]([\w.-]+)/) || [])[1] || '';
 
 const HELP = `
 prumo ${VERSION} — is your documentation still true?
@@ -42,8 +45,12 @@ CONFIG (.prumorc.json, optional)
 
 SUPPRESSING ONE LINE
   <!-- prumo-ignore -->            same line
-  <!-- prumo-ignore-next-line -->  the line below
+  <!-- prumo-ignore-next-line -->  the line below, or the whole fenced block below
   <!-- prumo-ignore-file -->       the whole file
+
+ENVIRONMENT
+  PRUMO_BANNER=0   no name and version above the report; =1 shows them even in a pipe
+  NO_COLOR=1       plain text in a terminal
 
 EXIT CODE
   0  nothing to review        1  findings          2  bad usage
@@ -126,7 +133,9 @@ if (!QUIET && FORMAT === 'json') {
   const lines = renderGithub(result);
   if (lines) console.log(lines);
 } else if (!QUIET) {
-  console.log(renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value }));
+  const color = wantsColor();
+  const head = wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '';
+  console.log(head + renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value, color }));
 }
 
 process.exit(total ? 1 : 0);

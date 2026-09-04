@@ -1,0 +1,116 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { renderText, renderGithub } from '../src/report.mjs';
+
+/** A result the way analyze() returns it, with whatever the test overrides. */
+const result = (over = {}) => ({
+  caseMismatch: [],
+  brokenLinks: [],
+  missingPaths: [],
+  orphans: [],
+  stats: { tracked: 12, targets: 1, historical: 0, suppressed: 0, gitignored: 0, untracked: 0 },
+  ...over,
+});
+
+test('a clean result renders the header and nothing to review', () => {
+  assert.equal(renderText(result()), 'prumo — 1 context file, 12 files in the git index\n\nnothing to review.');
+});
+
+test('the header counts what was skipped on purpose, one line per kind', () => {
+  const out = renderText(result({ stats: { tracked: 2, targets: 3, historical: 1, suppressed: 2, gitignored: 3, untracked: 1 } }));
+  assert.deepEqual(out.split('\n').slice(0, 5), [
+    'prumo — 3 context files, 2 files in the git index',
+    '        1 historical entry exempt from path checks',
+    '        2 lines or files suppressed by a prumo-ignore marker',
+    '        3 paths under .gitignore exempt from path checks',
+    '        1 context file not tracked by git',
+  ]);
+});
+
+test('each section renders the way the README shows it, and the total adds them up', () => {
+  const out = renderText(result({
+    caseMismatch: [{ file: 'CLAUDE.md', line: 18, cited: 'layouts/AppLayout.vue', actual: 'resources/js/Layouts/AppLayout.vue' }],
+    brokenLinks: [
+      { file: 'CLAUDE.md', line: 21, kind: 'wikilink', cited: 'deploy-checklist', suggestion: 'deploy_checklist' },
+      { file: 'CLAUDE.md', line: 30, kind: 'link', cited: 'docs/old.md', suggestion: null },
+    ],
+    missingPaths: [{ file: 'docs/setup.md', line: 44, cited: 'config/database.php', excerpt: 'Copy the template into `config/database.php`.' }],
+    orphans: ['loose.md'],
+  }));
+  assert.match(out, /^CASE MISMATCH  \(1\)   resolves on Windows and macOS, breaks on Linux and CI$/m);
+  assert.match(out, /^  CLAUDE\.md:18\n      layouts\/AppLayout\.vue\n      ->  resources\/js\/Layouts\/AppLayout\.vue$/m);
+  assert.match(out, /^BROKEN LINK  \(2\)   1 with a likely destination$/m);
+  assert.match(out, /^  CLAUDE\.md:21  \[\[deploy-checklist\]\]   ->  deploy_checklist$/m);
+  assert.match(out, /^  CLAUDE\.md:30  docs\/old\.md$/m);
+  assert.match(out, /^NOT IN INDEX  \(1\)/m);
+  assert.match(out, /^  loose\.md$/m);
+  assert.match(out, /^MISSING PATH  \(1\)/m);
+  assert.match(out, /^  docs\/setup\.md:44  config\/database\.php\n      Copy the template into `config\/database\.php`\.$/m);
+  assert.match(out, /\n5 to review$/);
+});
+
+test('the list stops at 25 unless --all, and says how many more there are', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({ file: 'CLAUDE.md', line: i + 1, cited: `config/f${i}.php`, excerpt: 'x' }));
+  const short = renderText(result({ missingPaths: many }));
+  assert.equal((short.match(/^  CLAUDE\.md:/gm) || []).length, 25);
+  assert.match(short, /… 5 more \(use --all\)/);
+  const full = renderText(result({ missingPaths: many }), { all: true });
+  assert.equal((full.match(/^  CLAUDE\.md:/gm) || []).length, 30);
+  assert.doesNotMatch(full, /use --all/);
+});
+
+test('a fix pass is reported before the findings, changes and skips alike', () => {
+  const fixed = {
+    files: 1,
+    paths: 1,
+    changes: [{ file: 'CLAUDE.md', line: 3, cited: 'layouts/App.vue', actual: 'resources/js/Layouts/App.vue' }],
+    skipped: [{ file: 'CLAUDE.md', line: 9, cited: 'x/y.vue', actual: 'x/Y.vue', why: 'line changed since the scan' }],
+  };
+  const out = renderText(result(), { fixed, jsonPath: 'out.json' });
+  assert.match(out, /^FIXED  1 path in 1 file\n  CLAUDE\.md:3   layouts\/App\.vue  ->  resources\/js\/Layouts\/App\.vue\n  skipped CLAUDE\.md:9 \(line changed since the scan\)$/m);
+  assert.match(out, /\njson: out\.json$/);
+});
+
+test('with colour, the titles become badges, the correction is painted apart, and the total is counted by kind', () => {
+  const findings = {
+    caseMismatch: [{ file: 'CLAUDE.md', line: 18, cited: 'layouts/AppLayout.vue', actual: 'resources/js/Layouts/AppLayout.vue' }],
+    brokenLinks: [
+      { file: 'CLAUDE.md', line: 21, kind: 'wikilink', cited: 'deploy-checklist', suggestion: 'deploy_checklist' },
+      { file: 'CLAUDE.md', line: 30, kind: 'link', cited: 'docs/old.md', suggestion: null },
+    ],
+    missingPaths: [{ file: 'docs/setup.md', line: 44, cited: 'config/database.php', excerpt: 'Copy the template into `config/database.php`.' }],
+    orphans: ['loose.md'],
+  };
+  const painted = renderText(result(findings), { color: true });
+  assert.match(painted, /\x1b\[7;38;5;203m CASE MISMATCH \x1b\[0m \x1b\[1m1\x1b\[0m   \x1b\[38;5;245mresolves on Windows/);
+  assert.match(painted, /\x1b\[38;5;173mlayouts\/AppLayout\.vue\x1b\[0m/);
+  assert.match(painted, /\x1b\[38;5;79m->\x1b\[0m  \x1b\[38;5;79mresources\/js\/Layouts\/AppLayout\.vue\x1b\[0m/);
+  assert.match(painted, /\x1b\[7;38;5;221m BROKEN LINK \x1b\[0m \x1b\[1m2\x1b\[0m   \x1b\[38;5;245m1 with a likely destination/);
+  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path\x1b\[0m$/);
+  assert.match(renderText(result(), { color: true }), /\x1b\[38;5;79mnothing to review\.\x1b\[0m$/);
+
+  const plain = renderText(result(findings));
+  assert.doesNotMatch(plain, /\x1b/, 'without colour there is no escape code at all');
+  assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, '').split('\n').length, plain.split('\n').length, 'colour adds no line');
+});
+
+test('the GitHub format is one annotation per finding, on the file and line', () => {
+  const out = renderGithub(result({
+    caseMismatch: [{ file: 'CLAUDE.md', line: 3, cited: 'a/B.js', actual: 'a/b.js' }],
+    brokenLinks: [
+      { file: 'CLAUDE.md', line: 4, kind: 'wikilink', cited: 'gone', suggestion: 'gone_note' },
+      { file: 'CLAUDE.md', line: 5, kind: 'link', cited: 'x.md', suggestion: null },
+    ],
+    missingPaths: [{ file: 'docs/a.md', line: 6, cited: 'src/gone.ts', excerpt: 'x' }],
+    orphans: ['loose.md'],
+  }));
+  assert.deepEqual(out.split('\n'), [
+    '::error file=CLAUDE.md,line=3::Case mismatch: a/B.js should be a/b.js',
+    '::warning file=CLAUDE.md,line=4::Broken link: gone — did you mean gone_note?',
+    '::warning file=CLAUDE.md,line=5::Broken link: x.md',
+    '::warning file=docs/a.md,line=6::Missing path: src/gone.ts',
+    '::notice::Not in index: loose.md',
+  ]);
+  assert.equal(renderGithub(result()), '');
+});

@@ -9,8 +9,9 @@ still match the code. Node 18+, ESM, no build step.
 - `bin/prumo-mcp.mjs` — MCP server over stdio, two tools, same analysis and same report.
 - `src/check.mjs` — the three checks, exported as `analyze()` and `resolveTargets()`.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
-- `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server.
-- `test/check.test.mjs` — the suite. Every test builds a throwaway git repository.
+- `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
+- `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
+- `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs` — the suite: the analysis and the fix, the two renderers, the server driven over stdio, and the banner. Every test that needs a repository builds a throwaway one.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `docs/design.md` — **read this before changing behaviour.** Why there are only three checks,
   what was measured and rejected, what each filter defends against, and the order in which a
@@ -45,4 +46,5 @@ node bin/prumo.mjs . --all      # do not truncate
 Run `npm run simulate` before a publish and `npm run simulate -- --registry` after it; the unit tests
 exercise `analyze()`, the simulation exercises what the docs promise through the CLI.
 Run it against a real repository with a large context file, not only against this one.
-`--json` output is the stable contract for anything consuming it programmatically.
+`--json` output is the stable contract for anything consuming it programmatically; it carries `schemaVersion`,
+which goes up when its shape changes.

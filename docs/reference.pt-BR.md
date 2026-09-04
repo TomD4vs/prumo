@@ -28,11 +28,19 @@ prumo [repo] [alvo...] [opções]
 | `-h`, `--help` | Mostra a ajuda |
 | `-v`, `--version` | Mostra a versão |
 
+No terminal, o relatório abre com o nome em letras grandes, a versão e a página do GitHub. Cada título de seção vira um rótulo colorido, o caminho que a nota cita é pintado em cor diferente do que o repositório tem, e a última linha conta os achados por tipo. Quando a saída vai para um pipe, um arquivo, o CI ou um agente, nada vem antes da linha de cabeçalho e nenhuma cor é usada, então o que eles leem é exatamente o que esta página mostra.
+
+| Variável | Significado |
+| --- | --- |
+| `PRUMO_BANNER=0` | Sem o nome acima do relatório, mesmo no terminal; `=1` mostra até em pipe |
+| `NO_COLOR=1` | Texto sem cor no terminal |
+| `FORCE_COLOR=1` | Cor mesmo em pipe |
+
 ### Arquivos encontrados automaticamente
 
 | Agente | Arquivos |
 | --- | --- |
-| Claude Code | `CLAUDE.md`, `CLAUDE.local.md`, `.claude/MEMORY.md` |
+| Claude Code | `CLAUDE.md`, `CLAUDE.local.md`, `.claude/MEMORY.md`, `.claude/commands/` |
 | Codex, Amp e a convenção AGENTS.md | `AGENTS.md`, `AGENT.md` |
 | Cursor | `.cursorrules`, `.cursor/rules/` |
 | GitHub Copilot | `.github/copilot-instructions.md`, `.github/instructions/` |
@@ -40,10 +48,12 @@ prumo [repo] [alvo...] [opções]
 | Windsurf | `.windsurfrules`, `.windsurf/rules/` |
 | Cline / Roo | `.clinerules`, `.roo/rules/` |
 | Aider | `CONVENTIONS.md` |
-| Agent Skills, qualquer host | `SKILL.md` em qualquer subpasta, como `.claude/skills/deploy/` |
+| Agent Skills, qualquer host | `SKILL.md` em qualquer subpasta, como `.claude/skills/deploy/`, rastreado pelo git ou não |
 | Qualquer um | `MEMORY.md`, `COPILOT.md` |
 
 `CLAUDE.md`, `AGENTS.md` e `SKILL.md` também são recolhidos de subpastas, então `packages/api/AGENTS.md` e `.claude/skills/deploy/SKILL.md` são lidos igual a um arquivo da raiz. Pastas como `vendor/` e `node_modules/` ficam de fora, porque um arquivo de contexto ali documenta uma dependência.
+
+Uma skill em `.claude/skills/` ou `.agents/skills/` é lida mesmo quando o git não a rastreia, como costuma acontecer com uma skill instalada. O cabeçalho conta os arquivos lidos desse jeito. Os arquivos ao lado dessa skill são procurados no disco, já que o índice não os tem, então uma capitalização errada num deles passa despercebida.
 
 Um `SKILL.md` na raiz do repositório não é detectado automaticamente. Na raiz, um arquivo com esse nome costuma ser a instrução de uma ferramenta, não uma skill instalada, e os caminhos dentro dele são exemplos, não referências. Quando o repositório é ele mesmo uma skill, nomeie o arquivo: `prumo . SKILL.md`.
 
@@ -80,6 +90,13 @@ as demais), ou a que tem uma `/` e termina numa extensão conhecida. Um nome de 
 pasta na frente, como `politica.md`, fica de fora, porque as notas mencionam nomes de arquivo de
 passagem muito mais do que os citam como caminho. Escreva `docs/politica.md`, ou use um link
 markdown `[politica](politica.md)`, e ele passa a ser checado como qualquer outro.
+
+**Um bloco de código cercado é lido como código.** Cada linha dentro de um bloco ```` ``` ```` é
+lida como um comando ou como uma entrada de árvore de arquivos, então `node scripts/seed.py` e
+`src/components/Button.tsx` são checados ali sem crase, e a frase que apresenta o bloco conta como
+contexto dele. Um bloco marcado como `markdown` é um exemplo de sintaxe, assim como qualquer coisa
+dentro de um comentário HTML, então nenhum dos dois é lido. Um link dentro de um bloco cercado está
+sendo citado, e fica de fora. Um caminho citado em várias linhas é reportado em cada uma delas.
 
 ### `CASE MISMATCH`
 
@@ -124,6 +141,8 @@ Outra sobre `config/older.php`.
 <!-- prumo-ignore-file -->
 ```
 
+Colocado na linha anterior a um bloco de código cercado, o `<!-- prumo-ignore-next-line -->` silencia o bloco inteiro, contado uma vez.
+
 `.prumorc.json` na raiz do repositório, para um padrão:
 
 ```jsonc
@@ -152,4 +171,6 @@ FIXED  1 path in 1 file
 
 Só a capitalização é reescrita, porque só nela o valor correto pode ser lido do índice do git em vez de adivinhado. Links quebrados e caminhos ausentes ficam intocados: a sugestão de link é um palpite bem informado, e um caminho ausente pode estar ausente de propósito.
 
-Linhas que mudaram desde a varredura são reportadas e puladas, não reescritas.
+Toda forma de citar um caminho é reescrita onde está: entre crases, dentro de um comando, dentro de um bloco de código cercado, escrita com barra invertida, seguida de número de linha, e num link escrito como `[a](x)`, `[a](<x>)` ou `[ref]: x`. Um caminho citado em várias linhas é corrigido em todas elas numa passada só.
+
+Se uma linha mudou entre a varredura e o `--fix`, o prumo deixa a linha como está e avisa no relatório.

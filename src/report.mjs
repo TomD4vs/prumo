@@ -1,8 +1,25 @@
 /**
- * prumo — the text report, shared by the CLI and the MCP server.
+ * prumo — the text report, shared by the CLI and the MCP server. Without colour it is the plain
+ * text the README shows and every pipe receives; colour is for a terminal only.
  */
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+const ESC = '\x1b[';
+/** The card's teal for what is right, orange for what the note says, red and yellow for the badges. */
+const PAINT = { bold: '1', dim: '38;5;245', teal: '38;5;79', orange: '38;5;173', red: '38;5;203', yellow: '38;5;221', blue: '38;5;75' };
+
+/** The painters, each one a no-op without colour, so the plain text is built by the same lines. */
+function palette(color) {
+  const paint = (code) => (color ? (s) => `${ESC}${code}m${s}${ESC}0m` : (s) => s);
+  return {
+    bold: paint(PAINT.bold),
+    dim: paint(PAINT.dim),
+    teal: paint(PAINT.teal),
+    orange: paint(PAINT.orange),
+    badge: (code, s) => `${ESC}7;${code}m ${s} ${ESC}0m`,
+  };
+}
 
 /**
  * Renders a result the way the README shows it.
@@ -11,57 +28,75 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
  * @param {boolean} [opts.all]     list every finding instead of the first 25
  * @param {object}  [opts.fixed]   what applyCaseFixes() returned, when --fix ran
  * @param {string}  [opts.jsonPath] file the findings were also written to
+ * @param {boolean} [opts.color]   paint it for a terminal
  */
-export function renderText(result, { all = false, fixed = null, jsonPath = null } = {}) {
+export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false } = {}) {
   const { caseMismatch, brokenLinks, missingPaths, orphans, stats } = result;
   const total = caseMismatch.length + brokenLinks.length + missingPaths.length + orphans.length;
+  const { bold, dim, teal, orange, badge } = palette(color);
   const out = [];
   const cap = (list) => (all ? list : list.slice(0, 25));
-  const more = (list) => (!all && list.length > 25 ? `  … ${list.length - 25} more (use --all)\n` : '');
+  const rest = (list) => (!all && list.length > 25 ? [dim(`  … ${list.length - 25} more (use --all)`), ''] : ['']);
+  const title = (label, code, n, caption) => (color
+    ? `${badge(code, label)} ${bold(String(n))}${caption ? `   ${dim(caption)}` : ''}`
+    : `${label}  (${n})${caption ? `   ${caption}` : ''}`);
+  const at = (o) => bold(`${o.file}:${o.line}`);
 
-  out.push(`prumo — ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.tracked, 'file', 'files')} in the git index`);
-  if (stats.historical) out.push(`        ${plural(stats.historical, 'historical entry', 'historical entries')} exempt from path checks`);
-  if (stats.suppressed) out.push(`        ${plural(stats.suppressed, 'line or file', 'lines or files')} suppressed by a prumo-ignore marker`);
-  if (stats.gitignored) out.push(`        ${plural(stats.gitignored, 'path', 'paths')} under .gitignore exempt from path checks`);
+  out.push(bold('prumo') + dim(` — ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.tracked, 'file', 'files')} in the git index`));
+  if (stats.historical) out.push(dim(`        ${plural(stats.historical, 'historical entry', 'historical entries')} exempt from path checks`));
+  if (stats.suppressed) out.push(dim(`        ${plural(stats.suppressed, 'line or file', 'lines or files')} suppressed by a prumo-ignore marker`));
+  if (stats.gitignored) out.push(dim(`        ${plural(stats.gitignored, 'path', 'paths')} under .gitignore exempt from path checks`));
+  if (stats.untracked) out.push(dim(`        ${plural(stats.untracked, 'context file', 'context files')} not tracked by git`));
   out.push('');
 
   if (fixed) {
-    out.push(`FIXED  ${plural(fixed.paths, 'path', 'paths')} in ${plural(fixed.files, 'file', 'files')}`);
-    for (const c of fixed.changes) out.push(`  ${c.file}:${c.line}   ${c.cited}  ->  ${c.actual}`);
-    for (const s of fixed.skipped) out.push(`  skipped ${s.file}:${s.line} (${s.why})`);
+    const count = `${plural(fixed.paths, 'path', 'paths')} in ${plural(fixed.files, 'file', 'files')}`;
+    out.push(color ? `${badge(PAINT.teal, 'FIXED')} ${bold(count)}` : `FIXED  ${count}`);
+    for (const c of fixed.changes) out.push(`  ${at(c)}   ${orange(c.cited)}  ${teal('->')}  ${teal(c.actual)}`);
+    for (const s of fixed.skipped) out.push(dim(`  skipped ${s.file}:${s.line} (${s.why})`));
     out.push('');
   }
 
   if (caseMismatch.length) {
-    out.push(`CASE MISMATCH  (${caseMismatch.length})   resolves on Windows and macOS, breaks on Linux and CI`);
-    for (const o of cap(caseMismatch)) out.push(`  ${o.file}:${o.line}`, `      ${o.cited}`, `      ->  ${o.actual}`);
-    out.push(more(caseMismatch) + '');
+    out.push(title('CASE MISMATCH', PAINT.red, caseMismatch.length, 'resolves on Windows and macOS, breaks on Linux and CI'));
+    for (const o of cap(caseMismatch)) out.push(`  ${at(o)}`, `      ${orange(o.cited)}`, `      ${teal('->')}  ${teal(o.actual)}`);
+    out.push(...rest(caseMismatch));
   }
 
   if (brokenLinks.length) {
     const withHint = brokenLinks.filter((l) => l.suggestion).length;
-    out.push(`BROKEN LINK  (${brokenLinks.length})${withHint ? `   ${withHint} with a likely destination` : ''}`);
+    out.push(title('BROKEN LINK', PAINT.yellow, brokenLinks.length, withHint ? `${withHint} with a likely destination` : ''));
     for (const o of cap(brokenLinks)) {
       const shown = o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited;
-      out.push(`  ${o.file}:${o.line}  ${shown}${o.suggestion ? `   ->  ${o.suggestion}` : ''}`);
+      out.push(`  ${at(o)}  ${orange(shown)}${o.suggestion ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`);
     }
-    out.push(more(brokenLinks) + '');
+    out.push(...rest(brokenLinks));
   }
 
   if (orphans.length) {
-    out.push(`NOT IN INDEX  (${orphans.length})   file the index never references`);
-    for (const o of cap(orphans)) out.push(`  ${o}`);
-    out.push(more(orphans) + '');
+    out.push(title('NOT IN INDEX', PAINT.blue, orphans.length, 'file the index never references'));
+    for (const o of cap(orphans)) out.push(`  ${orange(o)}`);
+    out.push(...rest(orphans));
   }
 
   if (missingPaths.length) {
-    out.push(`MISSING PATH  (${missingPaths.length})   paths cited to say they are gone were filtered out`);
-    for (const o of cap(missingPaths)) out.push(`  ${o.file}:${o.line}  ${o.cited}`, `      ${o.excerpt}`);
-    out.push(more(missingPaths) + '');
+    out.push(title('MISSING PATH', PAINT.yellow, missingPaths.length, 'paths cited to say they are gone were filtered out'));
+    for (const o of cap(missingPaths)) out.push(`  ${at(o)}  ${orange(o.cited)}`, `      ${dim(o.excerpt)}`);
+    out.push(...rest(missingPaths));
   }
 
-  out.push(total ? `${total} to review` : 'nothing to review.');
-  if (jsonPath) out.push(`json: ${jsonPath}`);
+  if (!total) out.push(teal('nothing to review.'));
+  else if (!color) out.push(`${total} to review`);
+  else {
+    const kinds = [
+      caseMismatch.length && plural(caseMismatch.length, 'case mismatch', 'case mismatches'),
+      brokenLinks.length && plural(brokenLinks.length, 'broken link', 'broken links'),
+      orphans.length && plural(orphans.length, 'note not in the index', 'notes not in the index'),
+      missingPaths.length && plural(missingPaths.length, 'missing path', 'missing paths'),
+    ].filter(Boolean);
+    out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}`));
+  }
+  if (jsonPath) out.push(dim(`json: ${jsonPath}`));
   return out.join('\n');
 }
 

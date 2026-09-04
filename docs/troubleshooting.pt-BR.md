@@ -70,7 +70,7 @@ Leia a frase antes de mudar qualquer coisa. Três casos já são filtrados sozin
 
 Outros três não são, porque pedem julgamento:
 
-- Uma receita que manda o leitor criar o arquivo, como em *"copie o modelo para `config/database.php`"*. O caminho está certo e o arquivo ainda não deve existir. Ponha `<!-- prumo-ignore -->` nessa linha.
+- Uma receita que manda o leitor criar o arquivo, como em *"copie o modelo para `config/database.php`"*. O caminho está certo e o arquivo ainda não deve existir. Ponha `<!-- prumo-ignore -->` nessa linha, ou `<!-- prumo-ignore-next-line -->` acima de um bloco de código que liste esses arquivos.
 - Um `[[wikilink]]` para uma nota guardada em outra pasta. Passe as duas pastas na mesma rodada, `prumo . notas-a notas-b`, e o link resolve.
 - Uma página gerada por uma etapa de build, como a página inicial de um site de documentação. Liste-a em `ignore` no `.prumorc.json`, ou inclua no `.gitignore` se ela nunca deve ser versionada.
 

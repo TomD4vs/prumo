@@ -15,6 +15,7 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | Filter | Why it exists |
 | --- | --- |
 | Negation, read across a paragraph | *"the project does not publish `config/x.php`"* names a file that must **not** exist. A grep sees a dead path; a reader sees a correct sentence. |
+| A fenced block read as code, a comment not read | A path inside a ```` ``` ```` block is a command or a file tree and is checked as one, with the sentence above the block as its context. A link there is being quoted, like anything inside `<!-- -->`, and neither is checked. A comment line inside the block is what a command prints, and `./name` with no folder is an argument the reader supplies. |
 | Historical notes exempt | An entry titled *phase 3 complete* cites what was later removed. That is its subject, not a defect. |
 | Transient artifacts ignored | `public/build`, `.vite`, `node_modules`, `dist` are born and die outside git. |
 | Aliases, short paths and the emitted extension resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. `@/` is tried against the repository root as well as `src`, `app` and the others, and a TypeScript project that writes `./logger.js` for the `logger.ts` git holds is matched to its source. |
@@ -167,6 +168,30 @@ of that same material; measured where nothing was fitted, the newest of them is 
 twenty-six. That is why both figures are published here, and why none of them is worth quoting without
 the material it came from.
 
+A seventh pass, on sixty repositories on none of the earlier lists, sampled from a search that included
+`SKILL.md`. This one ran 0.4.10 as published and the tree of 0.5.0 on the same material, so what it compares is
+two versions of the tool on one set of repositories:
+
+| Public repositories, seventh pass, 0.4.10 against 0.5.0 | |
+| --- | ---: |
+| Repositories checked | 57 |
+| Clean under 0.4.10 | 36 |
+| Clean under 0.5.0 | 34 |
+| Findings under 0.4.10 | 2599 |
+| Findings under 0.5.0 | 2863 |
+| Removed, all false: a `$VAR/` prefix, an `e.g.` example | 144 |
+| Added as the same path on another line | 404 |
+| Added from fenced blocks | 4 |
+| Of those, real | 2 |
+
+Nine findings in ten on that material sit in five repositories that catalogue skills for other projects. That
+is the shape the fifth pass measured, so no precision per finding is claimed here. What the pass does say is
+narrower. Reading fenced blocks found two stale test commands in a repository that 0.4.10 called clean, and
+two example output files in another. `.claude/commands` became a target in two repositories and raised
+nothing. `.claude/agents` was tried the same way and dropped, since its fifteen findings were all example
+paths inside agent definitions. Three rules were built from this material, the shell variable, the `e.g.` and
+a folder named `path`, so the next pass has to run on repositories none of this touched.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
@@ -182,6 +207,8 @@ The git index is the only source that stores a path's true letter case. `existsS
 The index has to be read the way git spells it. `git ls-files` runs with `core.quotepath` on by default, which returns a non-ASCII name quoted and octal-escaped, `"docs/A\303\247\303\243o.md"` for `docs/Ação.md`. Read that way, every accented path falls out of the index: the case check goes silent on it, and on Windows `existsSync` then accepts the wrong case without a word. A context file under an accented folder is not even detected. The call is therefore `git -c core.quotepath=false ls-files -z`, and the `-z` keeps a name that contains a newline in one piece. Any new call to `git ls-files` goes through `trackedFiles`.
 
 Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
+
+A path is reported on every line that cites it, so one `--fix` corrects all of them. Up to 0.4.10 a path was reported once per file, and its second citation onwards was invisible to the report and to `--fix`, which needed one run per citation. One part of that behaviour was kept on purpose. A path that a sentence excuses, as gone, as an output or as another repository's, stays excused on the lines of that file that follow, since they speak of the same file. The same release made `--fix` rewrite a path wherever it stands. It used to find its target only between backticks or after `](`, and answered *"line changed since the scan"* for a reference definition, a command, a Windows path or a line number that had not changed at all.
 
 ---
 

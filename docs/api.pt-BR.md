@@ -12,12 +12,18 @@ import { analyze, resolveTargets } from '@tomd4vs/prumo';
 const targets = resolveTargets('.', []);          // [] = detectar sozinho
 const result  = analyze({ repo: '.', targets });
 
+console.log(result.schemaVersion);  // 1, sobe quando este formato muda
+console.log(result.prumoVersion);   // a versão que rodou
+console.log(result.repo);           // caminho absoluto do repositório checado
+console.log(result.checkedAt);      // quando, como data ISO 8601
 console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
 console.log(result.orphans);        // ['nota-que-ninguem-linka.md']
-console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored }
+console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked }
 ```
+
+Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha.
 
 `kind` é `wikilink` ou `link`. Num case mismatch ele só aparece quando o caminho veio de um link markdown, e aí `actual` é relativo ao arquivo que contém o link, como o próprio link.
 
@@ -28,7 +34,7 @@ console.log(result.stats);          // { tracked, targets, historical, suppresse
 ```bash
 git clone https://github.com/TomD4vs/prumo.git
 cd prumo
-node --test          # 37 testes, sem dependências
+node --test          # todos os arquivos em test/, sem dependências
 node bin/prumo.mjs . # rodar nele mesmo
 npm run simulate     # um usuário novo segue o README contra o tarball empacotado
 ```

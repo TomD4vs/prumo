@@ -36,9 +36,11 @@ PB="$U/consumer/node_modules/@tomd4vs/prumo/bin/prumo.mjs"; PR="node $PB"
 [ -f "$PB" ] && ok "installed" || { bad "install failed"; exit 1; }
 chk "$($PR --version)" "$VERSION" "--version"
 H=$($PR --help); MISSING=""
-for s in USAGE ARGUMENTS OPTIONS CONFIG "SUPPRESSING ONE LINE" "EXIT CODE" EXAMPLES; do echo "$H" | grep -q "^$s" || MISSING="$MISSING $s"; done
-[ -z "$MISSING" ] && ok "--help has the seven sections" || bad "--help lacks:$MISSING"
+for s in USAGE ARGUMENTS OPTIONS CONFIG "SUPPRESSING ONE LINE" ENVIRONMENT "EXIT CODE" EXAMPLES; do echo "$H" | grep -q "^$s" || MISSING="$MISSING $s"; done
+[ -z "$MISSING" ] && ok "--help has the eight sections" || bad "--help lacks:$MISSING"
 npx prumo 2>&1 | grep -q "nothing to review" && ok "'npx prumo' from a devDependency" || bad "npx prumo"
+$PR 2>&1 | head -1 | grep -q "^prumo —" && ok "in a pipe the report opens with the header line, no banner" || bad "banner leaked into a pipe: $($PR 2>&1 | head -1)"
+PRUMO_BANNER=1 NO_COLOR=1 $PR 2>&1 | head -1 | grep -q "^██████╗" && ok "PRUMO_BANNER=1 puts the name above the report" || bad "PRUMO_BANNER=1: $(PRUMO_BANNER=1 $PR 2>&1 | head -1)"
 [ -f node_modules/.bin/prumo-mcp ] || [ -f node_modules/.bin/prumo-mcp.cmd ] && ok "prumo-mcp binary installed" || bad "prumo-mcp missing"
 
 echo; echo "########## A. Quick start on a clean Python + React monorepo"
@@ -87,8 +89,11 @@ echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted sc
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
-chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "caseMismatch,brokenLinks,missingPaths,orphans,stats gitignored,historical,suppressed,targets,tracked" "--format json: the keys docs/api.md lists"
+chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,orphans,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
+echo "$J" | grep -q '"schemaVersion": 1' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
+chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
+[ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
 Q=$($PR --quiet 2>&1); RC=$?; chk "$RC:${#Q}" "1:0" "--quiet: exit 1, no output"
 $PR --json >/dev/null 2>&1; chk "$?" "2" "--json without a path: exit 2"
 $PR --bogus >/dev/null 2>&1; chk "$?" "2" "unknown option: exit 2"
@@ -112,6 +117,8 @@ P3='{"tool_name":"Write","tool_input":{"file_path":"/home/me/t/.claude/skills/re
 echo "$P1" | bash -c "$HC" 2>&1 | grep -q "^prumo —" && ok "bash hook: Write CLAUDE.md with a Windows path runs prumo" || bad "bash hook P1"
 [ -z "$(echo "$P2" | bash -c "$HC" 2>&1)" ] && ok "bash hook: Edit main.py stays silent" || bad "bash hook P2"
 echo "$P3" | bash -c "$HC" 2>&1 | grep -q "^prumo —" && ok "bash hook: an installed SKILL.md runs prumo" || bad "bash hook P3"
+P4='{"tool_name":"Write","tool_input":{"file_path":"/home/me/t/.claude/commands/deploy.md"}}'
+echo "$P4" | bash -c "$HC" 2>&1 | grep -q "^prumo —" && ok "bash hook: a slash command file runs prumo" || bad "bash hook P4"
 echo "$P1" | bash -c "$HC" >/dev/null 2>&1; chk "$?" "0" "bash hook exits 0 despite findings, so the agent is not blocked"
 if command -v powershell >/dev/null 2>&1; then
   echo "$P1" | powershell -NoProfile -ExecutionPolicy Bypass -File hook-ps1.ps1 2>&1 | grep -q "^prumo —" && ok "PowerShell hook: Write CLAUDE.md runs prumo" || bad "PowerShell hook P1"
@@ -249,8 +256,28 @@ printf '%s
 grep -q '"isError":true' mcp-target.out && grep -q 'prumo: target not found: no-such-file.md' mcp-target.out && ok "tools/call with a target that does not exist: isError, not a report about another file" || bad "mcp missing target: $(cat mcp-target.out)"
 rm -f mcp.out
 
+echo; echo "########## M. Fenced blocks, comments, and every citation --fix rewrites"
+mk fences; mkdir -p src docs scripts; echo x > src/Component.vue; echo x > docs/README.md; echo x > scripts/build.js
+printf '# app\n\n```\nsrc/component.vue\ndocs/missing-file.md\n```\n\n```markdown\n[quoted](docs/gone.md)\n```\n\n<!-- [commented](docs/also-gone.md) -->\n\nRun `node scripts/Build.js` twice: `node scripts/Build.js --watch`.\n\n[r]: docs/readme.md\n' > CLAUDE.md; ci
+OUT=$($PR --all 2>&1)
+echo "$OUT" | grep -q "^  CLAUDE.md:4$" && echo "$OUT" | grep -q "^  CLAUDE.md:5  docs/missing-file.md" && ok "a path inside a fenced block is checked, case and missing alike" || bad "fenced paths: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
+echo "$OUT" | grep -q "gone.md" && bad "a link inside a markdown fence or an HTML comment was reported" || ok "a link inside a markdown fence or an HTML comment is a quotation"
+chk "$(echo "$OUT" | grep -c '^  CLAUDE.md:14$')" "1" "the same path twice on one line is one finding"
+echo "$OUT" | grep -q "^  CLAUDE.md:16$" && ok "a reference definition with the wrong case is a case mismatch" || bad "reference definition: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
+OUT=$($PR --fix --all 2>&1); RC=$?
+echo "$OUT" | grep -q "^FIXED  3 paths in 1 file" && echo "$OUT" | grep -q "^1 to review" && chk "$RC" "1" "--fix rewrites the fenced line, the command and the reference definition in one pass; the missing path remains, exit 1" || bad "fix: $(echo "$OUT" | grep -E '^(FIXED|  skipped|[0-9]+ to review)' | tr '\n' '|')"
+grep -q "^src/Component.vue$" CLAUDE.md && grep -q "node scripts/build.js --watch" CLAUDE.md && grep -q "^\[r\]: docs/README.md$" CLAUDE.md && ok "each line carries the spelling git holds" || bad "rewritten lines: $(grep -n -E 'Component|build.js|\[r\]' CLAUDE.md | tr '\n' '|')"
+mk untracked; mkdir -p src .claude/skills/deploy/steps .claude/commands; echo x > src/Component.vue
+printf '.claude/skills/\n' > .gitignore; printf '# app\n' > CLAUDE.md; printf 'Run `scripts/deploy.sh` first.\n' > .claude/commands/deploy.md
+printf -- '---\nname: deploy\ndescription: d\n---\nEdit `src/component.vue` and follow [setup](steps/setup.md).\n' > .claude/skills/deploy/SKILL.md; echo s > .claude/skills/deploy/steps/setup.md; ci
+OUT=$($PR 2>&1)
+echo "$OUT" | head -3 | grep -q "3 context files" && echo "$OUT" | grep -q "1 context file not tracked by git" && ok "an installed skill under .gitignore and a slash command are both read, and the header says which came from disk" || bad "untracked: $(echo "$OUT" | head -3 | tr '\n' '|')"
+echo "$OUT" | grep -q "^  .claude/skills/deploy/SKILL.md:5$" && ok "the case mismatch inside the untracked skill is reported" || bad "untracked case: $OUT"
+echo "$OUT" | grep -q "steps/setup.md" && bad "the skill's own file beside it was reported" || ok "the file beside the skill is found on disk"
+echo "$OUT" | grep -q "^  .claude/commands/deploy.md:1  scripts/deploy.sh" && ok "a slash command citing a dead path is reported" || bad "command target: $OUT"
+
 if [ "$GLOBAL" = 1 ]; then
-  echo; echo "########## M. npm install -g (opt-in)"
+  echo; echo "########## N. npm install -g (opt-in)"
   npm install -g "$PKG" --silent --no-audit --no-fund >/dev/null 2>&1 && hash -r
   chk "$(prumo --version 2>&1)" "$VERSION" "'prumo --version' after a global install"
   npm uninstall -g @tomd4vs/prumo --silent >/dev/null 2>&1; hash -r

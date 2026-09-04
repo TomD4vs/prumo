@@ -70,7 +70,7 @@ Read the sentence before changing anything. Three cases are already filtered aut
 
 Three more are not, because they need judgement:
 
-- A recipe that tells the reader to create the file, as in *"copy the template into `config/database.php`"*. The path is correct and the file is meant not to exist yet. Add `<!-- prumo-ignore -->` to that line.
+- A recipe that tells the reader to create the file, as in *"copy the template into `config/database.php`"*. The path is correct and the file is meant not to exist yet. Add `<!-- prumo-ignore -->` to that line, or `<!-- prumo-ignore-next-line -->` above a fenced block that lists such files.
 - A `[[wikilink]]` to a note kept in another folder. Pass both folders in one run, `prumo . notes-a notes-b`, and the link resolves.
 - A page that a build step generates, such as a documentation site's landing page. List it under `ignore` in `.prumorc.json`, or add it to `.gitignore` if it is never meant to be tracked.
 

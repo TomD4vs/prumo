@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { analyze, resolveTargets, loadConfig, DEFAULT_TARGETS, DEFAULT_DIRS, NESTED } from '../src/check.mjs';
+import { analyze, resolveTargets, loadConfig, DEFAULT_TARGETS, DEFAULT_DIRS, NESTED, SCHEMA_VERSION } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 
 const made = [];
@@ -288,7 +288,6 @@ test('a link inside backticks is a quotation, not a reference', () => {
 });
 
 test('finds an installed SKILL.md, ignores one at the root, and reports a renamed supporting file', () => {
-  // An installed skill links its supporting files by relative path; one was renamed later.
   const skill = [
     '---', 'name: deploy', 'description: test', '---',
     '- [Setup](steps/setup.md)',
@@ -297,7 +296,6 @@ test('finds an installed SKILL.md, ignores one at the root, and reports a rename
   ].join('\n');
   const repo = repoWith({
     'AGENTS.md': '# root\n',
-    // A root SKILL.md is not an installed skill; its paths are examples, not references.
     'SKILL.md': 'Each step lives in `steps/<name>.md`.\n',
     '.claude/skills/deploy/SKILL.md': skill,
     '.claude/skills/deploy/steps/setup.md': '# setup\n',
@@ -821,4 +819,228 @@ test('the same words on their own still silence it', () => {
     'src/index.js': '',
   });
   assert.equal(r.missingPaths.length, 0);
+});
+
+test('a path inside a fenced block is checked, and a link there is a quotation', () => {
+  const r = run({
+    'CLAUDE.md': [
+      '# app', '',
+      '```', 'src/component.vue', 'docs/missing-file.md', '```', '',
+      '```bash', 'node scripts/seed.js --force', '```', '',
+      '```markdown', 'See `src/gone-quoted.ts` and [a link](docs/gone.md).', '```', '',
+      '<!-- [commented](docs/also-gone.md) -->',
+      'A real one: [live](docs/really-gone.md).', '',
+    ].join('\n'),
+    'src/Component.vue': '',
+    'docs/README.md': '',
+  });
+  assert.deepEqual(r.caseMismatch.map((c) => [c.line, c.cited, c.actual]), [[4, 'src/component.vue', 'src/Component.vue']]);
+  assert.deepEqual(r.missingPaths.map((m) => [m.line, m.cited]), [[5, 'docs/missing-file.md'], [9, 'scripts/seed.js']]);
+  assert.deepEqual(r.brokenLinks.map((l) => [l.line, l.cited]), [[17, 'docs/really-gone.md']]);
+});
+
+test('inside a fenced block, a comment line and a bare ./name argument are not read', () => {
+  const r = run({
+    'CLAUDE.md': [
+      '```bash',
+      '# -> results_abc/runs.json',
+      '// see src/gone-in-comment.ts',
+      'tool export --messages ./messages.json --out ./out.json',
+      'tool import ./data/input.json',
+      'src/api/    # REST handlers',
+      '```',
+      '',
+    ].join('\n'),
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['data/input.json', 'src/api']);
+});
+
+test('a line number, a GitHub anchor or a ::symbol after a path points inside the file, not at another one', () => {
+  const r = run({
+    'CLAUDE.md': 'See `src/index.ts:42`, `src/index.ts#L10-L20`, `src/index.ts::main` and `src/gone.ts::helper`.\n',
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/gone.ts']);
+});
+
+test('a path that starts with a shell variable belongs to wherever the variable points', () => {
+  const r = run({
+    'CLAUDE.md': 'Read `$PROJECT_ROOT/docs/gone.md` and `$ENGINE/AGENTS.md`, then `docs/really-gone.md`.\n',
+    'docs/README.md': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['docs/really-gone.md']);
+});
+
+test('what sits inside an HTML comment is not read, and the rest of its line is', () => {
+  const r = run({
+    'CLAUDE.md': [
+      'Keep `src/index.ts` <!-- was `src/old.ts` --> as the entry.',
+      '<!--',
+      'Old notes: `config/gone.php` and [x](docs/gone.md).',
+      '-->',
+      'Still `config/really-gone.php`.',
+      '',
+    ].join('\n'),
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => [m.line, m.cited]), [[5, 'config/really-gone.php']]);
+  assert.equal(r.brokenLinks.length, 0);
+});
+
+test('a prumo-ignore-next-line marker before a fenced block silences the whole block, counted once', () => {
+  const r = run({
+    'CLAUDE.md': [
+      '<!-- prumo-ignore-next-line -->',
+      '```',
+      'src/gone-a.ts',
+      'src/gone-b.ts',
+      '```',
+      '- step:',
+      '',
+      '    ~~~sh',
+      '    cat src/gone-c.ts',
+      '    ~~~',
+      '',
+    ].join('\n'),
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/gone-c.ts']);
+  assert.equal(r.stats.suppressed, 1);
+});
+
+test('a path a sentence excuses stays excused on the lines of the file that follow', () => {
+  const r = run({
+    'CLAUDE.md': [
+      'The build generates `dist-notes/summary.md` on every run.',
+      '', '', '', '', '', '', '',
+      'Open `dist-notes/summary.md` when it is done, and read `src/gone.ts` first.',
+      '',
+    ].join('\n'),
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => [m.line, m.cited]), [[9, 'src/gone.ts']]);
+});
+
+test('e.g. marks an example the way the word itself does', () => {
+  const r = run({
+    'CLAUDE.md': 'Cite a file with line numbers, e.g. `src/api/client.ts:40-55`.\n',
+    'src/index.ts': '',
+  });
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a path cited on several lines is reported on each, and one fix pass corrects them all', () => {
+  const repo = repoWith({
+    'CLAUDE.md': 'Logo in `layouts/App.vue`.\n\nAlso `layouts/App.vue` and again `layouts/App.vue` here.\n',
+    'resources/js/Layouts/App.vue': '',
+  });
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  assert.deepEqual(before.caseMismatch.map((c) => c.line), [1, 3]);
+
+  const fixed = applyCaseFixes(before.caseMismatch, targets);
+  assert.equal(fixed.paths, 2);
+  assert.equal(fixed.skipped.length, 0);
+  assert.doesNotMatch(readFileSync(join(repo, 'CLAUDE.md'), 'utf8'), /layouts\/App\.vue/);
+  assert.equal(analyze({ repo, targets }).caseMismatch.length, 0);
+});
+
+test('--fix rewrites every form a path is cited in: a command, a backslash, a line number, a trailing slash, a fenced block, and each link syntax', () => {
+  const repo = repoWith({
+    'CLAUDE.md': [
+      'Run `node scripts/Build.js --watch`, see `src/layouts/App.vue:42`, models in `app/models/`.',
+      'The layout is `src\\layouts\\App.vue`, deployed by `./scripts/Build.js`.',
+      '```',
+      'cp app/models/User.php src/layouts/',
+      '```',
+      'Read [the note](<docs/nota longa.md>) and [the other][r].',
+      '',
+      '[r]: docs/real.md',
+      '',
+    ].join('\n'),
+    'scripts/build.js': '',
+    'src/Layouts/App.vue': '',
+    'app/Models/User.php': '',
+    'docs/Nota Longa.md': '',
+    'docs/Real.md': '',
+  });
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  assert.equal(before.caseMismatch.length, 9);
+
+  const fixed = applyCaseFixes(before.caseMismatch, targets);
+  assert.deepEqual(fixed.skipped, []);
+  assert.equal(fixed.paths, 9);
+  assert.equal(readFileSync(join(repo, 'CLAUDE.md'), 'utf8'), [
+    'Run `node scripts/build.js --watch`, see `src/Layouts/App.vue:42`, models in `app/Models/`.',
+    'The layout is `src\\Layouts\\App.vue`, deployed by `./scripts/build.js`.',
+    '```',
+    'cp app/Models/User.php src/Layouts/',
+    '```',
+    'Read [the note](<docs/Nota Longa.md>) and [the other][r].',
+    '',
+    '[r]: docs/Real.md',
+    '',
+  ].join('\n'));
+  assert.equal(analyze({ repo, targets }).caseMismatch.length, 0);
+});
+
+test('a skill installed under .claude/skills is read even when git does not track it', () => {
+  const repo = repoWith({
+    '.gitignore': '.claude/skills/\n',
+    'CLAUDE.md': '# app\n',
+    'src/Component.vue': '',
+  });
+  mkdirSync(join(repo, '.claude/skills/deploy/steps'), { recursive: true });
+  writeFileSync(join(repo, '.claude/skills/deploy/SKILL.md'), '---\nname: deploy\ndescription: d\n---\nEdit `src/component.vue`, follow [setup](steps/setup.md), run `steps/run.sh`.\n');
+  writeFileSync(join(repo, '.claude/skills/deploy/steps/setup.md'), '');
+  writeFileSync(join(repo, '.claude/skills/deploy/steps/run.sh'), '');
+
+  const targets = resolveTargets(repo, []);
+  assert.deepEqual(targets.map((t) => t.label), ['CLAUDE.md', '.claude/skills/deploy/SKILL.md']);
+  const r = analyze({ repo, targets });
+  assert.equal(r.stats.untracked, 1);
+  assert.deepEqual(r.caseMismatch.map((c) => [c.file, c.cited]), [['.claude/skills/deploy/SKILL.md', 'src/component.vue']]);
+  assert.equal(r.missingPaths.length, 0, 'the files beside the skill are on disk');
+  assert.equal(r.brokenLinks.length, 0);
+});
+
+test('a slash command under .claude/commands is a context file; an agent definition is not read unless named', () => {
+  const r = run({
+    'CLAUDE.md': '# app\n',
+    '.claude/commands/deploy.md': 'Run `scripts/deploy.sh`, then read `docs/release-notes.md`.\n',
+    '.claude/agents/reviewer.md': '---\nname: reviewer\n---\nCite a file with line numbers, as in `src/api/client.ts:40-55`.\n',
+    'scripts/deploy.sh': '',
+  });
+  assert.equal(r.stats.targets, 2);
+  assert.deepEqual(r.missingPaths.map((m) => [m.file, m.cited]), [['.claude/commands/deploy.md', 'docs/release-notes.md']]);
+});
+
+test('a folder named path is a placeholder wherever it sits, and a quoted path in prose code is left alone', () => {
+  const r = run({
+    'CLAUDE.md': 'Run `pytest tests/path/test.py::test_name -v`, load with `audio.play("sounds/sfx.json")`, and read `src/gone.ts`.\n',
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/gone.ts']);
+});
+
+test('NOT IN INDEX belongs to a folder passed explicitly, not to auto-detected folders beside a root MEMORY.md', () => {
+  const r = run({
+    'MEMORY.md': '# index\n',
+    'CLAUDE.md': '# app\n',
+    '.claude/commands/deploy.md': 'Deploy.\n',
+  });
+  assert.deepEqual(r.orphans, []);
+});
+
+test('the result identifies the run: schema, version, repository and time', () => {
+  const repo = repoWith({ 'CLAUDE.md': '# x\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  const version = JSON.parse(readFileSync(join(dirname(BIN), '..', 'package.json'), 'utf8')).version;
+  assert.deepEqual(Object.keys(r).slice(0, 4), ['schemaVersion', 'prumoVersion', 'repo', 'checkedAt']);
+  assert.equal(r.schemaVersion, SCHEMA_VERSION);
+  assert.equal(r.prumoVersion, version);
+  assert.equal(r.repo, resolve(repo));
+  assert.ok(!Number.isNaN(Date.parse(r.checkedAt)), 'checkedAt is an ISO date');
 });

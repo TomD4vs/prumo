@@ -12,12 +12,18 @@ import { analyze, resolveTargets } from '@tomd4vs/prumo';
 const targets = resolveTargets('.', []);          // [] = auto-detect
 const result  = analyze({ repo: '.', targets });
 
+console.log(result.schemaVersion);  // 1, bumped when this shape changes
+console.log(result.prumoVersion);   // the version that ran
+console.log(result.repo);           // absolute path of the repository checked
+console.log(result.checkedAt);      // when, as an ISO 8601 date
 console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
 console.log(result.orphans);        // ['note-nobody-links-to.md']
-console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored }
+console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked }
 ```
+
+The first four fields identify the run. A consumer can tell a change of shape from a breakage, and a report about one repository from a report about another. `--format json`, `--json FILE` and the MCP server's structured content carry them too. A path cited on several lines is one finding per line.
 
 `kind` is `wikilink` or `link`. On a case mismatch it is present only when the path came from a markdown link, and then `actual` is relative to the file that holds the link, as the link itself is.
 
@@ -28,7 +34,7 @@ console.log(result.stats);          // { tracked, targets, historical, suppresse
 ```bash
 git clone https://github.com/TomD4vs/prumo.git
 cd prumo
-node --test          # 37 tests, no dependencies
+node --test          # every file under test/, no dependencies
 node bin/prumo.mjs . # run it on itself
 npm run simulate     # a new user follows the README against the packed tarball
 ```
