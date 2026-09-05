@@ -390,6 +390,43 @@ above, the one reorganising its plugins, one pass rewrote nineteen citations in 
 none, and the run that followed reported no rename at all; the diff was read line by line before
 the clone was restored. A deletion is never rewritten, since there is nothing to write in its place.
 
+A twelfth pass, for 0.8.1, on sixty repositories from the same searches, none on any earlier list,
+and the first honest number for the fifth check, since nothing of it was shaped there. One clone
+failed, eight hold no context file prumo detects, five of them a `SKILL.md` at the root, six are
+catalogues above fifty, twenty-eight came back clean, and the other sixteen are counted apart. The
+history was restored on all of them but one, so the rename information of 0.7.2 was measured on
+fresh material at the same time:
+
+| Public repositories, twelfth pass, 0.8.0 to 0.8.1 | |
+| --- | ---: |
+| Repositories checked | 58 |
+| Findings outside the catalogues, under 0.8.0 | 97 |
+| Real | 43 |
+| Precision | 44% |
+| Removed by three rules built from this corpus | 9 |
+| Of those, real | 1 |
+| Findings under 0.8.1, 42 real | 88 |
+| Precision | 48% |
+| `AGENT CONFIG` findings, all real | 4 |
+| Missing paths and links git spoke for, all right | 12 |
+
+The fifth check read eight repositories with a configuration JSON, eleven rules and seven thousand
+skills, and reported four things: two hooks in one `.claude/settings.json` naming a script that
+lives in another folder, and two skills copied into a documentation folder without their front
+matter. Nothing false, on material that shaped none of its rules; the number is small because the
+shapes are rare, as the eleventh pass had said. The real findings of the other checks are the known
+ones, a folder of schemas that moved, a heading whose slug lost its parenthesis, links written one
+folder too shallow from a rules folder, a skills folder that moved from `.claude/` to `.agents/`
+while its own instructions kept citing the old place; git confirmed twelve of them, three moves and
+nine deletions, and corrected three that had been read as examples by hand, since the files had
+existed and were deleted. The false ones are the families of the earlier passes: files a setup step
+creates, examples inside skills that teach how to write skills, runtime folders, and paths of a
+plugin cited by where it gets installed. Three rules were built from this corpus and are fitted to
+it: `pnpm version` is pnpm itself, a sentence that says deleted, removed or retired in Chinese is
+a negation like its English and Portuguese counterparts, and an emphasis mark glued after a path,
+`scripts/sync.mjs._`, is not part of the path. They removed nine findings, eight false and one real
+that sat beside a Chinese negation, which is the same trade the paragraph rule has always made.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case and the renames git itself recorded, since a note corrected wrongly is worse than a stale one, and those two are the only corrections read from git rather than guessed. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.

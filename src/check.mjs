@@ -115,6 +115,7 @@ const NEGATION = new RegExp(
     'exclu[ií]d', '\\bsumi', 'deixou de', 'foi renomead', 'virou', 'passou a ser',
     'hist[óo]ric', 'obsolet', 'superad', 'revertid', 'substitu[íi]d',
     'antes (era|fazia|chamava)', '\\berrad', 'min[úu]scul', 'mai[úu]scul', 'caixa',
+    '已(删除|移除|下线|废弃|迁移)', '不存在', '重命名',
     '\\bcitad', 'exemplo', 'placeholder', 'example', '\\be\\.g\\.', 'gitignor', '\\bno\\b[^.\\n]{0,40}\\bfound\\b',
   ].join('|'),
   'i'
@@ -511,7 +512,7 @@ const SHELL_LANGUAGE = /^(bash|sh|shell|zsh|fish|console|terminal|cmd|bat|powers
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const ELSEWHERE_FLAG = /^(-w|--workspaces?|-C|--directory|--dir|-f|--file|--filter|-r|--recursive|--cwd|--prefix)(=.*)?$/;
 const YARN_BUILTIN = new Set('access add audit autoclean bin cache check config constraints create dedupe dlx exec explain generate-lock-entry global help import info init install licenses link list login logout node outdated owner pack patch patch-commit plugin policies publish rebuild remove run search set stage tag team unlink unplug up upgrade upgrade-interactive version versions why workspace workspaces'.split(' '));
-const PNPM_BUILTIN = new Set('add install i update up upgrade remove rm uninstall un link unlink import rebuild rb prune fetch dedupe patch patch-commit patch-remove audit licenses outdated list ls why run exec dlx create publish pack recursive server store env setup init deploy doctor config cat-file cat-index find-hash approve-builds ignored-builds self-update root bin help'.split(' '));
+const PNPM_BUILTIN = new Set('add install i update up upgrade remove rm uninstall un link unlink import rebuild rb prune fetch dedupe patch patch-commit patch-remove audit licenses outdated list ls why run exec dlx create publish pack recursive server store env setup init deploy doctor config cat-file cat-index find-hash approve-builds ignored-builds self-update root bin help version'.split(' '));
 const COMPOSER_BUILTIN = new Set('about archive audit browse bump check-platform-reqs clear-cache clearcache cc completion config create-project depends diagnose dump-autoload dumpautoload exec fund global help home init install i licenses list outdated prohibits reinstall remove require run run-script search self-update selfupdate show status suggests update u upgrade validate why why-not'.split(' '));
 const KNOWN_BIN = new Set(['tsc', 'tsserver', 'playwright', 'commitlint', 'changeset', 'svelte-kit', 'ng', 'sb', 'nest', 'remix', 'eas', 'firebase', 'netlify', 'biome']);
 
@@ -523,7 +524,7 @@ function tokensOf(span, strip) {
   const raw = span.split(/\s+/);
   const creates = CREATES.test(raw[0]);
   return raw.map((r, i) => ({
-    tok: r.replace(/^>+/, '').replace(/^--?[\w-]+=/, '').replace(strip, '').replace(CALL_PREFIX, ''),
+    tok: r.replace(/^>+/, '').replace(/^--?[\w-]+=/, '').replace(/\.[_*]+$/, '').replace(strip, '').replace(CALL_PREFIX, ''),
     out: creates || r.startsWith('>') || OUTPUT_FLAG.test(r) || (i > 0 && REDIRECT.test(raw[i - 1])),
   }));
 }
@@ -1324,6 +1325,24 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
   const missingKept = keep(missingPaths), linksKept = keep(brokenLinks);
   missingPaths.length = 0; missingPaths.push(...missingKept);
   brokenLinks.length = 0; brokenLinks.push(...linksKept);
+
+  // A link whose text is the same path in backticks is one citation, and the link is the one that resolves it.
+  const linkedOn = new Map();
+  for (const l of brokenLinks) {
+    if (l.kind !== 'link' || !relOf.has(l)) continue;
+    const key = `${l.file}\0${l.line}`;
+    if (!linkedOn.has(key)) linkedOn.set(key, new Set());
+    linkedOn.get(key).add(relOf.get(l));
+  }
+  if (linkedOn.size) {
+    const once = missingPaths.filter((o) => {
+      const set = linkedOn.get(`${o.file}\0${o.line}`);
+      if (!set) return true;
+      const bare = o.cited.replace(/^\.\//, '');
+      return !set.has(bare) && !set.has(posix.normalize(posix.join(posix.dirname(o.file), bare)));
+    });
+    missingPaths.length = 0; missingPaths.push(...once);
+  }
 
   const indexFile = checked.find((t) => t.fromDir && /^MEMORY\.md$/i.test(t.label));
   if (indexFile) {

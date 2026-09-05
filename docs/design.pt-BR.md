@@ -399,6 +399,44 @@ estava reorganizando seus plugins, uma passada reescreveu dezenove citações em
 pulou nenhuma, e a rodada seguinte não reportou rename nenhum; o diff foi lido linha a linha antes
 de o clone ser restaurado. Uma exclusão nunca é reescrita, porque não há o que escrever no lugar.
 
+Uma décima segunda passagem, para a 0.8.1, em sessenta repositórios das mesmas buscas, nenhum em
+lista anterior, e o primeiro número honesto da quinta checagem, porque nada dela foi moldado ali.
+Um clone falhou, oito não têm arquivo de contexto que o prumo detecte, cinco deles um `SKILL.md`
+na raiz, seis são catálogos acima de cinquenta, vinte e oito vieram limpos, e os outros dezesseis
+ficam contados à parte. O histórico foi restaurado em todos menos um, então a informação de rename
+da 0.7.2 foi medida em material fresco na mesma passagem:
+
+| Repositórios públicos, décima segunda passagem, 0.8.0 a 0.8.1 | |
+| --- | ---: |
+| Repositórios checados | 58 |
+| Achados fora dos catálogos, na 0.8.0 | 97 |
+| Reais | 43 |
+| Precisão | 44% |
+| Removidos por três regras nascidas deste corpus | 9 |
+| Desses, reais | 1 |
+| Achados na 0.8.1, 42 reais | 88 |
+| Precisão | 48% |
+| Achados de `AGENT CONFIG`, todos reais | 4 |
+| Caminhos ausentes e links pelos quais o git falou, todos certos | 12 |
+
+A quinta checagem leu oito repositórios com JSON de configuração, onze regras e sete mil skills, e
+reportou quatro coisas: dois hooks num mesmo `.claude/settings.json` nomeando um script que mora em
+outra pasta, e duas skills copiadas para uma pasta de documentação sem o frontmatter. Nenhum falso,
+em material que não moldou regra nenhuma dela; o número é pequeno porque as formas são raras, como a
+décima primeira passagem já tinha dito. Os achados reais das outras checagens são os conhecidos, uma
+pasta de schemas que se moveu, um título cujo slug perdeu o parêntese, links escritos uma pasta
+rasos demais a partir de uma pasta de regras, uma pasta de skills que se moveu de `.claude/` para
+`.agents/` enquanto as próprias instruções seguiam citando o lugar antigo; o git confirmou doze
+deles, três mudanças e nove exclusões, e corrigiu três que a leitura à mão tinha tomado por exemplo,
+porque os arquivos existiram e foram apagados. Os falsos são as famílias das passagens anteriores:
+arquivos que um passo de configuração cria, exemplos dentro de skills que ensinam a escrever skills,
+pastas de execução, e caminhos de um plugin citados pelo lugar em que ele é instalado. Três regras
+nasceram deste corpus e são ajustadas a ele: `pnpm version` é o próprio pnpm, uma frase que diz
+apagado, removido ou desativado em chinês é negação como as equivalentes em inglês e português, e
+uma marca de ênfase colada depois de um caminho, `scripts/sync.mjs._`, fica de fora dele. Elas
+removeram nove achados, oito falsos e um real que estava ao lado de uma negação em chinês, a mesma
+troca que a regra de parágrafo sempre fez.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.

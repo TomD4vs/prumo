@@ -1489,3 +1489,29 @@ test('an mdc: link in a Cursor rule resolves from the repository root, and keeps
   assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['mdc:src/gone.ts']);
   assert.equal(r.missingPaths.length, 0);
 });
+
+test('a link whose text is the same path in backticks is one citation, reported once as the link', () => {
+  const r = run({
+    'CLAUDE.md': '# app\n\nSee [\x60docs/gone.md\x60](docs/gone.md) and [\x60src/lost.ts\x60](./src/lost.ts).\nAlso \x60docs/other.md\x60 beside [x](docs/gone.md).\n',
+    'packages/api/AGENTS.md': '# api\n\nRead [\x60src/old.ts\x60](src/old.ts) here.\n',
+    'src/kept.ts': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => `${l.file}:${l.line} ${l.cited}`), [
+    'CLAUDE.md:3 docs/gone.md',
+    'CLAUDE.md:3 ./src/lost.ts',
+    'CLAUDE.md:4 docs/gone.md',
+    'packages/api/AGENTS.md:3 src/old.ts',
+  ]);
+  assert.deepEqual(r.missingPaths.map((o) => `${o.file}:${o.line} ${o.cited}`), ['CLAUDE.md:4 docs/other.md'], 'the backticked twin of a link is not a second finding; a different path beside a link still is');
+});
+
+test('pnpm version is a builtin, a Chinese sentence that says the file was deleted is a negation, and emphasis glued after a path is not part of it', () => {
+  const r = run({
+    'CLAUDE.md': '# app\n\n- 已清理模块:\x60packages/tauri\x60（原疑似废弃，现已删除）\n- \x60ws/lsp.ts\x60 文件已移除。\n\nBoth files carry an \x60_Auto-synced via scripts/sync-spec-docs.mjs._\x60 line.\n',
+    'AGENTS.md': '# agents\n\nBump with \x60pnpm version patch\x60 before \x60pnpm run release\x60. See \x60src/gone.ts\x60.\n',
+    'package.json': '{"name":"x","scripts":{"build":"tsc"}}\n',
+    'scripts/sync-spec-docs.mjs': '',
+  });
+  assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['pnpm run release'], 'pnpm version is pnpm itself, and only the script nothing defines is reported');
+  assert.deepEqual(r.missingPaths.map((o) => o.cited), ['src/gone.ts'], 'the lines that say deleted or removed in Chinese are quiet, and the path with markup glued on resolves');
+});
