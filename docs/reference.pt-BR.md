@@ -19,7 +19,7 @@ prumo [repo] [alvo...] [opções]
 
 | Opção | Significado |
 | --- | --- |
-| `--fix` | Corrige capitalização no lugar; nada mais é tocado |
+| `--fix` | Corrige capitalização e os renames que o git registrou, no lugar; nada mais é tocado |
 | `--format F` | `text` (padrão), `github`, `json` ou `sarif` |
 | `--sarif ARQ` | Também grava os achados em `ARQ` como SARIF, para o code scanning |
 | `--all` | Mostra todos os achados em vez dos 25 primeiros |
@@ -132,7 +132,7 @@ Centenas desses geralmente têm uma causa sistemática só. Numa execução medi
 
 A nota cita um arquivo que não existe mais em lugar nenhum do repositório. Atualize o caminho, ou reescreva a frase se o ponto dela for justamente que o arquivo sumiu. O prumo reconhece construções como *"foi removido"*, *"não existe mais"*, *"renomeado para"*, *"migrated from"*, *"moved to"* e *"no skills found"*, e se cala quando encontra uma.
 
-Quando o git guarda o histórico do arquivo, o achado diz para onde ele foi. `->  config/db.php   renamed in a3f21c9, 4 months ago` é a detecção de rename do próprio git, por similaridade, seguida por renomeações posteriores até o nome que existe agora, e `deleted in a3f21c9, 4 months ago` é o commit que o removeu. Um arquivo movido e reescrito de uma vez é lido como apagado, porque o git pareia um rename por similaridade, enquanto uma mudança dentro de um commit que tocou milhares de arquivos continua sendo lida como mudança, porque a consulta eleva o limite de renames do git. Nada é dito quando o histórico nunca teve o caminho, que é a cara de um marcador, de um erro de digitação ou de um caminho de outro projeto, nem quando o clone é raso. A consulta pergunta ao git só pelos caminhos que reporta, no máximo duzentos por execução, e um rename não é aplicado pelo `--fix`, que continua tocando só a capitalização.
+Quando o git guarda o histórico do arquivo, o achado diz para onde ele foi. `->  config/db.php   renamed in a3f21c9, 4 months ago` é a detecção de rename do próprio git, por similaridade, seguida por renomeações posteriores até o nome que existe agora, e `deleted in a3f21c9, 4 months ago` é o commit que o removeu. Um arquivo movido e reescrito de uma vez é lido como apagado, porque o git pareia um rename por similaridade, enquanto uma mudança dentro de um commit que tocou milhares de arquivos continua sendo lida como mudança, porque a consulta eleva o limite de renames do git. Nada é dito quando o histórico nunca teve o caminho, que é a cara de um marcador, de um erro de digitação ou de um caminho de outro projeto, nem quando o clone é raso. A consulta pergunta ao git só pelos caminhos que reporta, no máximo duzentos por execução. Um rename é a única coisa além da capitalização que o `--fix` aplica, abaixo; uma exclusão nunca é reescrita.
 
 Também reconhece uma frase que diz que o arquivo é escrito, como *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* ou *"`docs/run.log` é gerado pelo build"*, e deixa esse caminho em paz. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* continua checando `a`. Uma lista ou uma tabela toma o veredito da frase que as apresenta, ou do título da seção, e num comando um redirecionamento `>`, uma flag `-o` ou `mkdir` marca o que é escrito. Uma frase que faz da existência do arquivo uma condição, *"se `docs/contexto.md` existir, leia"* ou *"leia `docs/contexto.md` se existir"*, também fica em paz. Um caminho com a caixa errada é reportado diga a frase o que disser.
 
@@ -232,19 +232,20 @@ As supressões e o baseline são contados no cabeçalho, então um repositório 
 
 ---
 
-## Corrigindo capitalização automaticamente
+## Corrigindo capitalização e renames automaticamente
 
 ```bash
 prumo --fix
 ```
 
 ```
-FIXED  1 path in 1 file
+FIXED  2 paths in 1 file
   CLAUDE.md:18   layouts/AppLayout.vue  ->  resources/js/Layouts/AppLayout.vue
+  CLAUDE.md:30   config/database.php  ->  config/db.php   renamed in a3f21c9
 ```
 
-Só a capitalização é reescrita, porque só nela o valor correto pode ser lido do índice do git em vez de adivinhado. Links quebrados e caminhos ausentes ficam intocados: a sugestão de link é um palpite bem informado, e um caminho ausente pode estar ausente de propósito.
+Duas coisas são reescritas, porque só nelas o valor correto é lido em vez de adivinhado: uma capitalização errada, cuja grafia vem do índice do git, e um caminho ausente ou um link markdown cujo arquivo o git registrou como renomeado, cujo nome novo vem do histórico. Todo o resto fica intocado: um link sugerido pelo nome é um palpite bem informado, um caminho ausente sem histórico pode estar ausente de propósito, e um arquivo apagado não tem o que ser escrito no lugar dele.
 
-Toda forma de citar um caminho é reescrita onde está: entre crases, dentro de um comando, dentro de um bloco de código cercado, escrita com barra invertida, seguida de número de linha, e num link escrito como `[a](x)`, `[a](<x>)` ou `[ref]: x`. Um caminho citado em várias linhas é corrigido em todas elas numa passada só.
+Toda forma de citar um caminho é reescrita onde está: entre crases, dentro de um comando, dentro de um bloco de código cercado, escrita com barra invertida, seguida de número de linha, e num link escrito como `[a](x)`, `[a](<x>)` ou `[ref]: x`. Um caminho renomeado é escrito do jeito que a citação era: a partir da raiz, a partir da pasta da nota, com `/` ou `mdc:` na frente, ou com os espaços como `%20`. Um caminho citado em várias linhas é corrigido em todas elas numa passada só.
 
 Se uma linha mudou entre a varredura e o `--fix`, o prumo deixa a linha como está e avisa no relatório.

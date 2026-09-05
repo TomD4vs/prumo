@@ -7,7 +7,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { analyze, resolveTargets, loadConfig, loadBaseline, baselineOf, changedFiles, hasRootSkill, BASELINE_FILE } from '../src/check.mjs';
-import { applyCaseFixes } from '../src/fix.mjs';
+import { applyFixes, renameFixes } from '../src/fix.mjs';
 import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
 import { createRequire } from 'node:module';
@@ -31,7 +31,7 @@ ARGUMENTS
                 CLAUDE.md, AGENTS.md, .cursor/rules and friends.
 
 OPTIONS
-  --fix         correct case mismatches in place; nothing else is touched
+  --fix         correct case mismatches and the renames git recorded, in place; nothing else is touched
   --format F    text (default), github, json, or sarif
   --all         list every finding instead of the first 25
   --json F      also write the findings to F as JSON
@@ -133,9 +133,12 @@ try {
 }
 
 let fixed = null;
-if (FIX && result.caseMismatch.length) {
-  fixed = applyCaseFixes(result.caseMismatch, targets);
-  result = analyze({ repo, targets, config, baseline, only });
+if (FIX) {
+  const changes = [...result.caseMismatch, ...renameFixes(result)];
+  if (changes.length) {
+    fixed = applyFixes(changes, targets);
+    result = analyze({ repo, targets, config, baseline, only });
+  }
 }
 
 const { caseMismatch, brokenLinks, missingPaths, unknownCommands, configIssues, orphans, stats } = result;

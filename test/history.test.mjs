@@ -4,8 +4,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 import { analyze, resolveTargets } from '../src/check.mjs';
+import { applyFixes, renameFixes } from '../src/fix.mjs';
 import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 
 const made = [];
@@ -52,7 +55,7 @@ test('a missing path says where git moved it, or when git deleted it, and a path
   assert.equal(by['scripts/seed.py'].to, undefined);
   assert.equal(by['src/other.ts'], null, 'never in the history: no history line');
   assert.equal('path/to/file.php' in by, false, 'a placeholder is not a finding at all');
-  assert.equal(r.schemaVersion, 6);
+  assert.equal(r.schemaVersion, 7);
 
   const text = renderText(r);
   assert.match(text, new RegExp(`^  CLAUDE\\.md:3  config/database\\.php\\n      Copy .*\\n      ->  config/db\\.php   renamed in ${by['config/database.php'].commit}, today$`, 'm'));
@@ -134,4 +137,106 @@ test('a path cited from beside a nested note is looked up there too, a folder is
   const a = check(old).brokenLinks.concat(check(old).missingPaths).find((o) => o.cited === 'a.md');
   assert.ok(a && a.history, 'a bare name in a link or a path is looked up too');
   assert.match(a.history.when, /^\d+ years? ago$/);
+});
+
+const BIN = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', 'bin', 'prumo.mjs');
+const SERVER = join(dirname(BIN), 'prumo-mcp.mjs');
+
+test('--fix rewrites a missing path to the name git renamed it to, in the form the note used, and leaves a deletion and an unknown path alone', () => {
+  const repo = repoWith({
+    'CLAUDE.md': '# app\n\nCopy \x60config/database.php\x60 and run \x60./scripts/seed.py\x60. See \x60docs/gone.md\x60 and \x60src/other.ts\x60.\n',
+    'packages/api/AGENTS.md': '# api\n\nEdit \x60src/old.ts\x60 and \x60src\\old.ts\x60 here.\n',
+    'config/database.php': 'x',
+    'scripts/seed.py': 'y',
+    'docs/gone.md': '# gone\n',
+    'packages/api/src/old.ts': 'z',
+  });
+  git(repo, 'mv config/database.php config/db.php');
+  git(repo, 'mv scripts/seed.py scripts/seed_db.py');
+  git(repo, 'rm -q docs/gone.md');
+  git(repo, 'mv packages/api/src/old.ts packages/api/src/new.ts');
+  git(repo, 'commit -qm second');
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  const changes = renameFixes(before);
+  assert.deepEqual(changes.map((c) => `${c.file}:${c.line} ${c.cited} -> ${c.actual}`).sort(), [
+    'CLAUDE.md:3 config/database.php -> config/db.php',
+    'CLAUDE.md:3 scripts/seed.py -> scripts/seed_db.py',
+    'packages/api/AGENTS.md:3 src/old.ts -> src/new.ts',
+  ], 'a ./ prefix and a backslash spelling are one citation each, rewritten where they stand');
+  assert.ok(changes.every((c) => c.why === 'rename' && /^[0-9a-f]{7}$/.test(c.commit)));
+  const fixed = applyFixes([...before.caseMismatch, ...changes], targets);
+  assert.equal(fixed.paths, 3);
+  assert.equal(fixed.files, 2);
+  assert.equal(readFileSync(join(repo, 'CLAUDE.md'), 'utf8'), '# app\n\nCopy \x60config/db.php\x60 and run \x60./scripts/seed_db.py\x60. See \x60docs/gone.md\x60 and \x60src/other.ts\x60.\n');
+  assert.equal(readFileSync(join(repo, 'packages/api/AGENTS.md'), 'utf8'), '# api\n\nEdit \x60src/new.ts\x60 and \x60src\\new.ts\x60 here.\n');
+  const after = analyze({ repo, targets });
+  assert.deepEqual(after.missingPaths.map((o) => o.cited).sort(), ['docs/gone.md', 'src/other.ts'], 'the deletion and the unknown path stay reported');
+  const text = renderText(after, { fixed });
+  assert.match(text, new RegExp(`^  CLAUDE\\.md:3   config/database\\.php  ->  config/db\\.php   renamed in ${changes[0].commit}$`, 'm'));
+  assert.match(text, /^FIXED  3 paths in 2 files$/m);
+});
+
+test('--fix rewrites a moved link in every spelling: relative, from a nested note, rooted, mdc:, with %20 and with ./', () => {
+  const repo = repoWith({
+    'CLAUDE.md': '# app\n\n[a](docs/setup.md) [b](/docs/setup.md) [c](./docs/setup.md) [d](docs/Long%20Name.md) [e](<docs/Long Name.md>)\n\n[ref]: docs/setup.md\n',
+    'nested/deep/AGENTS.md': '# deep\n\n[f](../../docs/setup.md) [g](docs/local.md)\n',
+    '.cursor/rules/x.mdc': '---\nglobs: src/**\n---\n[h](mdc:docs/setup.md)\n',
+    'docs/setup.md': '# s\n',
+    'docs/Long Name.md': '# l\n',
+    'nested/deep/docs/local.md': '# local\n',
+  });
+  git(repo, 'mv docs/setup.md docs/install.md');
+  git(repo, '"mv" "docs/Long Name.md" "docs/Longer Name.md"');
+  git(repo, 'mv nested/deep/docs/local.md nested/deep/docs/moved.md');
+  git(repo, 'commit -qm second');
+  const targets = resolveTargets(repo, []);
+  const before = analyze({ repo, targets });
+  const changes = renameFixes(before);
+  assert.deepEqual(changes.map((c) => `${c.cited} -> ${c.actual}`).sort(), [
+    '../../docs/setup.md -> ../../docs/install.md',
+    './docs/setup.md -> ./docs/install.md',
+    '/docs/setup.md -> /docs/install.md',
+    'docs/Long Name.md -> docs/Longer Name.md',
+    'docs/Long%20Name.md -> docs/Longer%20Name.md',
+    'docs/local.md -> docs/moved.md',
+    'docs/setup.md -> docs/install.md',
+    'docs/setup.md -> docs/install.md',
+    'mdc:docs/setup.md -> mdc:docs/install.md',
+  ]);
+  applyFixes(changes, targets);
+  assert.equal(readFileSync(join(repo, 'CLAUDE.md'), 'utf8'), '# app\n\n[a](docs/install.md) [b](/docs/install.md) [c](./docs/install.md) [d](docs/Longer%20Name.md) [e](<docs/Longer Name.md>)\n\n[ref]: docs/install.md\n');
+  assert.equal(readFileSync(join(repo, 'nested/deep/AGENTS.md'), 'utf8'), '# deep\n\n[f](../../docs/install.md) [g](docs/moved.md)\n');
+  assert.match(readFileSync(join(repo, '.cursor/rules/x.mdc'), 'utf8'), /\[h\]\(mdc:docs\/install\.md\)/);
+  const after = analyze({ repo, targets });
+  assert.equal(after.brokenLinks.length, 0);
+});
+
+test('the CLI and the MCP server apply the renames with --fix and prumo_fix, and report them as renamed', () => {
+  const files = { 'CLAUDE.md': '# app\n\nSee \x60src/Old.ts\x60 and \x60lib/gone.ts\x60.\n', 'src/old.ts': 'x', 'lib/gone.ts': 'y' };
+  const repo = repoWith(files);
+  git(repo, 'mv lib/gone.ts lib/kept.ts');
+  git(repo, 'commit -qm second');
+  const r = spawnSync(process.execPath, [BIN, repo, '--fix'], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '0' } });
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /^FIXED  2 paths in 1 file$/m);
+  assert.match(r.stdout, /^  CLAUDE\.md:3   src\/Old\.ts  ->  src\/old\.ts$/m);
+  assert.match(r.stdout, /^  CLAUDE\.md:3   lib\/gone\.ts  ->  lib\/kept\.ts   renamed in [0-9a-f]{7}$/m);
+  assert.match(r.stdout, /^nothing to review\.$/m);
+
+  const again = repoWith(files);
+  git(again, 'mv lib/gone.ts lib/kept.ts');
+  git(again, 'commit -qm second');
+  const input = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'prumo_fix', arguments: { repo: again } } },
+    { jsonrpc: '2.0', id: 3, method: 'tools/list' },
+  ].map((m) => JSON.stringify(m)).join('\n') + '\n';
+  const s = spawnSync(process.execPath, [SERVER], { input, encoding: 'utf8' });
+  const replies = s.stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const fixed = replies.find((x) => x.id === 2).result.structuredContent.fixed;
+  assert.equal(fixed.paths, 2);
+  assert.ok(fixed.changes.some((c) => c.why === 'rename' && c.actual === 'lib/kept.ts'));
+  assert.match(readFileSync(join(again, 'CLAUDE.md'), 'utf8'), /lib\/kept\.ts/);
+  assert.match(replies.find((x) => x.id === 3).result.tools.find((x) => x.name === 'prumo_fix').description, /renamed/);
 });

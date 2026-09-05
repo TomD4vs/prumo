@@ -85,7 +85,7 @@ Every finding carries a file, a line number and the correction, and a missing pa
 Three limits, chosen on purpose and explained in [Design](docs/design.md):
 
 - It does not judge claims. Whether *"this flag disables caching"* is still true needs a model, and that is a different tool.
-- It does not edit beyond letter case. A link suggestion is an educated guess, and a missing path may be missing on purpose.
+- It does not edit beyond letter case and the renames git itself recorded. A link suggested from a name is an educated guess, and a missing path with no history may be missing on purpose.
 - It makes no network calls. No telemetry, no account, no model.
 
 ---
@@ -109,7 +109,7 @@ prumo is a plain CLI, so any agent with shell access can run it.
 
 **Ask the agent to run it.** `npx @tomd4vs/prumo` works in any git repository, and covers skills installed under `.claude/skills/` on its own. For a repository that is itself a skill, name the file: `npx @tomd4vs/prumo . SKILL.md`. The text output names the file, the line and the correction, which is enough for an agent to act on without parsing. `--format json` returns the same findings as structured data.
 
-**Expose it as a tool.** The package also ships `prumo-mcp`, an MCP server over stdio with two tools: `prumo_check`, which is read only, and `prumo_fix`, which rewrites letter case. In Claude Code:
+**Expose it as a tool.** The package also ships `prumo-mcp`, an MCP server over stdio with two tools: `prumo_check`, which is read only, and `prumo_fix`, which rewrites letter case and the renames git recorded. In Claude Code:
 
 ```bash
 claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp

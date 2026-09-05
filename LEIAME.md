@@ -85,7 +85,7 @@ Todo achado traz arquivo, número da linha e a correção, e um caminho ausente 
 Três limites, escolhidos de propósito e explicados em [Design](docs/design.pt-BR.md):
 
 - Não julga afirmações. Saber se *"esta flag desliga o cache"* continua verdade exige um modelo, e isso é outra ferramenta.
-- Não edita além da capitalização. A sugestão de link é um palpite bem informado, e um caminho ausente pode estar ausente de propósito.
+- Não edita além da capitalização e dos renames que o próprio git registrou. Um link sugerido pelo nome é um palpite bem informado, e um caminho ausente sem histórico pode estar ausente de propósito.
 - Não faz chamada de rede. Sem telemetria, sem conta, sem modelo.
 
 ---
@@ -109,7 +109,7 @@ O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rod
 
 **Peça ao agente para rodar.** `npx @tomd4vs/prumo` funciona em qualquer repositório git, e cobre sozinho as skills instaladas em `.claude/skills/`. Para um repositório que é ele mesmo uma skill, nomeie o arquivo: `npx @tomd4vs/prumo . SKILL.md`. A saída em texto traz arquivo, linha e correção, o que basta para um agente agir sem precisar interpretar nada. `--format json` devolve os mesmos achados como dados estruturados.
 
-**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a capitalização. No Claude Code:
+**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a capitalização e os renames que o git registrou. No Claude Code:
 
 ```bash
 claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp

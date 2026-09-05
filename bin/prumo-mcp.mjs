@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * prumo — MCP server over stdio, so an agent can ask for a check as a tool call.
- * Two tools: prumo_check (read only) and prumo_fix (rewrites case mismatches).
+ * Two tools: prumo_check (read only) and prumo_fix (rewrites case mismatches and the renames git recorded).
  * JSON-RPC 2.0, one message per line, no dependencies.
  */
 
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { analyze, resolveTargets, loadConfig, loadBaseline, hasRootSkill } from '../src/check.mjs';
-import { applyCaseFixes } from '../src/fix.mjs';
+import { applyFixes, renameFixes } from '../src/fix.mjs';
 import { renderText } from '../src/report.mjs';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
@@ -38,7 +38,7 @@ const TOOLS = [
   {
     name: 'prumo_fix',
     description:
-      'Rewrites case mismatches in place to the spelling the git index holds, then reports what remains. Only letter case is touched; broken links and missing paths are never edited.',
+      'Rewrites case mismatches in place to the spelling the git index holds, and a missing path or a markdown link to the name git recorded when it renamed the file, then reports what remains. Nothing else is touched: a link suggested from a name, a missing path with no history and a deleted file are never edited.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG },
@@ -61,9 +61,12 @@ function run(name, { repo = '.', targets: explicit = [] } = {}) {
   const baseline = loadBaseline(repo);
   let result = analyze({ repo, targets, config, baseline });
   let fixed = null;
-  if (name === 'prumo_fix' && result.caseMismatch.length) {
-    fixed = applyCaseFixes(result.caseMismatch, targets);
-    result = analyze({ repo, targets, config, baseline });
+  if (name === 'prumo_fix') {
+    const changes = [...result.caseMismatch, ...renameFixes(result)];
+    if (changes.length) {
+      fixed = applyFixes(changes, targets);
+      result = analyze({ repo, targets, config, baseline });
+    }
   }
   return { result, fixed };
 }
@@ -79,7 +82,7 @@ function handle(msg) {
         protocolVersion: PROTOCOL,
         capabilities: { tools: {} },
         serverInfo: { name: 'prumo', version: VERSION },
-        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case; everything else is for you to edit by hand.',
+        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand.',
       });
     case 'ping':
       return reply({});

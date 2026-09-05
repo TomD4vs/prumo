@@ -28,7 +28,7 @@ function palette(color) {
  * @param {object} result   what analyze() returned
  * @param {object} [opts]
  * @param {boolean} [opts.all]     list every finding instead of the first 25
- * @param {object}  [opts.fixed]   what applyCaseFixes() returned, when --fix ran
+ * @param {object}  [opts.fixed]   what applyFixes() returned, when --fix ran
  * @param {string}  [opts.jsonPath] file the findings were also written to
  * @param {boolean} [opts.color]   paint it for a terminal
  * @param {number}  [opts.baselineWritten] how many findings --baseline just recorded
@@ -57,7 +57,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   if (fixed) {
     const count = `${plural(fixed.paths, 'path', 'paths')} in ${plural(fixed.files, 'file', 'files')}`;
     out.push(color ? `${badge(PAINT.teal, 'FIXED')} ${bold(count)}` : `FIXED  ${count}`);
-    for (const c of fixed.changes) out.push(`  ${at(c)}   ${orange(c.cited)}  ${teal('->')}  ${teal(c.actual)}`);
+    for (const c of fixed.changes) out.push(`  ${at(c)}   ${orange(c.cited)}  ${teal('->')}  ${teal(c.actual)}${c.why === 'rename' ? `   ${dim(`renamed in ${c.commit}`)}` : ''}`);
     for (const s of fixed.skipped) out.push(dim(`  skipped ${s.file}:${s.line} (${s.why})`));
     out.push('');
   }

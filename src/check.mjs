@@ -11,7 +11,7 @@ import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:p
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -294,7 +294,7 @@ function makeHistorian(repo, index) {
       for (const path of candidates) {
         if (!seen.has(path)) seen.set(path, follow(path, 0));
         const h = seen.get(path);
-        if (h) return h;
+        if (h) return { ...h, from: path };
       }
       return null;
     },

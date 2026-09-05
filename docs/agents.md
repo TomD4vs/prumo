@@ -20,7 +20,7 @@ The text output names the file, the line and the correction, which is enough for
 
 ## Expose it as a tool
 
-The package ships `prumo-mcp`, an MCP server over stdio with two tools: `prumo_check`, which is read only, and `prumo_fix`, which rewrites letter case. The agent decides when to call them and reads the same report as the CLI, plus the findings as structured data.
+The package ships `prumo-mcp`, an MCP server over stdio with two tools: `prumo_check`, which is read only, and `prumo_fix`, which rewrites letter case and the renames git recorded. The agent decides when to call them and reads the same report as the CLI, plus the findings as structured data.
 
 In Claude Code:
 

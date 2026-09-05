@@ -393,7 +393,13 @@ regra do Cursor aponta para a raiz do repositório, é resolvido a partir da rai
 links falsos no décimo primeiro e fez uma skill copiada no oitavo cruzar o portão de outro projeto,
 vinte e dois achados retidos. Nos corpora fixos esta release não remove nem acrescenta nada.
 
-Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
+Com a 0.8.0, o `--fix` aplica esses renames, a primeira vez que ele escreve algo além da
+capitalização, e pode porque o nome novo vem do git em vez de um palpite. No catálogo acima, o que
+estava reorganizando seus plugins, uma passada reescreveu dezenove citações em três arquivos, não
+pulou nenhuma, e a rodada seguinte não reportou rename nenhum; o diff foi lido linha a linha antes
+de o clone ser restaurado. Uma exclusão nunca é reescrita, porque não há o que escrever no lugar.
+
+Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.
 

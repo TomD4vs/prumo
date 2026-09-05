@@ -60,7 +60,7 @@ test('a baseline records the findings of a run by kind, file and cited path, and
   assert.equal(total(held), 0);
   assert.equal(held.stats.baselined, 3);
   assert.equal(held.stats.baselineStale, 0);
-  assert.equal(held.schemaVersion, 6);
+  assert.equal(held.schemaVersion, 7);
   assert.equal(total(check(repo)), 3, 'without the baseline everything is reported');
 
   write(repo, 'CLAUDE.md', readFileSync(join(repo, 'CLAUDE.md'), 'utf8') + 'And `docs/new.md`.\n');

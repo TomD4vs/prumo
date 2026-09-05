@@ -384,7 +384,13 @@ which cleared eighteen false links on the eleventh and let a vendored skill on t
 another-project gate, twenty-two findings held back. On the fixed corpora this release removes
 nothing and adds nothing.
 
-Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
+With 0.8.0, `--fix` applies those renames, the first time it writes anything beyond letter case,
+and it is allowed to because the new name comes from git rather than from a guess. On the catalogue
+above, the one reorganising its plugins, one pass rewrote nineteen citations in three files, skipped
+none, and the run that followed reported no rename at all; the diff was read line by line before
+the clone was restored. A deletion is never rewritten, since there is nothing to write in its place.
+
+Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case and the renames git itself recorded, since a note corrected wrongly is worse than a stale one, and those two are the only corrections read from git rather than guessed. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
 

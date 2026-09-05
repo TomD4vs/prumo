@@ -97,7 +97,7 @@ echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
 chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats baselineStale,baselined,configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 6' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+echo "$J" | grep -q '"schemaVersion": 7' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -163,9 +163,12 @@ $PR 2>&1 | grep -q "TicketList" && bad "transient: a bare folder did not cover i
 $PR --no-config 2>&1 | grep -q "TicketList" && ok "--no-config bypasses the file" || bad "--no-config"
 printf '{ bad' > .prumorc.json; $PR >/dev/null 2>&1; chk "$?" "2" "invalid JSON: exit 2"; rm .prumorc.json
 
-echo; echo "########## F. --fix: prose paths and markdown links, nothing else"
-OUT=$($PR --fix 2>&1); echo "$OUT" | grep -q "^FIXED  1 path in 1 file" && ok "FIXED 1 path in 1 file" || bad "FIXED"
-chk "$(git diff --numstat | tr '\t' ' ')" "1 1 CLAUDE.md" "one line changed in one file"
+echo; echo "########## F. --fix: case mismatches and the renames git recorded, nothing else"
+OUT=$($PR --fix 2>&1); echo "$OUT" | grep -q "^FIXED  2 paths in 1 file" && ok "FIXED 2 paths in 1 file: the case and the rename git recorded" || bad "FIXED: $(echo "$OUT" | grep -A3 FIXED | tr '\n' '|')"
+echo "$OUT" | grep -qE "^  CLAUDE.md:[0-9]+   frontend/src/components/TicketList.tsx  ->  frontend/src/components/TicketTable.tsx   renamed in [0-9a-f]{7}$" && ok "the rename line names the commit" || bad "rename line: $(echo "$OUT" | grep TicketList | tr '\n' '|')"
+chk "$(git diff --numstat | tr '\t' ' ')" "2 2 CLAUDE.md" "two lines changed in one file"
+grep -q "frontend/src/components/TicketTable.tsx" CLAUDE.md && ok "CLAUDE.md now cites the component where git moved it" || bad "CLAUDE.md not rewritten"
+OUT=$($PR 2>&1); echo "$OUT" | grep -q "^MISSING PATH  (1)" && echo "$OUT" | grep -q "scripts/seed_db.py" && ok "after the fix only the deleted script remains, and a deletion is never rewritten" || bad "after fix: $(echo "$OUT" | grep -A2 MISSING | tr '\n' '|')"
 git checkout -q -- CLAUDE.md
 sed 's#(checklist.md)#(Checklist.md)#' .claude/skills/release/SKILL.md > S.tmp && mv S.tmp .claude/skills/release/SKILL.md; ci
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "^CASE MISMATCH  (2)" && echo "$OUT" | grep -q "Checklist.md" && ok "a markdown link with the wrong case is a case mismatch" || bad "link case: $(echo "$OUT" | grep -A3 CASE | tr '\n' '|')"
@@ -331,7 +334,7 @@ echo "$OUT" | grep -q "^4 to review" && chk "$RC" "1" "--no-baseline reports all
 mkdir -p config; echo x > config/old.php; git add -A >/dev/null 2>&1
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "^        2 findings held in .prumo-baseline.json; 1 entry there matches nothing now" && ok "a resolved finding shows as an entry that matches nothing now" || bad "stale: $(echo "$OUT" | grep held)"
 ci
-J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===6?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 6 in the JSON" || bad "json baseline stats"
+J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===7?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 7 in the JSON" || bad "json baseline stats"
 printf 'Read \x60docs/also-gone.md\x60.\n' >> AGENTS.md; git add AGENTS.md >/dev/null 2>&1
 OUT=$($PR --staged 2>&1); RC=$?
 echo "$OUT" | grep -q "^prumo — 1 context file, " && echo "$OUT" | grep -q "^        only the context files staged for commit" && echo "$OUT" | grep -q "docs/also-gone.md" && ! echo "$OUT" | grep -q "docs/new.md" && chk "$RC" "1" "--staged checks the staged AGENTS.md alone" || bad "staged: $(echo "$OUT" | tr '\n' '|')"
