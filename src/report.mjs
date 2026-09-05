@@ -31,7 +31,7 @@ function palette(color) {
  * @param {boolean} [opts.color]   paint it for a terminal
  */
 export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false } = {}) {
-  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, stats } = result;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, elsewhere = [], stats } = result;
   const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + orphans.length;
   const { bold, dim, teal, orange, badge } = palette(color);
   const out = [];
@@ -91,6 +91,12 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     out.push(...rest(unknownCommands));
   }
 
+  if (elsewhere.length) {
+    out.push(title('ANOTHER PROJECT', PAINT.blue, elsewhere.length, 'its paths start in folders this repository does not have, so its findings are held back'));
+    for (const o of cap(elsewhere)) out.push(`  ${bold(o.file)}   ${dim(`${o.absent} of ${o.cited} cited paths; name the file to check it in full`)}`);
+    out.push(...rest(elsewhere));
+  }
+
   if (!total) out.push(teal('nothing to review.'));
   else if (!color) out.push(`${total} to review`);
   else {
@@ -109,9 +115,10 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
 /** GitHub Actions annotations, one per finding. */
 export function renderGithub(result) {
-  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans } = result;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, elsewhere = [] } = result;
   const lines = [];
   const say = (level, o, msg) => lines.push(`::${level} file=${o.file},line=${o.line}::${msg}`);
+  for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} cited paths start in folders this repository does not have; findings held back`);
   for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);
   for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}`);

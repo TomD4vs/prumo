@@ -10,7 +10,7 @@ import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:p
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -33,15 +33,19 @@ export const DEFAULT_DIRS = ['.cursor/rules', '.windsurf/rules', '.roo/rules', '
 
 /** Where a host installs skills. A skill found here is read even when git does not track it. */
 const SKILL_DIRS = ['.claude/skills', '.agents/skills'];
+/** The folders a skill carries beside its `SKILL.md`. Missing, they are the skill's own gap, which is a finding, and never a sign that it documents another project. */
+const SKILL_BUNDLE = /^(references|scripts|assets|templates)$/i;
 
 export const NESTED = new Set(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', 'AGENT.md', 'GEMINI.md', 'COPILOT.md', 'SKILL.md']);
 
 const ROOTS = /^(app|apps|src|lib|resources|routes|database|config|tests?|public|scripts|bootstrap|packages|components|pages|layouts|server|api|cmd|internal|docs|dist|build|backend|frontend|services|client|\.github|\.claude)\//i;
 const CODE_EXT = /\.(php|vue|js|mjs|cjs|ts|tsx|jsx|css|scss|json|ya?ml|blade\.php|py|go|rb|rs|java|kt|sql|sh|html|toml|md)$/i;
 /** A shell variable in front points wherever the variable does, like a home folder or a URL. */
-const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:|\$)/;
-/** What a note appends to a path to point inside the file: a line number, a GitHub `#L10` anchor, or a `::symbol`. */
-const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::[\w.$]+)$/;
+const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:|file:|\$)/;
+/** `docs.example.com/page.md` and `gesetze-im-internet.de/x.html` start with a host, which is a web address written without its scheme. */
+const HOSTNAME = /^[\w-]+(\.[\w-]+)*\.(com|org|net|io|dev|ai|app|co|edu|gov|de|br|uk|fr|es|it|nl|ch|at|eu|me|info|xyz)\//i;
+/** What a note appends to a path to point inside the file: a line number, a GitHub `#L10` anchor, a `::symbol` or a `:symbol`. */
+const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::?[A-Za-z_$][\w.$]*)$/;
 const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 /** `path/to/thing.js`, `tests/path/test.py` and `src/foo/bar.test.ts` are how an example spells its argument, not files in this repository. */
 const PLACEHOLDER_PATH = /(^|[/])(path|foo|bar|baz)[/]/i;
@@ -91,8 +95,8 @@ const PRODUCED_ALL = new RegExp(PRODUCED.source, 'gi');
 const CONSUMES_ALL = new RegExp(CONSUMES.source, 'gi');
 const LIST_ITEM = /^(\s*)(?:[-*+]|\d+[.)])\s+/;
 const TABLE_ROW = /^\s*\|/;
-/** `report-YYYY-MM-DD.md` and `product/vX.Y.Z/` name a file to be created, not one that is here. */
-const TEMPLATE_TOKEN = /\bYYYY[-_]MM[-_]DD\b|\bv?X\.Y\.Z\b/i;
+/** `report-YYYY-MM-DD.md`, `product/vX.Y.Z/` and `shots/shot_NN.md` name a file to be created, not one that is here. */
+const TEMPLATE_TOKEN = /\bYYYY[-_]MM[-_]DD\b|\bv?X\.Y\.Z\b|(^|[_\-/])N{2,}([_\-.]|$)/;
 /** `src/common/constants.hpp/.cpp` is two files written as one token, never a path. */
 const COMPOUND_EXT = /\.[a-z0-9]{1,5}\/\.[a-z0-9]{1,5}$/i;
 /** What a markdown link may point at besides code and markdown: the images and documents a note embeds. */
@@ -102,7 +106,7 @@ const NEGATION = new RegExp(
   [
     '(does|do|did|is|are|was|were|has|have|will) ?n.?t ',
     'no longer', '\\bnever', 'used to', 'formerly', 'replaced by', 'deprecated',
-    'was removed', 'were removed', 'has been removed', 'deleted', 'renamed',
+    'was removed', 'were removed', 'has been removed', 'deleted', 'renamed', 'migrated', '\\bmoved\\b',
     'historical', 'reverted', 'superseded', 'not published', 'not exist',
     'n[ãa]o (existe|publica|h[áa]|tem)', 'n[ãa]o [ée] ', 'removid', 'apagad', 'deletad',
     'exclu[ií]d', '\\bsumi', 'deixou de', 'foi renomead', 'virou', 'passou a ser',
@@ -274,7 +278,7 @@ export function resolveTargets(repo, explicit = []) {
   if (explicit.length) {
     const missing = explicit.filter((t) => !existsSync(isAbsolute(t) ? t : join(repo, t)));
     if (missing.length) throw new Error(`target not found: ${missing.join(', ')}`);
-    return explicit.flatMap((t) => expandTarget(repo, t));
+    return explicit.flatMap((t) => expandTarget(repo, t)).map((t) => ({ ...t, explicit: true }));
   }
 
   const targets = [];
@@ -391,7 +395,7 @@ function pathsAmong(tokens) {
   const found = [];
   for (const { tok: raw, out } of tokens) {
     const tok = raw.includes('\\') ? raw.split('\\').join('/') : raw;
-    if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || PLACEHOLDER_PATH.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
+    if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || HOSTNAME.test(tok) || PLACEHOLDER_PATH.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
     if (TEMPLATE_TOKEN.test(tok) || COMPOUND_EXT.test(tok)) continue;
     if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
     found.push({ p: tok.replace(/^\.\//, '').replace(INSIDE_FILE, '').replace(/\/$/, ''), out });
@@ -411,7 +415,7 @@ function pathsInProse(line) {
     let tokens = [{ tok: t, out: false }];
     if (/\s/.test(t)) {
       const first = t.split(/\s+/)[0];
-      if (MOVES_OR_DELETES.test(t) || (first.includes('/') && !first.startsWith('./'))) continue;
+      if (MOVES_OR_DELETES.test(t) || /^\d/.test(first) || (first.includes('/') && !first.startsWith('./'))) continue;
       tokens = tokensOf(t, PROSE_STRIP);
     }
     for (const f of pathsAmong(tokens)) found.push({ ...f, at: m.index, len: m[0].length, command: false });
@@ -507,6 +511,14 @@ function governs(text, at, len) {
   const c = nearest(CONSUMES_ALL, true);
   if (p === Infinity && c === Infinity) return '';
   return p <= c ? 'produces' : 'consumes';
+}
+
+/** True when the sentence makes the file's existence a condition: *"if `x` exists, read it"*, *"check whether `x` is present"*, *"se `x` existir"*. */
+function conditionalExistence(text, at, len) {
+  const s = sentenceAround(text, at, len);
+  const plain = masked(s.text);
+  return /\b(if|when|whether|unless|se|caso|quando)\b[^.;!?]{0,60}$/i.test(plain.slice(0, s.at))
+    && /^[^.;!?]{0,40}\b(exists?|present|available|found|missing|absent|existir|existirem|exista|existe|presente|ausente|faltar)\b/i.test(plain.slice(s.at + len));
 }
 
 /** What a heading or a block's introduction says about the paths under it: a producing verb anywhere wins, since *"Output path | When to use"* is about outputs. */
@@ -631,7 +643,7 @@ function commandsIn(text) {
   const found = [];
   const add = (cited, name, source, strict) => { if (!/[./\\*{}$<>[\]]/.test(name)) found.push({ cited, name, source, strict }); };
   for (const seg of text.replace(PROMPT, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
-    const tok = seg.trim().split(/\s+/).map((t) => t.replace(/^["'`]+|["'`]+$/g, '')).filter(Boolean);
+    const tok = seg.replace(/(["'])(?:(?!\1).)*\1/g, (q) => (q.includes(' ') ? '' : q)).trim().split(/\s+/).map((t) => t.replace(/^["'`]+|["'`]+$/g, '')).filter(Boolean);
     while (tok.length && (ENV_ASSIGNMENT.test(tok[0]) || tok[0] === 'sudo' || tok[0] === 'time')) tok.shift();
     const [cmd, ...rest] = tok;
     if (!cmd || rest.some((t) => ELSEWHERE_FLAG.test(t))) continue;
@@ -781,7 +793,7 @@ export function analyze({ repo, targets, config = null }) {
   const loose = new Map();
   for (const n of linkable) loose.set(n.toLowerCase().replace(/[_-]/g, ''), n);
 
-  const caseMismatch = [], missingPaths = [], brokenLinks = [], unknownCommands = [], orphans = [];
+  const caseMismatch = [], missingPaths = [], brokenLinks = [], unknownCommands = [], orphans = [], elsewhere = [];
   let historical = 0, suppressed = 0, untracked = 0;
   const relOf = new Map();
   const resolved = new Map();
@@ -818,6 +830,14 @@ export function analyze({ repo, targets, config = null }) {
     const marked = classifyLines(lines);
     const headings = headingsAbove(lines, marked);
     const excused = new Set();
+    const opened = { caseMismatch: caseMismatch.length, brokenLinks: brokenLinks.length, missingPaths: missingPaths.length, unknownCommands: unknownCommands.length };
+    const citedHere = new Set(), absentHere = new Set();
+    const isSkill = /(^|\/)SKILL\.md$/i.test(target.label);
+    const cite = (p, missing) => {
+      citedHere.add(p);
+      const head = p.split('/')[0];
+      if (missing && !index.known.has(head) && !(isSkill && SKILL_BUNDLE.test(head))) absentHere.add(p);
+    };
     const context = (i, anchor, before, after) => (anchor === i
       ? lines.slice(Math.max(0, i - before), i + after + 1)
       : lines.slice(Math.max(0, anchor - before), anchor).concat(lines.slice(Math.max(anchor + 1, i - before), i + 1))
@@ -838,9 +858,9 @@ export function analyze({ repo, targets, config = null }) {
           if (p.startsWith('@/') && !index.aliasRoot) continue;
 
           const r = resolveOnce(p);
-          if (r.state === 'ok') continue;
+          if (r.state === 'ok') { cite(p, false); continue; }
           const paragraph = context(i, m.anchor, 2, 2);
-          if (NEGATION.test(paragraph) || namesAnotherRepo(context(i, m.anchor, 6, 1), own)) { excused.add(p); continue; }
+          if (NEGATION.test(paragraph) || namesAnotherRepo(context(i, m.anchor, 6, 1), own) || (!code && conditionalExistence(m.text, at, len))) { excused.add(p); continue; }
           if (r.state !== 'case') {
             const parent = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
             const v = out ? 'produces' : command ? '' : verdictOn(lines, marked, headings, i, m, at, len);
@@ -848,10 +868,12 @@ export function analyze({ repo, targets, config = null }) {
           }
 
           if (r.state === 'case') {
+            cite(p, false);
             caseMismatch.push({ file: target.label, line: i + 1, cited: p, actual: r.real });
           } else if (!existsSync(join(repo, p)) && !existsSync(join(dirname(target.path), p))) {
+            cite(p, true);
             missingPaths.push({ file: target.label, line: i + 1, cited: p, excerpt: line.trim().slice(0, 160) });
-          }
+          } else cite(p, false);
         }
 
         if (!code || SHELL_LANGUAGE.test(m.lang)) {
@@ -886,6 +908,7 @@ export function analyze({ repo, targets, config = null }) {
         const to = l[1].trim();
         if (linkable.has(to) || ignored(to)) continue;
         if (to.startsWith('@/') && !index.aliasRoot) continue;
+        if (to !== l[1] || to.includes('.') || /[\w$]/.test(prose[l.index - 1] || '')) continue;
         brokenLinks.push({
           file: target.label,
           line: i + 1,
@@ -908,7 +931,7 @@ export function analyze({ repo, targets, config = null }) {
           continue;
         }
         if (!CODE_EXT.test(to) && !LINK_EXT.test(to)) continue;
-        if (WILDCARD.test(to) || PLACEHOLDER_PATH.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
+        if (WILDCARD.test(to) || HOSTNAME.test(to) || PLACEHOLDER_PATH.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
         const href = decodeLink(to);
         let abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(target.path), href);
@@ -919,6 +942,7 @@ export function analyze({ repo, targets, config = null }) {
         if (atRoot) { abs = join(repo, fromRoot); rel = fromRoot; }
         const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
         if (inside && index.known.has(rel)) {
+          cite(rel, false);
           if (anchor && /\.(md|mdx)$/i.test(rel)) {
             const theirs = anchorsOf(abs);
             if (!theirs.has(anchor)) {
@@ -933,11 +957,12 @@ export function analyze({ repo, targets, config = null }) {
           if (real) {
             const fileDir = posix.dirname(relative(repo, target.path).split(sep).join('/'));
             const fixed = atRoot ? real : posix.relative(fileDir, real);
+            cite(rel, false);
             caseMismatch.push({ file: target.label, line: i + 1, kind: 'link', cited: to, actual: href === to ? fixed : fixed.split(' ').join('%20') });
             continue;
           }
         }
-        if (existsSync(abs)) continue;
+        if (existsSync(abs)) { if (inside) cite(rel, false); continue; }
         const bare = href.slice(href.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
         const finding = {
           file: target.label,
@@ -946,10 +971,18 @@ export function analyze({ repo, targets, config = null }) {
           cited: to,
           suggestion: loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null,
         };
-        if (inside) relOf.set(finding, rel);
+        if (inside) { cite(rel, true); relOf.set(finding, rel); }
         brokenLinks.push(finding);
       }
     });
+
+    if (!target.explicit && absentHere.size >= 4 && absentHere.size >= citedHere.size * 0.6) {
+      elsewhere.push({ file: target.label, cited: citedHere.size, absent: absentHere.size });
+      caseMismatch.splice(opened.caseMismatch);
+      brokenLinks.splice(opened.brokenLinks);
+      missingPaths.splice(opened.missingPaths);
+      unknownCommands.splice(opened.unknownCommands);
+    }
   }
 
   for (const m of missingPaths) relOf.set(m, m.cited);
@@ -985,6 +1018,7 @@ export function analyze({ repo, targets, config = null }) {
     missingPaths,
     unknownCommands,
     orphans,
+    elsewhere,
     stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked },
   };
 }

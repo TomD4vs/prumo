@@ -1025,6 +1025,85 @@ test('a command is left alone where the repository has no file of that kind, or 
   assert.equal(elsewhere.unknownCommands.length, 0);
 });
 
+test('a file whose cited paths start in folders the repository does not have documents another project, and its findings are held back', () => {
+  const files = {
+    'CLAUDE.md': 'Models in `app/Models/User.php`, routes in `routes/web.php`, views in `resources/views/home.blade.php`, tests in `tests/Feature/HomeTest.php`, and read `docs/README.md`.\n',
+    'docs/README.md': '',
+  };
+  const r = run(files);
+  assert.equal(r.missingPaths.length, 0);
+  assert.deepEqual(r.elsewhere, [{ file: 'CLAUDE.md', cited: 5, absent: 4 }]);
+  const named = run(files, ['CLAUDE.md']);
+  assert.equal(named.missingPaths.length, 4);
+  assert.equal(named.elsewhere.length, 0);
+});
+
+test('a stale note that still cites the folders the repository has is checked in full, and so is a short or a mostly present one', () => {
+  const stale = run({
+    'CLAUDE.md': 'See `docs/a.md`, `docs/b.md`, `docs/c.md`, `docs/d.md` and `docs/e.md`.\n',
+    'docs/README.md': '',
+  });
+  assert.equal(stale.missingPaths.length, 5);
+  assert.equal(stale.elsewhere.length, 0);
+  const few = run({
+    'CLAUDE.md': 'See `app/a.php`, `routes/b.php` and `lib/c.php`.\n',
+    'src/index.js': '',
+  });
+  assert.equal(few.missingPaths.length, 3);
+  assert.equal(few.elsewhere.length, 0);
+  const mostlyHere = run({
+    'CLAUDE.md': 'See `src/a.js`, `src/b.js`, `src/c.js`, `src/d.js`, `src/e.js`, `src/f.js`, `app/x.php`, `routes/y.php`, `lib/z.php` and `config/w.php`.\n',
+    'src/a.js': '', 'src/b.js': '', 'src/c.js': '', 'src/d.js': '', 'src/e.js': '', 'src/f.js': '',
+  });
+  assert.equal(mostlyHere.missingPaths.length, 4);
+  assert.equal(mostlyHere.elsewhere.length, 0);
+});
+
+test('a sentence that makes the existence of the file a condition excuses it', () => {
+  const r = run({
+    'AGENTS.md': 'If `docs/context.md` exists, read it first. Check whether `docs/notes.md` is present. Se `docs/regras.md` existir, siga. Then read `docs/guide.md`.\n',
+    'docs/README.md': '',
+  });
+  assert.deepEqual(r.missingPaths.map((f) => f.cited), ['docs/guide.md']);
+});
+
+test('template syntax and code in double brackets are not wikilinks, and a span that opens with a number is not a command', () => {
+  const r = run({
+    'AGENTS.md': 'Set $[[ inputs.stage ]], filter with df[[col]], and see [[semgrep.ruleset]]. Real: [[deploy-checklist]]. Open `000 Inbox/Inbox.md` daily.\n',
+    'docs/README.md': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['deploy-checklist']);
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('a skill missing its own references is a finding, never a skill for another project', () => {
+  const r = run({
+    '.claude/skills/x/SKILL.md': 'See `references/a.md`, `references/b.md`, `scripts/run.py`, `assets/logo.md` and `templates/t.md`.\n',
+    'docs/README.md': '',
+  });
+  assert.equal(r.missingPaths.length, 5);
+  assert.equal(r.elsewhere.length, 0);
+});
+
+test('a host written without its scheme, a file:// address, a path:symbol, a NN stencil and a quoted argument with spaces', () => {
+  const r = run({
+    'AGENTS.md': [
+      'See `docs.example.com/guide.md`, `gesetze-im-internet.de/estg/__3a.html` and `file://provider.py`.',
+      'The checks live in `src/doctor.ts:runSharedChecks`; each shot is `shots/shot_NN.md` and each migration `db/NNNN_name.sql`.',
+      'The index was migrated from `docs/old-index.md`; the body moved to `docs/new.md`.',
+      'Run `make explore FILES="a b" MSG=\'main contradiction\'`.',
+      '',
+    ].join('\n'),
+    'src/doctor.ts': '',
+    'docs/README.md': '',
+    'Makefile': 'explore:\n\techo x\n',
+  });
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.unknownCommands.length, 0);
+  const symbol = run({ 'AGENTS.md': 'See `src/gone.ts:run`.\n', 'src/index.ts': '' });
+  assert.deepEqual(symbol.missingPaths.map((f) => f.cited), ['src/gone.ts']);
+});
+
 test('a fenced block in a programming language is not read', () => {
   const r = run({
     'AGENTS.md': '```js\nconst x = require(\'lib/gone.js\');\n```\n\n```python\nopen("lib/gone.py")\n```\n\n```bash\nnode lib/gone.js\n```\n',

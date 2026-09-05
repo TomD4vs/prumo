@@ -14,13 +14,14 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 
 | Filtro | Por que existe |
 | --- | --- |
-| Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. |
+| Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. Uma frase que faz da existência uma condição, *"se `docs/contexto.md` existir, leia"*, diz o mesmo sobre o arquivo que nomeia. |
+| Um arquivo que documenta outro projeto | Um arquivo de contexto cujos caminhos citados começam, na maior parte, em pastas que este repositório não tem é um modelo, ou uma skill escrita para a base de código em que vai ser instalada. Seus achados ficam retidos atrás de uma linha que o nomeia, e um arquivo nomeado na linha de comando é sempre checado por inteiro. Na quarta passagem, dezenove dos vinte e nove falsos estavam em seis repositórios onde nada era real, e na oitava todo falso que sobrou fora dos catálogos tinha essa forma. A pasta é o sinal porque uma nota envelhecida ainda cita as pastas que o repositório tem. |
 | Bloco cercado lido como código, comentário não lido | Um caminho dentro de um bloco ```` ``` ```` é um comando ou uma árvore de arquivos e é checado como tal, com a frase acima do bloco como contexto. Um link ali está sendo citado, como qualquer coisa dentro de `<!-- -->`, e nenhum dos dois é checado. Uma linha de comentário dentro do bloco é o que um comando imprime, e `./nome` sem pasta é um argumento que o leitor fornece. Um bloco numa linguagem de programação, `js` ou `python`, é código-fonte, e uma string ali é um especificador de módulo que a linguagem resolve, então ele não é lido. |
 | Um caminho que a frase diz que é escrito | *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* e *"`docs/run.log` é gerado pelo build"* nomeiam um arquivo que ainda não existe por definição. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* mantém `a` checado, e um verbo depois do caminho só conta na voz passiva, porque *"`x` cria usuários"* faz do caminho o autor. Uma lista, uma tabela ou um bloco cercado toma o veredito da frase que os apresenta ou do título da seção; num comando, um redirecionamento `>`, uma flag `-o` e `mkdir` marcam o que é escrito. Um caminho com a caixa errada é reportado diga a frase o que disser. |
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
 | Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. Um link que resolve a partir da raiz do repositório e de nenhum outro lugar é lido a partir da raiz, como um agente o lê. |
-| Marcador de posição e identificador | `path/to/test.js` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
+| Marcador de posição e identificador | `path/to/test.js` e `src/foo/bar.test.ts` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` e `shots/shot_NN.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só, nem `docs.exemplo.com/guia.md`, que é um endereço da web sem o esquema. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
@@ -167,6 +168,7 @@ versões, e em acervo fixo toda release removeu achado falso e manteve todos os 
 | 0.4.7 | 52% | 30% |
 | 0.4.10 | 86% | 32% |
 | 0.5.1 | 87% | 57% |
+| 0.5.2 | 92% | 57% |
 
 Lendo uma coluna, a ferramenta melhorou. Lendo uma linha, o material é outro. As duas coisas são
 verdade, e só as colunas respondem se uma release ajudou. A última linha conta as três checagens que as
@@ -240,6 +242,40 @@ a página no GitHub, porque um título que abre com emoji ou número ganha uma �
 mão não tem. No quinto corpus, o único comando levantado é real. No oitavo, os comandos levantados
 dentro dos catálogos nomeiam scripts dos projetos a que aquelas skills se destinam, que é a mesma
 família falsa dos caminhos.
+
+Uma nona passagem, para a 0.5.2, em sessenta repositórios de buscas simples por `SKILL.md`,
+`CLAUDE.md` e `AGENTS.md`, nenhum em lista anterior, a 0.5.1 publicada contra esta release. O portão
+sobre o arquivo que documenta outro projeto, a existência condicional, os colchetes de template e o
+trecho numerado foram congelados antes de ela rodar; seis regras menores nasceram do que ela mostrou
+e estão marcadas como tal. Oito dos sessenta não têm arquivo de contexto que o prumo detecte, oito
+são catálogos acima de cinquenta achados, e os outros quarenta e quatro ficam contados à parte:
+
+| Repositórios públicos, nona passagem, 0.5.1 contra 0.5.2 | |
+| --- | ---: |
+| Repositórios checados | 52 |
+| Catálogos de skills, mais de cinquenta achados cada | 8 |
+| Achados nos catálogos na 0.5.1 | 1991 |
+| Achados nos catálogos na 0.5.2 | 1650 |
+| Retidos ali, de trinta lidos à mão: caminhos de outro projeto, endpoints de API escritos como caminho, hosts lidos como pasta | 18 |
+| Dos mesmos trinta: um pacote de personas linkando arquivos de prompt que não carrega | 12 |
+| Os outros 44 repositórios, achados na 0.5.1 | 87 |
+| Reais | 30 |
+| Achados na 0.5.2 | 69 |
+| Reais | 29 |
+| Precisão, 0.5.1 | 34% |
+| Precisão, 0.5.2 | 42% |
+
+O portão não disparou em nenhum dos quarenta e quatro. O que ele reteve está em três catálogos, e os
+doze links do pacote de personas são a troca que ele faz: pela convenção acima são reais, porque os
+arquivos de prompt não estão lá, e o portão lê um arquivo cujas pastas estão todas ausentes como
+pertencente a outro lugar e diz isso numa linha. Os dezoito achados que saíram dos quarenta e quatro
+são cinco *"migrated from"*, seis endereços `file://`, dois argumentos entre aspas que uma linha de
+`make` tinha partido em alvo, um estêncil, um `:simbolo`, e um que a convenção chamava de real, um
+stub cujo corpo tinha *"moved to"* outro arquivo. As três regras que a 0.5.1 tirou do oitavo corpus
+não mudaram nada aqui. No oitavo corpus esta release remove mais vinte achados fora dos catálogos,
+todos falsos, 267 para 247 e 50% para 54%, e 3807 dentro deles; no quarto remove os dois hosts lidos
+como pasta, família nomeada ali e intocada desde então, e as três checagens que ela divide com a
+0.4.7 ficam em 92%.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 

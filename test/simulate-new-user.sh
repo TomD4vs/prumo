@@ -90,8 +90,8 @@ echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted sc
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
-chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,orphans,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 2' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,orphans,elsewhere,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
+echo "$J" | grep -q '"schemaVersion": 3' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -209,7 +209,7 @@ $PR 2>&1 | grep -q "packages/api/AGENTS.md" && ok "nested AGENTS.md read" || bad
 OUT=$($PR . docs 2>&1); echo "$OUT" | head -1 | grep -q "1 context file," && echo "$OUT" | grep -q "x/y.php" && ok "a folder target reads the .md files directly inside it" || bad "folder target"
 cd "$U"; rm -rf "My Project"; git init -q "My Project"; cd "My Project"; printf 'A `b/c.php`.\n' > CLAUDE.md; ci
 $PR "$U/My Project" 2>&1 | grep -q "b/c.php" && ok "a quoted path with spaces" || bad "spaces"
-mk many; { echo "# N"; for i in $(seq 1 30); do echo "See ${BT}config/f$i.php${BT}."; done; } > CLAUDE.md; ci
+mk many; mkdir -p config; echo x > config/app.php; { echo "# N"; for i in $(seq 1 30); do echo "See ${BT}config/f$i.php${BT}."; done; } > CLAUDE.md; ci
 chk "$($PR 2>&1 | grep -c '^  CLAUDE.md:'):$($PR --all 2>&1 | grep -c '^  CLAUDE.md:')" "25:30" "25 shown by default, 30 with --all"
 
 echo; echo "########## I. Skills"
@@ -287,6 +287,12 @@ echo "$OUT" | grep -q "gone.js" && bad "a js block was read" || ok "a fenced blo
 echo "$OUT" | grep -q "^UNKNOWN COMMAND  (1)" && echo "$OUT" | grep -q "^  CLAUDE.md:12  npm run test:unit   ->  npm run test:units" && ok "a script nothing defines is reported with the closest name" || bad "command: $(echo "$OUT" | grep -E 'UNKNOWN|npm' | tr '\n' '|')"
 echo "$OUT" | grep -q "^  CLAUDE.md:15  docs/setup.md#schema" && ! echo "$OUT" | grep -q "#database" && ok "a link to a heading the page lacks is a broken link, and one it has is not" || bad "anchor: $(echo "$OUT" | grep -E 'setup.md' | tr '\n' '|')"
 echo "$OUT" | grep -q "^3 to review" && chk "$RC" "1" "3 to review, exit 1" || bad "total: $(echo "$OUT" | tail -1)"
+mk elsewhere; mkdir -p docs; echo x > docs/README.md
+printf '# template\n\nCopy this file to your project. Models in `app/Models/User.php`, routes in `routes/web.php`, views in `resources/views/home.blade.php`, tests in `tests/Feature/HomeTest.php`, and read `docs/README.md`.\n' > CLAUDE.md; ci
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^ANOTHER PROJECT  (1)" && echo "$OUT" | grep -q "^  CLAUDE.md   4 of 5 cited paths" && chk "$RC" "0" "a file whose paths start in folders the repository lacks is held back, exit 0" || bad "elsewhere: $(echo "$OUT" | grep -E 'ANOTHER|CLAUDE' | tr '\n' '|')"
+OUT=$($PR . CLAUDE.md 2>&1); RC=$?
+echo "$OUT" | grep -q "^MISSING PATH  (4)" && chk "$RC" "1" "naming the file checks it in full" || bad "named: $(echo "$OUT" | grep -E 'MISSING|ANOTHER' | tr '\n' '|')"
 
 if [ "$GLOBAL" = 1 ]; then
   echo; echo "########## O. npm install -g (opt-in)"

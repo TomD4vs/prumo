@@ -67,6 +67,14 @@ test('an unknown command and a heading anchor render like the other findings, an
   assert.equal(gh, '::warning file=AGENTS.md,line=12::Unknown command: npm run test:unit — did you mean npm run test:units?');
 });
 
+test('a file held back as documenting another project is listed without counting', () => {
+  const out = renderText(result({ elsewhere: [{ file: '.claude/skills/deploy/SKILL.md', cited: 14, absent: 12 }] }));
+  assert.match(out, /^ANOTHER PROJECT  \(1\)   its paths start in folders this repository does not have, so its findings are held back$/m);
+  assert.match(out, /^  \.claude\/skills\/deploy\/SKILL\.md   12 of 14 cited paths; name the file to check it in full$/m);
+  assert.match(out, /\nnothing to review\.$/);
+  assert.equal(renderGithub(result({ elsewhere: [{ file: 'x.md', cited: 5, absent: 4 }] })), '::notice file=x.md::Documents another project: 4 of 5 cited paths start in folders this repository does not have; findings held back');
+});
+
 test('the list stops at 25 unless --all, and says how many more there are', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ file: 'CLAUDE.md', line: i + 1, cited: `config/f${i}.php`, excerpt: 'x' }));
   const short = renderText(result({ missingPaths: many }));
