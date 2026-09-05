@@ -91,7 +91,8 @@ test('growth is measured against a commit: the one thirty days ago, the first on
 
 test('the CLI runs the report, exits 0, takes --since and --format json, and refuses the options of the check', () => {
   const repo = repoWith({ 'CLAUDE.md': '# app\n\nShort.\n' });
-  const run = (...args) => spawnSync(process.execPath, [CLI, 'budget', repo, ...args], { encoding: 'utf8' });
+  // The shell running the suite may carry FORCE_COLOR; every CLI run here reads the plain report.
+  const run = (...args) => spawnSync(process.execPath, [CLI, 'budget', repo, ...args], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '' } });
   const plain = run();
   assert.equal(plain.status, 0);
   assert.match(plain.stdout, /^prumo — budget, 1 context file, \d+ tokens at four characters each\n/);

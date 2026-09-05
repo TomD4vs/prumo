@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -139,7 +139,8 @@ test('sections are split by headings outside fences, and a front matter alone is
 
 test('the CLI runs the report, exits 0, takes --format json and --json FILE, and refuses the options of the check', () => {
   const repo = repoWith({ 'CLAUDE.md': '# app\n\nSee `src/app.js`.\n', 'src/app.js': 'a' }, '2025-01-01T12:00:00Z');
-  const run = (...args) => spawnSync(process.execPath, [CLI, 'drift', repo, ...args], { encoding: 'utf8' });
+  // The shell running the suite may carry FORCE_COLOR; every CLI run here reads the plain report.
+  const run = (...args) => spawnSync(process.execPath, [CLI, 'drift', repo, ...args], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '' } });
   const plain = run();
   assert.equal(plain.status, 0);
   assert.match(plain.stdout, /^prumo — drift, 1 context file, 1 section, 1 cited file\n/);
@@ -151,7 +152,7 @@ test('the CLI runs the report, exits 0, takes --format json and --json FILE, and
   const parsed = JSON.parse(json.stdout);
   assert.equal(parsed.command, 'drift');
   assert.equal(parsed.sections.length, 1);
-  assert.equal(JSON.parse(execSync(`node -p "require(String.raw\`${out}\`) && 1"`).toString().trim()), 1);
+  assert.equal(JSON.parse(readFileSync(out, 'utf8')).command, 'drift', '--json FILE writes the same result');
 
   const fix = run('--fix');
   assert.equal(fix.status, 2);
