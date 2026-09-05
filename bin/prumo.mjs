@@ -7,7 +7,7 @@
 import { writeFileSync } from 'node:fs';
 import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
-import { renderText, renderGithub } from '../src/report.mjs';
+import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -31,9 +31,10 @@ ARGUMENTS
 
 OPTIONS
   --fix         correct case mismatches in place; nothing else is touched
-  --format F    text (default), github, or json
+  --format F    text (default), github, json, or sarif
   --all         list every finding instead of the first 25
   --json F      also write the findings to F as JSON
+  --sarif F     also write the findings to F as SARIF, for code scanning
   --quiet       print nothing; use the exit code
   --no-config   ignore .prumorc.json
   -h, --help
@@ -73,18 +74,20 @@ const valueAt = (flag) => {
 };
 
 const jsonArg = valueAt('--json');
+const sarifArg = valueAt('--sarif');
 const formatArg = valueAt('--format');
 
 if (argv.includes('--json') && !jsonArg.value) { console.error('prumo: --json needs a file path'); process.exit(2); }
+if (argv.includes('--sarif') && !sarifArg.value) { console.error('prumo: --sarif needs a file path'); process.exit(2); }
 
 const FORMAT = formatArg.value || 'text';
-if (!['text', 'github', 'json'].includes(FORMAT)) {
-  console.error(`prumo: unknown format "${FORMAT}". Use text, github or json.`);
+if (!['text', 'github', 'json', 'sarif'].includes(FORMAT)) {
+  console.error(`prumo: unknown format "${FORMAT}". Use text, github, json or sarif.`);
   process.exit(2);
 }
 
-const KNOWN = new Set(['--all', '--json', '--quiet', '--fix', '--format', '--no-config', '--help', '--version', '-h', '-v']);
-const valueIndexes = new Set([jsonArg.index, formatArg.index].filter((i) => i > 0));
+const KNOWN = new Set(['--all', '--json', '--sarif', '--quiet', '--fix', '--format', '--no-config', '--help', '--version', '-h', '-v']);
+const valueIndexes = new Set([jsonArg.index, sarifArg.index, formatArg.index].filter((i) => i > 0));
 const unknown = argv.find((a, i) => a.startsWith('-') && !valueIndexes.has(i) && !KNOWN.has(a));
 if (unknown) {
   console.error(`prumo: unknown option "${unknown}". Run "prumo --help" to see the options.`);
@@ -126,9 +129,12 @@ const { caseMismatch, brokenLinks, missingPaths, unknownCommands, orphans, stats
 const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + orphans.length;
 
 if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(result, null, 2));
+if (sarifArg.value) writeFileSync(sarifArg.value, renderSarif(result));
 
 if (!QUIET && FORMAT === 'json') {
   console.log(JSON.stringify(result, null, 2));
+} else if (!QUIET && FORMAT === 'sarif') {
+  console.log(renderSarif(result));
 } else if (!QUIET && FORMAT === 'github') {
   const lines = renderGithub(result);
   if (lines) console.log(lines);

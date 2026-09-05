@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderText, renderGithub } from '../src/report.mjs';
+import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 
 /** A result the way analyze() returns it, with whatever the test overrides. */
 const result = (over = {}) => ({
@@ -73,6 +73,32 @@ test('a file held back as documenting another project is listed without counting
   assert.match(out, /^  \.claude\/skills\/deploy\/SKILL\.md   12 of 14 cited paths; name the file to check it in full$/m);
   assert.match(out, /\nnothing to review\.$/);
   assert.equal(renderGithub(result({ elsewhere: [{ file: 'x.md', cited: 5, absent: 4 }] })), '::notice file=x.md::Documents another project: 4 of 5 cited paths start in folders this repository does not have; findings held back');
+});
+
+test('SARIF carries one result per finding, with the rule, the level, the file and the line', () => {
+  const sarif = JSON.parse(renderSarif(result({
+    prumoVersion: '9.9.9',
+    caseMismatch: [{ file: 'CLAUDE.md', line: 18, cited: 'layouts/App.vue', actual: 'resources/js/Layouts/App.vue' }],
+    brokenLinks: [{ file: 'CLAUDE.md', line: 21, kind: 'wikilink', cited: 'deploy-checklist', suggestion: 'deploy_checklist' }],
+    missingPaths: [{ file: 'docs/setup.md', line: 44, cited: 'config/database.php', excerpt: 'x' }],
+    unknownCommands: [{ file: 'AGENTS.md', line: 12, cited: 'npm run test:unit', suggestion: null }],
+    orphans: ['loose.md'],
+    elsewhere: [{ file: '.claude/skills/x/SKILL.md', cited: 5, absent: 4 }],
+  })));
+  assert.equal(sarif.version, '2.1.0');
+  const run = sarif.runs[0];
+  assert.equal(run.tool.driver.name, 'prumo');
+  assert.equal(run.tool.driver.version, '9.9.9');
+  assert.equal(run.tool.driver.rules.length, 6);
+  assert.deepEqual(run.results.map((r) => [r.ruleId, r.level, r.locations[0].physicalLocation.artifactLocation.uri, r.locations[0].physicalLocation.region?.startLine]), [
+    ['case-mismatch', 'error', 'CLAUDE.md', 18],
+    ['broken-link', 'warning', 'CLAUDE.md', 21],
+    ['missing-path', 'warning', 'docs/setup.md', 44],
+    ['unknown-command', 'warning', 'AGENTS.md', 12],
+    ['not-in-index', 'note', 'loose.md', undefined],
+    ['another-project', 'note', '.claude/skills/x/SKILL.md', undefined],
+  ]);
+  assert.equal(run.results[1].message.text, '[[deploy-checklist]] (did you mean deploy_checklist?)');
 });
 
 test('the list stops at 25 unless --all, and says how many more there are', () => {

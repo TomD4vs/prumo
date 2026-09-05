@@ -20,7 +20,8 @@ prumo [repo] [target...] [options]
 | Option | Meaning |
 | --- | --- |
 | `--fix` | Correct case mismatches in place; nothing else is touched |
-| `--format F` | `text` (default), `github`, or `json` |
+| `--format F` | `text` (default), `github`, `json`, or `sarif` |
+| `--sarif FILE` | Also write the findings to `FILE` as SARIF, for code scanning |
 | `--all` | Show every finding instead of the first 25 |
 | `--json FILE` | Also write the findings to `FILE` as JSON |
 | `--quiet` | Print nothing; use the exit code |
@@ -142,6 +143,43 @@ Not a finding. A context file whose cited paths start, for the most part, in fol
 Appears only when you pass a folder of notes. A file sits in the folder but `MEMORY.md` never mentions it, so nothing leads a reader to it. Add it to the index or delete it.
 
 ---
+
+## Continuous integration
+
+Three ways in, all the same check.
+
+**The action.** `TomD4vs/prumo@v1` is a composite step that runs the checked-out prumo at that tag, so there is nothing to install and no network call. `@v1` follows the latest release; pin `@v0.6.0` to freeze it.
+
+```yaml
+- uses: TomD4vs/prumo@v1
+  with:
+    path: .                    # the repository to check, relative to the workspace
+    targets: ''                # files or folders to check instead of auto-detecting, separated by spaces
+    format: github             # github annotates the pull request; text, json and sarif are the others
+    sarif-file: ''             # also write SARIF here, for the upload below
+    fail-on-findings: 'true'   # 'false' only annotates
+```
+
+Every value above is the default, so the one-line form in the README is this same step. The step's `total` output is the number of findings.
+
+**SARIF.** `--format sarif` prints SARIF 2.1.0, and `--sarif FILE` writes it beside whatever the run prints: one result per finding, with its rule, level, file and line. GitHub code scanning takes the file through the upload action, and the workflow needs `permissions: security-events: write` for it:
+
+```yaml
+- uses: TomD4vs/prumo@v1
+  with: { sarif-file: prumo.sarif, fail-on-findings: 'false' }
+- uses: github/codeql-action/upload-sarif@v3
+  with: { sarif_file: prumo.sarif }
+```
+
+**pre-commit.** The repository ships a hook for the [pre-commit](https://pre-commit.com) framework. It runs when a staged file is one prumo auto-detects, checks the whole repository, since a note can point at any file, and blocks the commit on a finding:
+
+```yaml
+repos:
+  - repo: https://github.com/TomD4vs/prumo
+    rev: v0.6.0
+    hooks:
+      - id: prumo
+```
 
 ## Silencing a finding
 

@@ -1,0 +1,56 @@
+name: prumo
+description: Checks the context files your coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md and the rest) against the git index, and fails the job when something needs review.
+author: Elyton
+branding:
+  icon: check-square
+  color: green
+inputs:
+  path:
+    description: The repository to check, relative to the workspace.
+    required: false
+    default: .
+  targets:
+    description: Context files or folders to check instead of auto-detecting them, separated by spaces.
+    required: false
+    default: ''
+  format:
+    description: What to print. github puts an annotation on the exact line of the pull request; text, json and sarif are the other formats.
+    required: false
+    default: github
+  sarif-file:
+    description: Also write the findings to this file as SARIF, for the upload-sarif action.
+    required: false
+    default: ''
+  fail-on-findings:
+    description: Whether the step fails when there is something to review. Set to false to only annotate.
+    required: false
+    default: 'true'
+outputs:
+  total:
+    description: How many findings there were.
+    value: ${{ steps.check.outputs.total }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        PRUMO_PATH: ${{ inputs.path }}
+        PRUMO_TARGETS: ${{ inputs.targets }}
+        PRUMO_FORMAT: ${{ inputs.format }}
+        PRUMO_SARIF: ${{ inputs.sarif-file }}
+        PRUMO_FAIL: ${{ inputs.fail-on-findings }}
+      run: |
+        set +e
+        json="$RUNNER_TEMP/prumo-$RANDOM.json"
+        if [ -n "$PRUMO_SARIF" ]; then
+          node "$GITHUB_ACTION_PATH/bin/prumo.mjs" "$PRUMO_PATH" $PRUMO_TARGETS --format "$PRUMO_FORMAT" --json "$json" --sarif "$PRUMO_SARIF"
+        else
+          node "$GITHUB_ACTION_PATH/bin/prumo.mjs" "$PRUMO_PATH" $PRUMO_TARGETS --format "$PRUMO_FORMAT" --json "$json"
+        fi
+        code=$?
+        total=$(node -e "const r=require(process.argv[1]);console.log(r.caseMismatch.length+r.brokenLinks.length+r.missingPaths.length+r.unknownCommands.length+r.orphans.length)" "$json" 2>/dev/null || echo 0)
+        echo "total=$total" >> "$GITHUB_OUTPUT"
+        if [ "$code" = 2 ]; then exit 2; fi
+        if [ "$PRUMO_FAIL" = "true" ]; then exit "$code"; fi
+        exit 0

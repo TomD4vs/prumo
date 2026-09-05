@@ -20,7 +20,8 @@ prumo [repo] [alvo...] [opções]
 | Opção | Significado |
 | --- | --- |
 | `--fix` | Corrige capitalização no lugar; nada mais é tocado |
-| `--format F` | `text` (padrão), `github` ou `json` |
+| `--format F` | `text` (padrão), `github`, `json` ou `sarif` |
+| `--sarif ARQ` | Também grava os achados em `ARQ` como SARIF, para o code scanning |
 | `--all` | Mostra todos os achados em vez dos 25 primeiros |
 | `--json ARQ` | Também grava os achados em `ARQ` como JSON |
 | `--quiet` | Não imprime nada; use o código de saída |
@@ -142,6 +143,43 @@ Não é um achado. Um arquivo de contexto cujos caminhos citados começam, na ma
 Só aparece quando você passa uma pasta de notas. Um arquivo está na pasta mas o `MEMORY.md` nunca o menciona, então nada leva o leitor até ele. Inclua no índice ou apague.
 
 ---
+
+## Integração contínua
+
+Três portas de entrada, a mesma checagem.
+
+**A action.** `TomD4vs/prumo@v1` é um passo composto que roda o prumo do checkout daquela tag, então não há nada a instalar nem chamada de rede. `@v1` acompanha a última release; fixe `@v0.6.0` para congelar.
+
+```yaml
+- uses: TomD4vs/prumo@v1
+  with:
+    path: .                    # o repositório a checar, relativo ao workspace
+    targets: ''                # arquivos ou pastas a checar em vez de detectar sozinho, separados por espaço
+    format: github             # github anota o pull request; text, json e sarif são os outros
+    sarif-file: ''             # também grava SARIF aqui, para o envio abaixo
+    fail-on-findings: 'true'   # 'false' só anota
+```
+
+Todo valor acima é o padrão, então a forma de uma linha do README é este mesmo passo. A saída `total` do passo é o número de achados.
+
+**SARIF.** `--format sarif` imprime SARIF 2.1.0, e `--sarif ARQ` grava ao lado do que a execução imprime: um resultado por achado, com regra, nível, arquivo e linha. O code scanning do GitHub recebe o arquivo pela action de envio, e o workflow precisa de `permissions: security-events: write` para isso:
+
+```yaml
+- uses: TomD4vs/prumo@v1
+  with: { sarif-file: prumo.sarif, fail-on-findings: 'false' }
+- uses: github/codeql-action/upload-sarif@v3
+  with: { sarif_file: prumo.sarif }
+```
+
+**pre-commit.** O repositório traz um hook para o framework [pre-commit](https://pre-commit.com). Ele roda quando um arquivo em stage é um dos que o prumo detecta sozinho, checa o repositório inteiro, porque uma nota pode apontar para qualquer arquivo, e bloqueia o commit quando há achado:
+
+```yaml
+repos:
+  - repo: https://github.com/TomD4vs/prumo
+    rev: v0.6.0
+    hooks:
+      - id: prumo
+```
 
 ## Silenciando um achado
 

@@ -113,6 +113,48 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   return out.join('\n');
 }
 
+/** What each finding is called in SARIF, how serious it is there, and the sentence that describes the rule. */
+const SARIF_RULES = {
+  'case-mismatch': ['error', 'A path spelled with different letter case than the git index holds. It resolves on Windows and macOS and breaks on Linux and CI.'],
+  'broken-link': ['warning', 'A wikilink, a markdown link or a heading anchor that points at nothing.'],
+  'missing-path': ['warning', 'A path the note cites that no longer exists in the repository.'],
+  'unknown-command': ['warning', 'A command naming a script or target that no package.json, Makefile or composer.json defines.'],
+  'not-in-index': ['note', 'A note in a folder whose index never mentions it.'],
+  'another-project': ['note', 'A context file whose cited paths start in folders this repository does not have. Its findings are held back.'],
+};
+
+/** SARIF 2.1.0, one result per finding, for GitHub code scanning and any tool that reads that format. */
+export function renderSarif(result) {
+  const results = [];
+  const at = (rule, o, text) => results.push({
+    ruleId: rule,
+    level: SARIF_RULES[rule][0],
+    message: { text },
+    locations: [{ physicalLocation: { artifactLocation: { uri: o.file, uriBaseId: '%SRCROOT%' }, ...(o.line ? { region: { startLine: o.line } } : {}) } }],
+  });
+  for (const o of result.caseMismatch) at('case-mismatch', o, `${o.cited} should be ${o.actual}`);
+  for (const o of result.brokenLinks) at('broken-link', o, `${o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
+  for (const o of result.missingPaths) at('missing-path', o, o.cited);
+  for (const o of result.unknownCommands || []) at('unknown-command', o, `${o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
+  for (const file of result.orphans) at('not-in-index', { file }, `${file} is not referenced by the index beside it`);
+  for (const o of result.elsewhere || []) at('another-project', o, `${o.absent} of ${o.cited} cited paths start in folders this repository does not have; findings held back`);
+  return JSON.stringify({
+    $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+    version: '2.1.0',
+    runs: [{
+      tool: {
+        driver: {
+          name: 'prumo',
+          version: result.prumoVersion,
+          informationUri: 'https://github.com/TomD4vs/prumo',
+          rules: Object.entries(SARIF_RULES).map(([id, [level, text]]) => ({ id, shortDescription: { text }, defaultConfiguration: { level } })),
+        },
+      },
+      results,
+    }],
+  }, null, 2);
+}
+
 /** GitHub Actions annotations, one per finding. */
 export function renderGithub(result) {
   const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, elsewhere = [] } = result;

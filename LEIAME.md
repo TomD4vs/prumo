@@ -129,7 +129,7 @@ Rode `npx @tomd4vs/prumo` e corrija todos os achados que ele reportar.
 
 ## Integração contínua
 
-O prumo sai com código diferente de zero quando acha algo, então entra em qualquer pipeline como um passo só:
+O prumo sai com código diferente de zero quando acha algo, então entra em qualquer pipeline como um passo só. A forma mais curta é a action que este repositório publica:
 
 ```yaml
 # .github/workflows/docs.yml
@@ -140,12 +140,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npx @tomd4vs/prumo --quiet
+      - uses: TomD4vs/prumo@v1
 ```
 
-Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. O `--format github` transforma os achados em anotações na linha exata do pull request. `--quiet`, `--format` e as demais opções estão na [referência](docs/reference.pt-BR.md#uso).
+Ela anota a linha exata do pull request e faz o job falhar quando há algo a revisar. `npx @tomd4vs/prumo --quiet` depois do `actions/setup-node` faz o mesmo em qualquer pipeline. Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. `--sarif ARQ` grava os achados para o code scanning, e o `.pre-commit-hooks.yaml` roda a mesma checagem antes de cada commit pelo framework pre-commit. As entradas da action, o envio do SARIF e o bloco do pre-commit estão na [referência](docs/reference.pt-BR.md#integração-contínua).
 
 ---
 

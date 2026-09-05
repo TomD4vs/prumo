@@ -131,6 +131,10 @@ rm -f hook-bash.txt hook-ps1.ps1
 echo; echo "########## D. The README's CI step"
 $PR --quiet; chk "$?" "1" "the CI step would fail on this state"
 $PR --format github 2>/dev/null | head -1 | grep -q "^::error file=CLAUDE.md,line=3::Case mismatch" && ok "annotation on the exact line" || bad "annotation"
+chk "$($PR --format sarif 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const s=JSON.parse(d);console.log(s.version+':'+s.runs[0].results.length+':'+s.runs[0].results[0].ruleId)})")" "2.1.0:4:case-mismatch" "--format sarif: one result per finding"
+$PR --sarif out.sarif >/dev/null 2>&1; grep -q '"ruleId": "missing-path"' out.sarif && ok "--sarif FILE beside the text report" || bad "--sarif FILE"; rm -f out.sarif
+grep -q "^  using: composite" "$HERE/action.yml" && grep -q 'GITHUB_ACTION_PATH/bin/prumo.mjs' "$HERE/action.yml" && ok "action.yml runs the checked-out prumo" || bad "action.yml"
+grep -q "^- id: prumo" "$HERE/.pre-commit-hooks.yaml" && grep -q "language: node" "$HERE/.pre-commit-hooks.yaml" && ok ".pre-commit-hooks.yaml declares the hook" || bad "pre-commit hook file"
 
 echo; echo "########## E. Silencing: three markers, four config keys, --no-config"
 sed 's#^The list view is.*$#& <!-- prumo-ignore -->#' CLAUDE.md > C.tmp && mv C.tmp CLAUDE.md

@@ -69,6 +69,6 @@ test('piped output opens with the header line, and only PRUMO_BANNER=1 puts the 
 
   const shown = run({ PRUMO_BANNER: '1', NO_COLOR: '1' });
   assert.match(shown, /^██████╗ /);
-  assert.match(shown, /━\n0\.5\.\d+  is your documentation still true\?\n +github\.com\/TomD4vs\n\nprumo — 1 context file/);
+  assert.match(shown, /━\n\d+\.\d+\.\d+  is your documentation still true\?\n +github\.com\/TomD4vs\n\nprumo — 1 context file/);
   assert.doesNotMatch(shown, //, 'NO_COLOR keeps the banner and drops the colour');
 });

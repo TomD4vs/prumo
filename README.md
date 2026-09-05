@@ -129,7 +129,7 @@ Run `npx @tomd4vs/prumo` and fix every finding it reports.
 
 ## Continuous integration
 
-prumo exits non-zero on findings, so it drops into a pipeline as a single step:
+prumo exits non-zero on findings, so it drops into a pipeline as a single step. The shortest form is the action this repository ships:
 
 ```yaml
 # .github/workflows/docs.yml
@@ -140,12 +140,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npx @tomd4vs/prumo --quiet
+      - uses: TomD4vs/prumo@v1
 ```
 
-Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. `--format github` turns findings into annotations on the exact line of the pull request. `--quiet`, `--format` and the other options are in the [reference](docs/reference.md#usage).
+It annotates the exact line of the pull request and fails the job when something needs review. `npx @tomd4vs/prumo --quiet` after `actions/setup-node` does the same in any pipeline. Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. `--sarif FILE` writes the findings for code scanning, and `.pre-commit-hooks.yaml` runs the same check before each commit through the pre-commit framework. The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
 
 ---
 

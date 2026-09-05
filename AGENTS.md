@@ -13,6 +13,8 @@ still match the code. Node 18+, ESM, no build step.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
 - `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs` — the suite: the analysis and the fix, the two renderers, the server driven over stdio, and the banner. Every test that needs a repository builds a throwaway one.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
+- `action.yml` — the GitHub Action, `uses: TomD4vs/prumo@v1`: a composite step that runs the checked-out `bin/prumo.mjs`. Not in the npm tarball.
+- `.pre-commit-hooks.yaml` — the hook for the pre-commit framework; its `files:` regex is guarded by the same test as the hook in `docs/agents.md`.
 - `docs/design.md` — **read this before changing behaviour.** Why there are so few checks,
   what was measured and rejected, what each filter defends against, and the order in which a
   path is resolved. `docs/api.md` has the development recipes.

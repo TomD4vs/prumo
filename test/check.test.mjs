@@ -611,11 +611,21 @@ test('the hook in docs/agents.md fires for every file prumo auto-detects', () =>
     ...[...NESTED].filter((n) => n !== 'SKILL.md').map((n) => `packages/api/${n}`),
     '.claude/skills/release/SKILL.md',
   ];
-  for (const re of [new RegExp(bash, 'i'), new RegExp(ps, 'i')]) {
+  const preCommit = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '.pre-commit-hooks.yaml'), 'utf8').match(/^\s*files:\s*'(.+)'\s*$/m)[1];
+  for (const re of [new RegExp(bash, 'i'), new RegExp(ps, 'i'), new RegExp(preCommit)]) {
     for (const path of covered) assert.ok(re.test(path), `the hook ignores ${path}`);
     assert.ok(!re.test('src/main.py'), 'the hook fires on a code file');
     assert.ok(!re.test('SKILL.md'), 'the hook fires on a root SKILL.md, which prumo does not auto-detect');
   }
+});
+
+test('the GitHub Action runs the checked-out prumo itself, with every input the README names', () => {
+  const action = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'action.yml'), 'utf8');
+  assert.match(action, /^runs:\n  using: composite/m);
+  assert.match(action, /\$GITHUB_ACTION_PATH\/bin\/prumo\.mjs/);
+  for (const input of ['path', 'targets', 'format', 'sarif-file', 'fail-on-findings']) assert.match(action, new RegExp(`^  ${input}:`, 'm'));
+  assert.match(action, /^  total:/m);
+  assert.match(action, /^branding:/m);
 });
 
 test('an @/ alias resolves against the repository root, not only against src and app', () => {
