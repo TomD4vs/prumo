@@ -15,7 +15,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Filtro | Por que existe |
 | --- | --- |
 | Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. Uma frase que faz da existência uma condição, *"se `docs/contexto.md` existir, leia"*, diz o mesmo sobre o arquivo que nomeia. |
-| Um arquivo que documenta outro projeto | Um arquivo de contexto cujos caminhos citados começam, na maior parte, em pastas que este repositório não tem é um modelo, ou uma skill escrita para a base de código em que vai ser instalada. Seus achados ficam retidos atrás de uma linha que o nomeia, e um arquivo nomeado na linha de comando é sempre checado por inteiro. Na quarta passagem, dezenove dos vinte e nove falsos estavam em seis repositórios onde nada era real, e na oitava todo falso que sobrou fora dos catálogos tinha essa forma. A pasta é o sinal porque uma nota envelhecida ainda cita as pastas que o repositório tem. |
+| Um arquivo que documenta outro projeto | Um arquivo de contexto cujos caminhos citados começam, na maior parte, em pastas que este repositório não tem é um modelo, ou uma skill escrita para a base de código em que vai ser instalada. Seus achados ficam retidos atrás de uma linha que o nomeia, e um arquivo nomeado na linha de comando é sempre checado por inteiro. Na quarta passagem, dezenove dos vinte e nove falsos estavam em seis repositórios onde nada era real, e na oitava todo falso que sobrou fora dos catálogos tinha essa forma. A pasta é o sinal porque uma nota envelhecida ainda cita as pastas que o repositório tem. Desde a décima terceira passagem a mesma leitura é feita do repositório por inteiro, somando todos os arquivos de contexto, porque um plugin publicado para outra base de código e notas que linkam um wiki guardado em outro lugar citam caminhos de menos por arquivo para o portão por arquivo, e em maioria ausentes no repositório inteiro. |
 | Uma regra viva por um glob, uma pasta de regras guardada para várias stacks | Uma regra do Cursor ou uma instrução do Copilot se acopla quando qualquer um de seus globs casa, então um glob morto ao lado de um vivo fica em paz; só uma regra em que nenhum glob alcança um arquivo é reportada. E uma pasta de regras em que a maioria das regras não casa com nada aqui é um catálogo escrito para os projetos em que vai ser copiado, retido como fica um arquivo que documenta outro projeto. Na décima primeira passagem, todo glob que uma primeira versão reportou um a um estava ao lado de um vivo. |
 | Bloco cercado lido como código, comentário não lido | Um caminho dentro de um bloco ```` ``` ```` é um comando ou uma árvore de arquivos e é checado como tal, com a frase acima do bloco como contexto. Um link ali está sendo citado, como qualquer coisa dentro de `<!-- -->`, e nenhum dos dois é checado. Uma linha de comentário dentro do bloco é o que um comando imprime, e `./nome` sem pasta é um argumento que o leitor fornece. Um bloco numa linguagem de programação, `js` ou `python`, é código-fonte, e uma string ali é um especificador de módulo que a linguagem resolve, então ele não é lido. |
 | Um caminho que a frase diz que é escrito | *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* e *"`docs/run.log` é gerado pelo build"* nomeiam um arquivo que ainda não existe por definição. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* mantém `a` checado, e um verbo depois do caminho só conta na voz passiva, porque *"`x` cria usuários"* faz do caminho o autor. Uma lista, uma tabela ou um bloco cercado toma o veredito da frase que os apresenta ou do título da seção; num comando, um redirecionamento `>`, uma flag `-o` e `mkdir` marcam o que é escrito. Um caminho com a caixa errada é reportado diga a frase o que disser. |
@@ -23,7 +23,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
 | Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. Um link que resolve a partir da raiz do repositório e de nenhum outro lugar é lido a partir da raiz, como um agente o lê. |
 | Marcador de posição e identificador | `path/to/test.js`, `src/foo/bar.test.ts` e `src/plugins/myplugin.ts` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` e `shots/shot_NN.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só, nem `docs.exemplo.com/guia.md`, que é um endereço da web sem o esquema. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
-| Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
+| Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. Um prefixo que deixaria um arquivo solto na raiz é mantido, a menos que seja o nome do próprio repositório na origem, como faz uma nota que escreve `dono/repo/AGENTS.md`; a décima quarta passagem teve um repositório fazendo isso em vinte e nove arquivos. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
 | Um arquivo que cada máquina escreve para si | `CLAUDE.local.md`, `settings.local.json`, `.env.local`: um nome com `.local` antes da extensão é escrito por máquina e nunca entra no commit, então uma nota que manda o agente lê-lo nomeia um arquivo ausente de propósito. Na décima segunda passagem um repositório citou um arquivo assim sete vezes. |
@@ -481,6 +481,63 @@ caminhos citados são em maioria ausentes em todos os arquivos documenta outro p
 Essa regra não foi construída ainda, para que possa ser medida em material de onde não veio. Uma
 regra nasceu deste corpus e é ajustada a ele: um link com esquema `file:` é um endereço, como a
 regra da prosa já dizia, e ela limpou dois.
+
+Uma décima quarta passagem, para a 0.8.3, em sessenta repositórios das mesmas buscas, nenhum em
+lista anterior. Ela mede a regra que a décima terceira pediu: um repositório cujos arquivos de
+contexto detectados citam, somados, pelo menos doze caminhos cuja primeira pasta está ausente do
+índice, e seis em cada dez de tudo que citam, documenta outro projeto por inteiro e recebe uma
+linha só. Os dois números foram fixados nas contagens somadas do nono ao décimo terceiro corpus,
+onde nenhum repositório com achado real cruza os dois. No décimo terceiro o portão levou dois dos
+três repositórios que o motivaram, trinta e três achados, todos falsos; o terceiro linka um wiki
+por nomes de página sem pasta, que o portão não conta, e fica. Medi-lo no décimo segundo o refinou
+duas vezes: um link escrito como nome solto ao lado da nota mantém a própria pasta da nota como
+cabeça, então uma skill sem um arquivo seu é achado e nunca outro projeto, e um pacote de skill é
+reconhecido pelo último segmento da pasta. Neste corpus o portão não removeu nada fora dos
+catálogos, e não havia o que remover: nenhum repositório aqui cruza os dois números, e os achados
+falsos ficam em famílias que nenhum dos dois portões cobre. Dentro dos catálogos, contados à parte,
+ele aparece: limpou noventa e uma citações em três deles aqui, e no décimo segundo corpus levou
+um marketplace de skills inteiro, setecentos e noventa e seis achados numa linha, com o jeito de
+checar um arquivo dele por inteiro na página de referência. Oito repositórios não têm arquivo de
+contexto que o prumo detecte, três deles um `SKILL.md` na raiz, sete são catálogos acima de
+cinquenta, e trinta e quatro vieram limpos:
+
+| Repositórios públicos, décima quarta passagem, 0.8.2 a 0.8.3 | |
+| --- | ---: |
+| Repositórios checados | 60 |
+| Achados fora dos catálogos, na 0.8.2 | 79 |
+| Reais | 21 |
+| Precisão | 27% |
+| Removidos pelo portão por repositório, nascido do décimo terceiro corpus | 0 |
+| Removidos por três regras nascidas deste corpus | 34 |
+| Desses, reais | 0 |
+| Achados na 0.8.3, os mesmos 21 reais | 45 |
+| Precisão | 47% |
+| Achados de `AGENT CONFIG`, seis repositórios com JSON de configuração | 0 |
+
+A regra do `file:` da 0.8.2, ajustada no décimo terceiro corpus, não encontrou linha nenhuma aqui
+fora dos catálogos, nem as outras duas regras da 0.8.2, que limparam dezesseis citações dentro
+deles, caminhos de instalação e arquivos `.local`. A quinta checagem leu
+seis repositórios com JSON de configuração e não reportou nada; com o décimo segundo e o décimo
+terceiro, são cinco reportes em material que não moldou regra nenhuma dela, todos reais, e um
+corpus sem o que reportar. Os achados reais são os tipos conhecidos: quatro páginas de documentação
+que uma nota linka e nunca foram acrescentadas, dois pacotes internos renomeados, uma tabela de
+rotas e um arquivo de aliases que se mudaram, páginas irmãs que uma cópia vendorizada de um conjunto
+de skills deixou para trás, um arquivo de regras citado uma pasta curto, uma nota de revisão que
+sumiu, e seis links escritos uma pasta rasos demais de dentro de uma pasta de skills. Os falsos que
+sobram depois desta versão ficam em quatro repositórios: pastas que um pipeline escreve em tempo de
+execução; uma skill que documenta outro aplicativo, copiada em cada exercício de um curso, em que
+toda cópia cita quatro caminhos e o repositório inteiro cita muitos mais que existem; instruções
+dentro de skills que constroem coisas, *"edite `config/app.js` e acrescente"*, que nomeiam um
+arquivo do projeto em que a skill vai rodar; e um exemplo. Três regras nasceram deste corpus e são
+ajustadas a ele: o que segue um `#` numa linha de comando é comentário, então as palavras de um
+comentário depois de um alvo do make não são lidas como mais alvos; o nome do próprio repositório,
+lido da origem, é um prefixo que uma nota pode escrever antes de um arquivo da raiz, como um
+repositório fez em vinte e nove notas; e uma frase que faz de uma pasta uma condição, *"se o
+repositório tem `docs/product/`"*, é condicional como *"se existir"*. Elas removeram trinta e
+quatro achados, todos falsos. No décimo segundo e no décimo terceiro corpus, que não moldaram
+nenhuma delas, não removeram nada fora dos catálogos, e sete citações dentro, todas em frases que
+fazem de um arquivo de estado ou de configuração uma condição, *"se o usuário já tem"*, que se leem
+como certas.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 

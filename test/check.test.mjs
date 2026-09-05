@@ -1539,3 +1539,39 @@ test('a file: link is an address, like a file:// path in prose, and is not a bro
   });
   assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['docs/gone.md']);
 });
+
+test('a repository whose context files cite mostly absent paths documents another project as a whole, and its findings are held back together', () => {
+  const skill = (name, tail) => `---\nname: ${name}\ndescription: d\n---\nSee [a](python/packages/${tail}.py), [b](unittest/scripts/${tail}.js), [c](../../../PORT.md) and [d](../../../CMakeLists.txt).\n`;
+  const files = { 'CLAUDE.md': '# app\n\nRead [[concepts/budget]] and [[entities/host]]; see \x60src/app.ts\x60.\n', 'src/app.ts': '' };
+  for (const host of ['claude', 'codex', 'opencode']) {
+    files[`${host}/plugin/skills/create/SKILL.md`] = skill('create', 'registrar');
+    files[`${host}/plugin/skills/review/SKILL.md`] = skill('review', 'review');
+  }
+  const r = run(files);
+  assert.equal(r.brokenLinks.length + r.missingPaths.length, 0, 'every finding is held back');
+  assert.deepEqual(r.elsewhere.map((e) => e.file), ['.']);
+  assert.ok(r.elsewhere[0].absent >= 12 && r.elsewhere[0].absent >= r.elsewhere[0].cited * 0.6, JSON.stringify(r.elsewhere));
+  assert.equal(r.stats.absent, r.elsewhere[0].absent);
+  const named = run(files, ['CLAUDE.md']);
+  assert.deepEqual(named.brokenLinks.map((l) => l.cited), ['concepts/budget', 'entities/host'], 'a named file is checked in full, and a wikilink written with a folder is a path for the gate');
+
+  const stale = run({
+    'CLAUDE.md': '# app\n\nSee \x60src/a.ts\x60, \x60src/b.ts\x60 and [c](src/c.ts).\n',
+    'packages/api/AGENTS.md': '# api\n\nSee [x](lib/x.ts), [y](lib/y.ts) and \x60src/z.ts\x60.\n',
+    'src/kept.ts': '', 'packages/api/lib/kept.ts': '',
+  });
+  assert.equal(stale.brokenLinks.length + stale.missingPaths.length, 6, 'notes that cite the folders the repository has are stale, and stay reported');
+  assert.deepEqual(stale.elsewhere, []);
+});
+
+test('a shell comment ends a command line, the repository name is a prefix before a root file, and "if the repo has" is a condition', () => {
+  const repo = repoWith({
+    'AGENTS.md': '# app\n\n\x60\x60\x60bash\nmake docs-serve        # serve Documentation-GENERATED-temp at http://localhost:8000\nmake gone              # a target nothing defines\n\x60\x60\x60\n\nParent: \x60prumo-test/AGENTS.md\x60; lane: \x60prumo-test/docs/lane.md\x60. If the repo has a \x60docs/product/\x60 folder, update it there; read \x60docs/gone.md\x60.\n',
+    'Makefile': 'docs-serve:\n\ttrue\n',
+    'docs/lane.md': '',
+  });
+  execSync('git remote add origin https://github.com/someone/prumo-test.git', { cwd: repo, stdio: 'ignore' });
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['make gone'], 'the words after # are a comment, and only the target nothing defines is reported');
+  assert.deepEqual(r.missingPaths.map((o) => o.cited), ['docs/gone.md'], 'the repository name before a root file resolves, and a folder the sentence makes conditional is quiet');
+});

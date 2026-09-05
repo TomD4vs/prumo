@@ -11,7 +11,7 @@ import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:p
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -662,7 +662,9 @@ function conditionalExistence(text, at, len) {
   const plain = masked(s.text);
   const state = '(exists?|present|available|found|missing|absent|existir|existirem|exista|existe|presente|ausente|faltar)';
   const after = plain.slice(s.at + len);
+  const holds = '(has|have|holds|contains|ships|tem|tiver|houver|contiver|traz)';
   return (/\b(if|when|whether|unless|se|caso|quando)\b[^.;!?]{0,60}$/i.test(plain.slice(0, s.at)) && new RegExp('^[^.;!?]{0,40}\\b' + state + '\\b', 'i').test(after))
+    || new RegExp('\\b(if|when|whether|unless|se|caso|quando)\\b[^.;!?]{0,40}\\b' + holds + '\\b[^.;!?]{0,60}$', 'i').test(plain.slice(0, s.at))
     || new RegExp('^[^.;!?]{0,40}\\b(if|when|whether|unless|se|caso|quando)\\b[^.;!?]{0,40}\\b' + state + '\\b', 'i').test(after);
 }
 
@@ -787,7 +789,7 @@ function commandSources(repo, tracked) {
 function commandsIn(text) {
   const found = [];
   const add = (cited, name, source, strict) => { if (!/[./\\*{}$<>[\]]/.test(name)) found.push({ cited, name, source, strict }); };
-  for (const seg of text.replace(PROMPT, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
+  for (const seg of text.replace(PROMPT, '').replace(/(^|\s)#.*$/, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
     const tok = seg.replace(/(["'])(?:(?!\1).)*\1/g, (q) => (q.includes(' ') ? '' : q)).trim().split(/\s+/).map((t) => t.replace(/^["'`]+|["'`]+$/g, '')).filter(Boolean);
     while (tok.length && (ENV_ASSIGNMENT.test(tok[0]) || tok[0] === 'sudo' || tok[0] === 'time')) tok.shift();
     const [cmd, ...rest] = tok;
@@ -887,7 +889,7 @@ function resolvePath(index, p) {
   }
   const head = p.includes('/') ? p.slice(0, p.indexOf('/')) : '';
   const rest = head ? p.slice(head.length + 1) : '';
-  if (head && rest.includes('/') && !index.known.has(head) && index.known.has(rest)) tries.push(rest);
+  if (head && (rest.includes('/') || head.toLowerCase() === index.name) && !index.known.has(head) && index.known.has(rest)) tries.push(rest);
   const js = p.match(/\.(js|jsx|mjs|cjs)$/i);
   if (js) for (const base of [...tries]) for (const e of TS_FOR[js[1].toLowerCase()]) tries.push(base.slice(0, -js[0].length) + e);
   if (!/\.[a-z0-9]{2,5}$/i.test(p)) {
@@ -1066,6 +1068,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
   if (!index.tracked.length) throw new Error('the git index is empty, so nothing can be checked against it. Commit or "git add" the files first.');
 
   const own = originRepo(repo);
+  index.name = (own.split('/')[1] || resolve(repo).split(sep).pop() || '').toLowerCase();
   const settings = config ?? loadConfig(repo);
   const ignored = makeMatcher(settings.ignore);
   const excluded = makeMatcher(settings.exclude);
@@ -1090,6 +1093,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
   const caseMismatch = [], missingPaths = [], brokenLinks = [], unknownCommands = [], configIssues = [], orphans = [], elsewhere = [];
   let historical = 0, suppressed = 0, untracked = 0, configs = 0;
   const autoRun = !checked.some((t) => t.explicit);
+  const citedAll = new Set(), absentAll = new Set();
   const rulesFolders = new Map();
   const rulesElsewhere = (folder) => { let c = rulesFolders.get(folder); if (!c) { c = { cited: 0, absent: 0 }; rulesFolders.set(folder, c); } return c; };
   const relOf = new Map();
@@ -1136,10 +1140,9 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
     const opened = { caseMismatch: caseMismatch.length, brokenLinks: brokenLinks.length, missingPaths: missingPaths.length, unknownCommands: unknownCommands.length };
     const citedHere = new Set(), absentHere = new Set();
     const isSkill = /(^|\/)SKILL\.md$/i.test(target.label);
-    const cite = (p, missing) => {
+    const cite = (p, missing, head = p.split('/')[0]) => {
       citedHere.add(p);
-      const head = p.split('/')[0];
-      if (missing && !index.known.has(head) && !(isSkill && SKILL_BUNDLE.test(head))) absentHere.add(p);
+      if (missing && !index.known.has(head) && !(isSkill && SKILL_BUNDLE.test(head.slice(head.lastIndexOf('/') + 1)))) absentHere.add(p);
     };
     const context = (i, anchor, before, after) => (anchor === i
       ? lines.slice(Math.max(0, i - before), i + after + 1)
@@ -1162,7 +1165,6 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
           const r = resolveOnce(p);
           if (r.state === 'ok') { cite(p, false); continue; }
-          // A case mismatch is reported wherever it sits; only a path that is absent can be a per-machine file or an install path.
           if (r.state !== 'case' && LOCAL_FILE.test(p)) continue;
           if (r.state === 'missing' && installedElsewhere(p)) { cite(p, false); continue; }
           const paragraph = context(i, m.anchor, 2, 2);
@@ -1212,9 +1214,10 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
       for (const l of prose.matchAll(/\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g)) {
         const to = l[1].trim();
-        if (linkable.has(to) || ignored(to)) continue;
+        if (linkable.has(to) || ignored(to)) { if (to.includes('/')) cite(to, false); continue; }
         if (to.startsWith('@/') && !index.aliasRoot) continue;
         if (to !== l[1] || to.includes('.') || /[\w$]/.test(prose[l.index - 1] || '')) continue;
+        if (to.includes('/')) cite(to, true);
         brokenLinks.push({
           file: target.label,
           line: i + 1,
@@ -1248,6 +1251,15 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
           && (index.known.has(fromRoot) || index.lower.has(fromRoot.toLowerCase()));
         if (atRoot) { abs = join(repo, fromRoot); rel = fromRoot; }
         const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
+        const linkHead = () => {
+          if (mdc || href.startsWith('/') || atRoot) return rel.split('/')[0];
+          const parts = href.replace(/^\.\//, '').split('/');
+          let base = posix.dirname(relative(repo, target.path).split(sep).join('/'));
+          if (base === '.') base = '';
+          while (parts.length > 1 && parts[0] === '..') { parts.shift(); base = base.includes('/') ? base.slice(0, base.lastIndexOf('/')) : ''; }
+          if (parts.length === 1) return rel.split('/')[0];
+          return base ? `${base}/${parts[0]}` : parts[0];
+        };
         if (inside && index.known.has(rel)) {
           cite(rel, false);
           if (anchor && /\.(md|mdx)$/i.test(rel)) {
@@ -1280,7 +1292,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
           cited: to,
           suggestion: loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null,
         };
-        if (inside) { cite(rel, true); relOf.set(finding, rel); }
+        if (inside) { cite(rel, true, linkHead()); relOf.set(finding, rel); }
         brokenLinks.push(finding);
       }
     });
@@ -1296,6 +1308,10 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
       unknownCommands.splice(opened.unknownCommands, unknownCommands.length, ...kept);
     }
 
+    if (!target.explicit) {
+      for (const p of citedHere) citedAll.add(p);
+      for (const p of absentHere) absentAll.add(p);
+    }
     if (!target.explicit && absentHere.size >= 4 && absentHere.size >= citedHere.size * 0.6) {
       elsewhere.push({ file: target.label, cited: citedHere.size, absent: absentHere.size });
       caseMismatch.splice(opened.caseMismatch);
@@ -1308,6 +1324,19 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
       if (issue.kind === 'glob' && !target.explicit) rulesElsewhere(posix.dirname(target.label)).absent++;
     }
     if (!target.explicit) { const rule = ruleGlobs(target.label, frontmatterOf(lines)); if (rule && rule.globs.length) rulesElsewhere(posix.dirname(target.label)).cited++; }
+  }
+
+  // A repository whose context files, taken together, cite mostly absent folders documents another project as a whole:
+  // a plugin shipped for another codebase, or notes that link a wiki kept elsewhere, file by file too thin for the file gate.
+  if (autoRun && absentAll.size >= 12 && absentAll.size >= citedAll.size * 0.6) {
+    const held = new Set(checked.filter((t) => !t.explicit).map((t) => t.label));
+    for (const list of [caseMismatch, brokenLinks, missingPaths, unknownCommands]) {
+      const kept = list.filter((o) => !held.has(o.file));
+      list.length = 0;
+      list.push(...kept);
+    }
+    elsewhere.length = 0;
+    elsewhere.push({ file: '.', cited: citedAll.size, absent: absentAll.size });
   }
 
   for (const [folder, count] of rulesFolders) {
@@ -1418,6 +1447,6 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
     configIssues,
     orphans,
     elsewhere,
-    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, ...(only ? { only: only.label } : {}) },
+    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, cited: citedAll.size, absent: absentAll.size, ...(only ? { only: only.label } : {}) },
   };
 }

@@ -55,7 +55,7 @@ test('a missing path says where git moved it, or when git deleted it, and a path
   assert.equal(by['scripts/seed.py'].to, undefined);
   assert.equal(by['src/other.ts'], null, 'never in the history: no history line');
   assert.equal('path/to/file.php' in by, false, 'a placeholder is not a finding at all');
-  assert.equal(r.schemaVersion, 7);
+  assert.equal(r.schemaVersion, 8);
 
   const text = renderText(r);
   assert.match(text, new RegExp(`^  CLAUDE\\.md:3  config/database\\.php\\n      Copy .*\\n      ->  config/db\\.php   renamed in ${by['config/database.php'].commit}, today$`, 'm'));

@@ -112,7 +112,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
   if (elsewhere.length) {
     out.push(title('ANOTHER PROJECT', PAINT.blue, elsewhere.length, 'its paths start in folders this repository does not have, so its findings are held back'));
-    for (const o of cap(elsewhere)) out.push(`  ${bold(o.file)}   ${dim(`${o.absent} of ${o.cited} ${o.unit || 'cited paths'}; name ${o.unit ? 'a rule' : 'the file'} to check it in full`)}`);
+    for (const o of cap(elsewhere)) out.push(`  ${bold(o.file === '.' ? 'the repository' : o.file)}   ${dim(`${o.absent} of ${o.cited} ${o.unit || 'cited paths'}; name ${o.unit ? 'a rule' : o.file === '.' ? 'a file' : 'the file'} to check it in full`)}`);
     out.push(...rest(elsewhere));
   }
 
