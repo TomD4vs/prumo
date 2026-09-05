@@ -108,9 +108,11 @@ const hooks=(f)=>[...fs.readFileSync(f,'utf8').matchAll(/\`\`\`json\n([\s\S]*?)\
 const en=hooks(process.argv[1]), pt=hooks(process.argv[2]);
 if(en.length!==2) throw new Error('expected 2 hook blocks, found '+en.length);
 if(JSON.stringify(en)!==JSON.stringify(pt)) throw new Error('the translated hooks drifted from the English ones');
-fs.writeFileSync('hook-bash.txt',en.find(h=>!h.shell).command);
-fs.writeFileSync('hook-ps1.ps1',en.find(h=>h.shell==='powershell').command);
-" "$HERE/docs/agents.md" "$HERE/docs/agents.pt-BR.md" && ok "every json block in docs/agents.md parses, and both pages carry the same two hooks" || bad "hook JSON"
+if(!en.every(h=>h.command.includes('npx @tomd4vs/prumo'))) throw new Error('a hook no longer calls npx @tomd4vs/prumo');
+const local=(c)=>c.split('npx @tomd4vs/prumo').join('node \"'+process.argv[3]+'\"');
+fs.writeFileSync('hook-bash.txt',local(en.find(h=>!h.shell).command));
+fs.writeFileSync('hook-ps1.ps1',local(en.find(h=>h.shell==='powershell').command));
+" "$HERE/docs/agents.md" "$HERE/docs/agents.pt-BR.md" "$PB" && ok "every json block in docs/agents.md parses, both pages carry the same two hooks, and both call npx @tomd4vs/prumo" || bad "hook JSON"
 HC=$(cat hook-bash.txt)
 P1='{"tool_name":"Write","tool_input":{"file_path":"C:\\Users\\me\\tickets\\CLAUDE.md"}}'
 P2='{"tool_name":"Edit","tool_input":{"file_path":"C:\\Users\\me\\tickets\\backend\\app\\main.py"}}'
