@@ -86,3 +86,5 @@ msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
 ```
 
 `--virtual-time-budget` is required; without it the shot lands before the web fonts load and the card renders in a fallback face.
+
+The demo at the top of the README, `assets/demo.gif`, is a recording of a real Windows Terminal window running the published package on the example repository, `npx @tomd4vs/prumo` typed at a human pace and the report as it prints; `assets/report.png`, further down the README, is the last frame of the same recording. Both are redone whenever the report changes its look, from the maintainer's machine.

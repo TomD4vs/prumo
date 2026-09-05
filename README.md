@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/social.png" alt="prumo — is your documentation still true?" width="820">
+  <img src="assets/demo.gif" alt="prumo in a terminal: one command, then a case mismatch, two broken links and a missing path, each with its correction" width="820">
 </p>
 
 <p align="center">

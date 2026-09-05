@@ -86,3 +86,5 @@ msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
 ```
 
 O `--virtual-time-budget` é obrigatório; sem ele a captura acontece antes de as fontes carregarem e o card sai com uma fonte de fallback.
+
+A demo no topo do README, `assets/demo.gif`, é uma gravação de uma janela real do Windows Terminal rodando o pacote publicado no repositório de exemplo, com `npx @tomd4vs/prumo` digitado num ritmo humano e o relatório aparecendo como ele imprime; o `assets/report.png`, mais abaixo no README, é o último quadro da mesma gravação. Os dois são refeitos sempre que o relatório muda de aparência, na máquina do mantenedor.
