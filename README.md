@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/demo.gif" alt="prumo in a terminal: one command, then a case mismatch, two broken links and a missing path, each with its correction" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.png">
+    <img src="assets/header-light.png" alt="prumo, a context linter for coding agents. Is your documentation still true?" width="820">
+  </picture>
 </p>
 
 <p align="center">
@@ -7,10 +10,23 @@
 </p>
 
 <p align="center">
-  <a href="LEIAME.md">🇧🇷 Leia em português</a>
+  <a href="https://www.npmjs.com/package/@tomd4vs/prumo"><img src="https://img.shields.io/npm/v/@tomd4vs/prumo?label=npm&color=4FBDAE" alt="npm version"></a>
+  <a href="https://github.com/TomD4vs/prumo/actions/workflows/ci.yml"><img src="https://github.com/TomD4vs/prumo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/TomD4vs/prumo?color=4FBDAE" alt="MIT license"></a>
 </p>
 
----
+<p align="center">
+  <a href="LEIAME.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/lang-pt-dark.png">
+      <img src="assets/lang-pt-light.png" alt="Leia em português" width="236">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="prumo in a terminal: one command, then a case mismatch, two broken links and a missing path, each with its correction" width="820">
+</p>
 
 ## The problem
 
@@ -24,13 +40,9 @@ The folder has since been renamed to `Layouts`, with a capital L. Windows and ma
 
 That line survived six hand-run audits of the same files. prumo found it in four seconds.
 
----
-
 ## Quick start
 
-If you already have [Node.js 18+](https://nodejs.org) and `git`, you are ready. Nothing to install, nothing to configure, no account to create.
-
-From a terminal inside any git repository:
+If you already have [Node.js 18+](https://nodejs.org) and `git`, you are ready. Nothing to install, nothing to configure, no account to create. From a terminal inside any git repository:
 
 ```bash
 npx @tomd4vs/prumo
@@ -38,13 +50,16 @@ npx @tomd4vs/prumo
 
 prumo locates your context files on its own: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `.github/copilot-instructions.md`, installed skills in `.claude/skills/` and the rest. Every file and folder it looks for is in the [reference](docs/reference.md#files-found-automatically).
 
----
+For frequent use, install it once:
+
+```bash
+npm install -g @tomd4vs/prumo             # available everywhere on your machine
+npm install --save-dev @tomd4vs/prumo     # or as a dev dependency of one project
+```
+
+Either way the command is `prumo`, with zero dependencies. Errors at this step, such as an old Node or a folder that isn't a git repository, are in [Troubleshooting](docs/troubleshooting.md).
 
 ## Reading the result
-
-<p align="center">
-  <img src="assets/report.png" alt="prumo in a terminal, reporting a case mismatch, two broken links and a missing path" width="820">
-</p>
 
 A clean run:
 
@@ -78,21 +93,6 @@ MISSING PATH  (1)   paths cited to say they are gone were filtered out
 
 Every finding carries a file, a line number and the correction, and a missing path says where git moved it when the history holds a rename. Nothing is guessed and nothing is written. What each finding means, and what to do about it, is in the [reference](docs/reference.md#what-each-finding-means). If it flags a line you know is correct, [Silencing a finding](docs/reference.md#silencing-a-finding) covers the two ways to say so.
 
----
-
-## Two reports
-
-Beyond the checks, two commands measure instead of judging, and exit 0 whatever they find:
-
-```bash
-prumo drift     # which sections describe code that changed since they were written
-prumo budget    # what each context file costs the agent, and what is written twice
-```
-
-`drift` reads from `git blame` when each section was last written, counts the commits that touched the files it cites since then, and lists the sections most moved first: a reading order for a review, since a section whose files changed forty times may still be right. `budget` estimates the tokens each file costs at every session, how much that grew since a commit, and which paragraphs are written in more than one place. Both are on the [reference](docs/reference.md#two-reports-drift-and-budget), and both are tools of the MCP server.
-
----
-
 ## What it will not do
 
 Three limits, chosen on purpose and explained in [Design](docs/design.md):
@@ -101,20 +101,7 @@ Three limits, chosen on purpose and explained in [Design](docs/design.md):
 - It does not edit beyond letter case and the renames git itself recorded. A link suggested from a name is an educated guess, and a missing path with no history may be missing on purpose.
 - It makes no network calls. No telemetry, no account, no model.
 
----
-
-## Installing
-
-`npx @tomd4vs/prumo` works without installing anything. For frequent use:
-
-```bash
-npm install -g @tomd4vs/prumo       # available everywhere on your machine
-npm install --save-dev @tomd4vs/prumo   # or as a dev dependency of one project
-```
-
-Either way the command is `prumo`. Node 18 or newer, `git` on the `PATH`, zero dependencies. Errors at this step, such as an old Node or a folder that isn't a git repository, are in [Troubleshooting](docs/troubleshooting.md).
-
----
+Every check was measured on public repositories before it shipped, and the design page publishes the numbers, the ugly ones included.
 
 ## Using it from an agent
 
@@ -138,8 +125,6 @@ Run `npx @tomd4vs/prumo` and fix every finding it reports.
 
 **Run it after every edit.** A `PostToolUse` hook runs prumo whenever the agent writes a context file, so the findings land in the transcript and it can fix them in the same turn. The hook, for bash and for PowerShell, is in [Agents](docs/agents.md#run-it-automatically-after-edits).
 
----
-
 ## Continuous integration
 
 prumo exits non-zero on findings, so it drops into a pipeline as a single step. The shortest form is the action this repository ships:
@@ -156,9 +141,24 @@ jobs:
       - uses: TomD4vs/prumo@v1
 ```
 
-It annotates the exact line of the pull request and fails the job when something needs review. `npx @tomd4vs/prumo --quiet` after `actions/setup-node` does the same in any pipeline. Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. In a repository with a backlog, `npx @tomd4vs/prumo --baseline` records what is there once, and later runs fail only on what is new; on a pull request, `--since origin/main` checks only the context files the branch touched. `--sarif FILE` writes the findings for code scanning, and `.pre-commit-hooks.yaml` runs the same check before each commit through the pre-commit framework. The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
+It annotates the exact line of the pull request and fails the job when something needs review. `npx @tomd4vs/prumo --quiet` after `actions/setup-node` does the same in any pipeline. Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. Three options cover the rest:
 
----
+- `--baseline` records what a repository with a backlog already has, once; later runs fail only on what is new.
+- `--since origin/main` checks only the context files a pull request touched.
+- `--sarif FILE` writes the findings for code scanning, and `.pre-commit-hooks.yaml` runs the same check before each commit through the pre-commit framework.
+
+The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
+
+## Two reports
+
+Beyond the checks, two commands measure instead of judging, and exit 0 whatever they find:
+
+```bash
+prumo drift     # which sections describe code that changed since they were written
+prumo budget    # what each context file costs the agent, and what is written twice
+```
+
+`drift` reads from `git blame` when each section was last written, counts the commits that touched the files it cites since then, and lists the sections most moved first: a reading order for a review, since a section whose files changed forty times may still be right. `budget` estimates the tokens each file costs at every session, how much that grew since a commit, and which paragraphs are written in more than one place. Both are on the [reference](docs/reference.md#two-reports-drift-and-budget), and both are tools of the MCP server.
 
 ## Documentation
 

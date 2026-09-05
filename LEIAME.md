@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/demo.gif" alt="prumo no terminal: um comando, depois uma capitalização errada, dois links quebrados e um caminho ausente, cada um com a correção" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.png">
+    <img src="assets/header-light.png" alt="prumo, um linter de contexto para agentes de código. Sua documentação ainda é verdade?" width="820">
+  </picture>
 </p>
 
 <p align="center">
@@ -7,10 +10,23 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 Read in English</a>
+  <a href="https://www.npmjs.com/package/@tomd4vs/prumo"><img src="https://img.shields.io/npm/v/@tomd4vs/prumo?label=npm&color=4FBDAE" alt="versão no npm"></a>
+  <a href="https://github.com/TomD4vs/prumo/actions/workflows/ci.yml"><img src="https://github.com/TomD4vs/prumo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/TomD4vs/prumo?color=4FBDAE" alt="licença MIT"></a>
 </p>
 
----
+<p align="center">
+  <a href="README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/lang-en-dark.png">
+      <img src="assets/lang-en-light.png" alt="Read in English" width="236">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="prumo no terminal: um comando, depois uma capitalização errada, dois links quebrados e um caminho ausente, cada um com a correção" width="820">
+</p>
 
 ## O problema
 
@@ -24,13 +40,9 @@ De lá para cá a pasta foi renomeada para `Layouts`, com L maiúsculo. No Windo
 
 Essa linha sobreviveu a seis auditorias feitas à mão nos mesmos arquivos. O prumo achou em quatro segundos.
 
----
-
 ## Começando
 
-Se você já tem [Node.js 18+](https://nodejs.org) e `git`, está pronto. Nada para instalar, nada para configurar, nenhuma conta para criar.
-
-Num terminal, dentro de qualquer repositório git:
+Se você já tem [Node.js 18+](https://nodejs.org) e `git`, está pronto. Nada para instalar, nada para configurar, nenhuma conta para criar. Num terminal, dentro de qualquer repositório git:
 
 ```bash
 npx @tomd4vs/prumo
@@ -38,13 +50,16 @@ npx @tomd4vs/prumo
 
 O prumo localiza seus arquivos de contexto sozinho: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `.github/copilot-instructions.md`, skills instaladas em `.claude/skills/` e os demais. Todo arquivo e pasta que ele procura está na [referência](docs/reference.pt-BR.md#arquivos-encontrados-automaticamente).
 
----
+Para uso frequente, instale uma vez:
+
+```bash
+npm install -g @tomd4vs/prumo             # disponível em qualquer lugar da máquina
+npm install --save-dev @tomd4vs/prumo     # ou como dependência de desenvolvimento de um projeto
+```
+
+Nos dois casos o comando é `prumo`, com zero dependências. Erros nesta etapa, como um Node antigo ou uma pasta que não é repositório git, estão em [Resolvendo problemas](docs/troubleshooting.pt-BR.md).
 
 ## Lendo o resultado
-
-<p align="center">
-  <img src="assets/report.png" alt="prumo no terminal, apontando uma capitalização errada, dois links quebrados e um caminho ausente" width="820">
-</p>
 
 Execução limpa:
 
@@ -78,21 +93,6 @@ MISSING PATH  (1)   paths cited to say they are gone were filtered out
 
 Todo achado traz arquivo, número da linha e a correção, e um caminho ausente diz para onde o git o moveu quando o histórico guarda um rename. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.
 
----
-
-## Dois relatórios
-
-Além das checagens, dois comandos medem em vez de julgar, e saem com código 0 seja qual for o resultado:
-
-```bash
-prumo drift     # quais seções descrevem código que mudou depois que foram escritas
-prumo budget    # quanto cada arquivo de contexto custa ao agente, e o que está escrito duas vezes
-```
-
-O `drift` lê no `git blame` quando cada seção foi escrita pela última vez, conta os commits que mexeram nos arquivos que ela cita desde então, e lista primeiro as seções que mais se moveram: uma ordem de leitura para uma revisão, já que uma seção cujos arquivos mudaram quarenta vezes pode continuar certa. O `budget` estima os tokens que cada arquivo custa a cada sessão, quanto isso cresceu desde um commit, e quais parágrafos estão escritos em mais de um lugar. Os dois estão na [referência](docs/reference.pt-BR.md#dois-relatórios-drift-e-budget), e os dois são ferramentas do servidor MCP.
-
----
-
 ## O que ele não faz
 
 Três limites, escolhidos de propósito e explicados em [Design](docs/design.pt-BR.md):
@@ -101,20 +101,7 @@ Três limites, escolhidos de propósito e explicados em [Design](docs/design.pt-
 - Não edita além da capitalização e dos renames que o próprio git registrou. Um link sugerido pelo nome é um palpite bem informado, e um caminho ausente sem histórico pode estar ausente de propósito.
 - Não faz chamada de rede. Sem telemetria, sem conta, sem modelo.
 
----
-
-## Instalando
-
-O `npx @tomd4vs/prumo` funciona sem instalar nada. Para uso frequente:
-
-```bash
-npm install -g @tomd4vs/prumo           # disponível em qualquer lugar da máquina
-npm install --save-dev @tomd4vs/prumo   # ou como dependência de desenvolvimento de um projeto
-```
-
-Nos dois casos o comando é `prumo`. Node 18 ou mais novo, `git` no `PATH`, zero dependências. Erros nesta etapa, como um Node antigo ou uma pasta que não é repositório git, estão em [Resolvendo problemas](docs/troubleshooting.pt-BR.md).
-
----
+Toda checagem foi medida em repositórios públicos antes de sair, e a página de design publica os números, inclusive os feios.
 
 ## Usando a partir de um agente
 
@@ -138,8 +125,6 @@ Rode `npx @tomd4vs/prumo` e corrija todos os achados que ele reportar.
 
 **Rode depois de cada edição.** Um hook `PostToolUse` roda o prumo sempre que o agente grava um arquivo de contexto, então os achados caem na transcrição e ele corrige na mesma rodada. O hook, em bash e em PowerShell, está em [Agentes](docs/agents.pt-BR.md#rode-automaticamente-depois-de-cada-edição).
 
----
-
 ## Integração contínua
 
 O prumo sai com código diferente de zero quando acha algo, então entra em qualquer pipeline como um passo só. A forma mais curta é a action que este repositório publica:
@@ -156,9 +141,24 @@ jobs:
       - uses: TomD4vs/prumo@v1
 ```
 
-Ela anota a linha exata do pull request e faz o job falhar quando há algo a revisar. `npx @tomd4vs/prumo --quiet` depois do `actions/setup-node` faz o mesmo em qualquer pipeline. Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. Num repositório com passivo, `npx @tomd4vs/prumo --baseline` grava o que existe uma vez, e as rodadas seguintes só falham no que é novo; num pull request, `--since origin/main` checa só os arquivos de contexto que o branch tocou. `--sarif ARQ` grava os achados para o code scanning, e o `.pre-commit-hooks.yaml` roda a mesma checagem antes de cada commit pelo framework pre-commit. As entradas da action, o envio do SARIF e o bloco do pre-commit estão na [referência](docs/reference.pt-BR.md#integração-contínua).
+Ela anota a linha exata do pull request e faz o job falhar quando há algo a revisar. `npx @tomd4vs/prumo --quiet` depois do `actions/setup-node` faz o mesmo em qualquer pipeline. Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. Três opções cobrem o resto:
 
----
+- `--baseline` grava uma vez o que um repositório com passivo já tem; as rodadas seguintes só falham no que é novo.
+- `--since origin/main` checa só os arquivos de contexto que o pull request tocou.
+- `--sarif ARQ` grava os achados para o code scanning, e o `.pre-commit-hooks.yaml` roda a mesma checagem antes de cada commit pelo framework pre-commit.
+
+As entradas da action, o envio do SARIF e o bloco do pre-commit estão na [referência](docs/reference.pt-BR.md#integração-contínua).
+
+## Dois relatórios
+
+Além das checagens, dois comandos medem em vez de julgar, e saem com código 0 seja qual for o resultado:
+
+```bash
+prumo drift     # quais seções descrevem código que mudou depois que foram escritas
+prumo budget    # quanto cada arquivo de contexto custa ao agente, e o que está escrito duas vezes
+```
+
+O `drift` lê no `git blame` quando cada seção foi escrita pela última vez, conta os commits que mexeram nos arquivos que ela cita desde então, e lista primeiro as seções que mais se moveram: uma ordem de leitura para uma revisão, já que uma seção cujos arquivos mudaram quarenta vezes pode continuar certa. O `budget` estima os tokens que cada arquivo custa a cada sessão, quanto isso cresceu desde um commit, e quais parágrafos estão escritos em mais de um lugar. Os dois estão na [referência](docs/reference.pt-BR.md#dois-relatórios-drift-e-budget), e os dois são ferramentas do servidor MCP.
 
 ## Documentação
 

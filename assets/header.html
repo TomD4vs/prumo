@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 820px; height: 190px; background: transparent; overflow: hidden; }
+  :root {
+    --eyebrow: #6E7C8C; --mark: #F2F6FA; --tag: #B9C4D0; --wall: #2B333D; --brick: #222A33; --teal: #4FBDAE; --orange: #E4855C;
+  }
+  html[data-theme="light"] {
+    --eyebrow: #6E7C8C; --mark: #1F2328; --tag: #57606A; --wall: #D0D7DE; --brick: #D8DEE4; --teal: #2FA391; --orange: #C9663D;
+  }
+  body { display: grid; grid-template-columns: 1fr 250px; font-family: "IBM Plex Mono", monospace; }
+  .left { padding: 30px 0 0 34px; display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--eyebrow); }
+  .mark { font-size: 76px; font-weight: 600; letter-spacing: -.03em; line-height: .9; color: var(--mark); }
+  .tag { font-family: "Newsreader", Georgia, serif; font-size: 27px; line-height: 1.2; color: var(--tag); margin-top: 4px; }
+  .right { position: relative; overflow: hidden; }
+  .wall { position: absolute; left: 60px; top: -30px; width: 150px; height: 300px; border-left: 2px solid var(--wall); border-right: 2px solid var(--wall); transform: rotate(5.2deg); transform-origin: 50% 30%; }
+  .brick { position: absolute; left: 0; right: 0; height: 2px; background: var(--brick); }
+  .anchor { position: absolute; left: 118px; top: -4px; width: 20px; height: 10px; background: var(--teal); border-radius: 2px; }
+  .line { position: absolute; left: 127px; top: 0; width: 2px; height: 128px; background: var(--teal); }
+  .bob { position: absolute; left: 114px; top: 126px; width: 28px; height: 56px; background: var(--teal); clip-path: polygon(50% 0%, 100% 22%, 50% 100%, 0% 22%); }
+  .angle { position: absolute; left: 148px; top: 52px; font-size: 12px; font-weight: 500; color: var(--orange); letter-spacing: .04em; }
+  .angle::before { content: ""; position: absolute; left: -22px; top: 7px; width: 18px; height: 2px; background: var(--orange); opacity: .55; }
+</style>
+<script>
+  const theme = new URLSearchParams(location.search).get('theme');
+  if (theme) document.documentElement.dataset.theme = theme;
+</script>
+</head>
+<body>
+  <div class="left">
+    <div class="eyebrow">Context linter for coding agents</div>
+    <h1 class="mark">prumo</h1>
+    <p class="tag">Is your documentation still true?</p>
+  </div>
+  <div class="right">
+    <div class="wall">
+      <div class="brick" style="top:60px"></div>
+      <div class="brick" style="top:120px"></div>
+      <div class="brick" style="top:180px"></div>
+      <div class="brick" style="top:240px"></div>
+    </div>
+    <div class="anchor"></div>
+    <div class="line"></div>
+    <div class="bob"></div>
+    <div class="angle">out of true</div>
+  </div>
+</body>
+</html>

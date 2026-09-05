@@ -87,4 +87,15 @@ msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
 
 `--virtual-time-budget` is required; without it the shot lands before the web fonts load and the card renders in a fallback face.
 
-The demo at the top of the README, `assets/demo.gif`, is a recording of a real Windows Terminal window running the published package on the example repository, `npx @tomd4vs/prumo` typed at a human pace and the report as it prints; `assets/report.png`, further down the README, is the last frame of the same recording. Both are redone whenever the report changes its look, from the maintainer's machine.
+The README header and the language button come from `assets/header.html` and `assets/lang.html` the same way, once per GitHub theme, at twice the size and on a transparent ground, which is what lets one `<picture>` in the README pick the right one:
+
+```bash
+msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
+  --window-size=820,190 --hide-scrollbars --force-device-scale-factor=2 \
+  --default-background-color=00000000 --virtual-time-budget=8000 \
+  --screenshot=assets/header-dark.png "file:///<abs>/assets/header.html?theme=dark"
+```
+
+`?theme=light` gives the other header; `lang.html?lang=pt&theme=dark` and its three siblings give the buttons, at 236×34.
+
+The demo at the top of the README, `assets/demo.gif`, is a recording of a real Windows Terminal window running the published package on the example repository, `npx @tomd4vs/prumo` typed at a human pace and the report as it prints. It is redone whenever the report changes its look, from the maintainer's machine.

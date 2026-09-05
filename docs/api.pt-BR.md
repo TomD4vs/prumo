@@ -87,4 +87,15 @@ msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
 
 O `--virtual-time-budget` é obrigatório; sem ele a captura acontece antes de as fontes carregarem e o card sai com uma fonte de fallback.
 
-A demo no topo do README, `assets/demo.gif`, é uma gravação de uma janela real do Windows Terminal rodando o pacote publicado no repositório de exemplo, com `npx @tomd4vs/prumo` digitado num ritmo humano e o relatório aparecendo como ele imprime; o `assets/report.png`, mais abaixo no README, é o último quadro da mesma gravação. Os dois são refeitos sempre que o relatório muda de aparência, na máquina do mantenedor.
+O cabeçalho do README e o botão de idioma vêm de `assets/header.html` e `assets/lang.html` do mesmo jeito, uma vez por tema do GitHub, no dobro do tamanho e com fundo transparente, que é o que deixa um `<picture>` no README escolher o certo:
+
+```bash
+msedge --headless=new --disable-gpu --no-first-run --user-data-dir=<tmp> \
+  --window-size=820,190 --hide-scrollbars --force-device-scale-factor=2 \
+  --default-background-color=00000000 --virtual-time-budget=8000 \
+  --screenshot=assets/header-dark.png "file:///<abs>/assets/header.html?theme=dark"
+```
+
+`?theme=light` dá o outro cabeçalho; `lang.html?lang=pt&theme=dark` e os três irmãos dão os botões, em 236×34.
+
+A demo no topo do README, `assets/demo.gif`, é uma gravação de uma janela real do Windows Terminal rodando o pacote publicado no repositório de exemplo, com `npx @tomd4vs/prumo` digitado num ritmo humano e o relatório aparecendo como ele imprime. Ela é refeita sempre que o relatório muda de aparência, na máquina do mantenedor.

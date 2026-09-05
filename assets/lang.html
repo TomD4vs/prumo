@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 236px; height: 34px; background: transparent; overflow: hidden; }
+  :root { --border: #23504C; --bg: #12211F; --chip: #4FBDAE; --text: #E6EAF0; --arrow: #6E7C8C; }
+  html[data-theme="light"] { --border: #B6E3DA; --bg: #EAF6F3; --chip: #2FA391; --text: #1F2328; --arrow: #6E7C8C; }
+  body { display: flex; align-items: center; justify-content: center; font-family: "IBM Plex Mono", monospace; }
+  .pill { width: 232px; height: 32px; border: 1px solid var(--border); background: var(--bg); border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--text); }
+  .chip { color: var(--chip); font-weight: 600; letter-spacing: .06em; }
+  .arrow { color: var(--arrow); }
+</style>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get('theme')) document.documentElement.dataset.theme = q.get('theme');
+  addEventListener('DOMContentLoaded', () => {
+    const pt = q.get('lang') !== 'en';
+    document.querySelector('.chip').textContent = pt ? 'PT-BR' : 'EN';
+    document.querySelector('.label').textContent = pt ? 'Leia em português' : 'Read in English';
+  });
+</script>
+</head>
+<body>
+  <div class="pill"><span class="chip">PT-BR</span><span class="label">Leia em português</span><span class="arrow">→</span></div>
+</body>
+</html>

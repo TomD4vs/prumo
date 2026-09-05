@@ -22,7 +22,8 @@ still match the code. Node 18+, ESM, no build step.
   path is resolved. `docs/api.md` has the development recipes.
 - `CONTRIBUTING.md` — the bar an outside change has to clear, in both languages.
 - `assets/social.html` — source of `assets/social.png`, rendered headless at 1280x640.
-- `assets/demo.gif` and `assets/report.png` — the demo at the top of the README and the still image under "Reading the result", both from one recording of a real Windows Terminal window; `docs/api.md` says what is recorded.
+- `assets/header.html` and `assets/lang.html` — sources of the README header and the language button, `assets/header-dark.png`, `assets/header-light.png` and the four `assets/lang-*.png`, one per GitHub theme, rendered headless on a transparent ground; `docs/api.md` has the command.
+- `assets/demo.gif` — the demo at the top of the README, a recording of a real Windows Terminal window; `docs/api.md` says what is recorded.
 
 ## Running it
 
