@@ -155,7 +155,7 @@ Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um ch
 | --- | --- |
 | [Referência](docs/reference.pt-BR.md) | Toda opção e código de saída, o que cada achado significa, como silenciar um, o que o `--fix` toca |
 | [Agentes](docs/agents.pt-BR.md) | Cada integração por inteiro: o servidor MCP, o hook `PostToolUse` em bash e PowerShell, o comando de barra |
-| [Design](docs/design.pt-BR.md) | Por que só três checagens: a medição que removeu a quarta, e os filtros que mantêm as outras caladas |
+| [Design](docs/design.pt-BR.md) | Por que tão poucas checagens: a medição que removeu o verificador de símbolos, e os filtros que mantêm as outras caladas |
 | [Resolvendo problemas](docs/troubleshooting.pt-BR.md) | Mensagens de erro, e as perguntas que as pessoas fazem antes de adotar |
 | [API](docs/api.pt-BR.md) | Chamar a partir de código, e rodar a suíte de testes |
 

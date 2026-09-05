@@ -31,8 +31,8 @@ function palette(color) {
  * @param {boolean} [opts.color]   paint it for a terminal
  */
 export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false } = {}) {
-  const { caseMismatch, brokenLinks, missingPaths, orphans, stats } = result;
-  const total = caseMismatch.length + brokenLinks.length + missingPaths.length + orphans.length;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, stats } = result;
+  const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + orphans.length;
   const { bold, dim, teal, orange, badge } = palette(color);
   const out = [];
   const cap = (list) => (all ? list : list.slice(0, 25));
@@ -85,6 +85,12 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     out.push(...rest(missingPaths));
   }
 
+  if (unknownCommands.length) {
+    out.push(title('UNKNOWN COMMAND', PAINT.yellow, unknownCommands.length, 'no package.json, Makefile or composer.json defines it'));
+    for (const o of cap(unknownCommands)) out.push(`  ${at(o)}  ${orange(o.cited)}${o.suggestion ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`);
+    out.push(...rest(unknownCommands));
+  }
+
   if (!total) out.push(teal('nothing to review.'));
   else if (!color) out.push(`${total} to review`);
   else {
@@ -93,6 +99,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
       brokenLinks.length && plural(brokenLinks.length, 'broken link', 'broken links'),
       orphans.length && plural(orphans.length, 'note not in the index', 'notes not in the index'),
       missingPaths.length && plural(missingPaths.length, 'missing path', 'missing paths'),
+      unknownCommands.length && plural(unknownCommands.length, 'unknown command', 'unknown commands'),
     ].filter(Boolean);
     out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}`));
   }
@@ -102,12 +109,13 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
 /** GitHub Actions annotations, one per finding. */
 export function renderGithub(result) {
-  const { caseMismatch, brokenLinks, missingPaths, orphans } = result;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans } = result;
   const lines = [];
   const say = (level, o, msg) => lines.push(`::${level} file=${o.file},line=${o.line}::${msg}`);
   for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);
   for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}`);
+  for (const o of unknownCommands) say('warning', o, `Unknown command: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of orphans) lines.push(`::notice::Not in index: ${o}`);
   return lines.join('\n');
 }

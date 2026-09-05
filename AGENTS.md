@@ -7,13 +7,13 @@ still match the code. Node 18+, ESM, no build step.
 
 - `bin/prumo.mjs` — CLI: argument parsing, then the report. No analysis lives here.
 - `bin/prumo-mcp.mjs` — MCP server over stdio, two tools, same analysis and same report.
-- `src/check.mjs` — the three checks, exported as `analyze()` and `resolveTargets()`.
+- `src/check.mjs` — the four checks, exported as `analyze()` and `resolveTargets()`.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
 - `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs` — the suite: the analysis and the fix, the two renderers, the server driven over stdio, and the banner. Every test that needs a repository builds a throwaway one.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
-- `docs/design.md` — **read this before changing behaviour.** Why there are only three checks,
+- `docs/design.md` — **read this before changing behaviour.** Why there are so few checks,
   what was measured and rejected, what each filter defends against, and the order in which a
   path is resolved. `docs/api.md` has the development recipes.
 - `CONTRIBUTING.md` — the bar an outside change has to clear, in both languages.

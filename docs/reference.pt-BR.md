@@ -95,8 +95,11 @@ markdown `[politica](politica.md)`, e ele passa a ser checado como qualquer outr
 lida como um comando ou como uma entrada de árvore de arquivos, então `node scripts/seed.py` e
 `src/components/Button.tsx` são checados ali sem crase, e a frase que apresenta o bloco conta como
 contexto dele. Um bloco marcado como `markdown` é um exemplo de sintaxe, assim como qualquer coisa
-dentro de um comentário HTML, então nenhum dos dois é lido. Um link dentro de um bloco cercado está
-sendo citado, e fica de fora. Um caminho citado em várias linhas é reportado em cada uma delas.
+dentro de um comentário HTML, então nenhum dos dois é lido. Um bloco numa linguagem de programação,
+como `js`, `python` ou `php`, é código-fonte, e uma string ali é algo que a linguagem resolve, então
+ele também não é lido. Num bloco que é lido, `require('lib/x.js')` e `path=lib/x.js` são checados
+como `lib/x.js`. Um link dentro de um bloco cercado está sendo citado, e fica de fora. Um caminho
+citado em várias linhas é reportado em cada uma delas.
 
 ### `CASE MISMATCH`
 
@@ -106,9 +109,9 @@ O resultado é o clássico "na minha máquina funciona": passa localmente e morr
 
 ### `BROKEN LINK`
 
-Um `[[wikilink]]`, ou um link markdown como `[Setup](docs/setup.md)`, aponta para um arquivo que não está lá. O agente que segue esse link não encontra nada e segue adiante sem avisar. Wikilinks são casados pelo nome contra as notas sendo checadas e contra todo arquivo markdown rastreado pelo git; links markdown são resolvidos relativos ao arquivo que os contém, e um link que começa com `/` a partir da raiz do repositório, como o GitHub faz. Um `%20` no destino é lido como o espaço que ele representa, e o `--fix` o devolve codificado, para que um link corrigido continue funcionando.
+Um `[[wikilink]]`, ou um link markdown como `[Setup](docs/setup.md)`, aponta para um arquivo que não está lá. O agente que segue esse link não encontra nada e segue adiante sem avisar. Wikilinks são casados pelo nome contra as notas sendo checadas e contra todo arquivo markdown rastreado pelo git; links markdown são resolvidos relativos ao arquivo que os contém, e um link que começa com `/` a partir da raiz do repositório, como o GitHub faz. Um link que resolve a partir da raiz e de nenhum outro lugar é lido a partir da raiz, porque é assim que um agente lê um caminho, e é assim que uma nota aninhada em `.claude/skills/` costuma escrevê-lo. Um `%20` no destino é lido como o espaço que ele representa, e o `--fix` o devolve codificado, para que um link corrigido continue funcionando.
 
-O alvo pode ser uma página markdown, uma imagem, um PDF ou um arquivo de código, e as três formas de escrever link em markdown são lidas: `[a](x.md)`, `[a](<um nome com espaços.md>)` e um `[a][ref]` cuja definição `[ref]:` é reportada na própria linha dela.
+O alvo pode ser uma página markdown, uma imagem, um PDF ou um arquivo de código, e as três formas de escrever link em markdown são lidas: `[a](x.md)`, `[a](<um nome com espaços.md>)` e um `[a][ref]` cuja definição `[ref]:` é reportada na própria linha dela. Um link para um título, `[setup](docs/guide.md#quick-start)` ou `[topo](#quick-start)`, é checado contra os títulos daquela página, transformados em âncoras do jeito que o GitHub faz, e contra qualquer atributo `id` ou `name` no HTML dela.
 
 Quando o prumo imprime `-> sugestão`, aquele é quase certamente o arquivo pretendido; os dois costumam divergir só em `-` contra `_`. Sem sugestão, o destino foi renomeado ou apagado, então atualize ou remova o link.
 
@@ -118,7 +121,13 @@ Centenas desses geralmente têm uma causa sistemática só. Numa execução medi
 
 A nota cita um arquivo que não existe mais em lugar nenhum do repositório. Atualize o caminho, ou reescreva a frase se o ponto dela for justamente que o arquivo sumiu. O prumo reconhece construções como *"foi removido"*, *"não existe mais"* e *"renomeado para"*, e se cala quando encontra uma.
 
+Também reconhece uma frase que diz que o arquivo é escrito, como *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* ou *"`docs/run.log` é gerado pelo build"*, e deixa esse caminho em paz. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* continua checando `a`. Uma lista ou uma tabela toma o veredito da frase que as apresenta, ou do título da seção, e num comando um redirecionamento `>`, uma flag `-o` ou `mkdir` marca o que é escrito. Um caminho com a caixa errada é reportado diga a frase o que disser.
+
 Um caminho coberto pelo `.gitignore` está ausente de propósito, então fica isento desta checagem e da de links quebrados. O cabeçalho conta essas isenções, para que um repositório que depende delas nunca pareça limpo por acidente.
+
+### `UNKNOWN COMMAND`
+
+A nota manda o agente rodar `npm run test:unit`, `yarn build`, `make deploy` ou `composer lint`, e nenhum `package.json`, `Makefile` ou `composer.json` rastreado pelo git define um script ou alvo com esse nome. Script é renomeado com mais frequência do que arquivo, e um agente que roda o nome antigo para ali mesmo. Todo manifesto do repositório conta, então a nota de um monorepo pode nomear o script de qualquer pacote, e `yarn x` e `pnpm x` aceitam também o nome de uma dependência, porque rodam o binário dela. Um comando apontado para outro lugar, com `-w`, `--filter` ou `make -C`, fica em paz, assim como o `make` quando um alvo é montado a partir de variável, porque aí a lista não pode ser lida. Quando o prumo imprime `-> sugestão`, aquele é o nome definido mais próximo do citado.
 
 ### `NOT IN INDEX`
 

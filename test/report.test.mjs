@@ -50,6 +50,23 @@ test('each section renders the way the README shows it, and the total adds them 
   assert.match(out, /\n5 to review$/);
 });
 
+test('an unknown command and a heading anchor render like the other findings, and count in the total', () => {
+  const out = renderText(result({
+    brokenLinks: [{ file: 'CLAUDE.md', line: 8, kind: 'anchor', cited: 'docs/setup.md#databse', suggestion: 'docs/setup.md#database' }],
+    unknownCommands: [
+      { file: 'AGENTS.md', line: 12, cited: 'npm run test:unit', name: 'test:unit', source: 'package.json', suggestion: 'npm run test:units', excerpt: 'Run `npm run test:unit`.' },
+      { file: 'AGENTS.md', line: 40, cited: 'make deploy', name: 'deploy', source: 'Makefile', suggestion: null, excerpt: 'make deploy' },
+    ],
+  }));
+  assert.match(out, /^  CLAUDE\.md:8  docs\/setup\.md#databse   ->  docs\/setup\.md#database$/m);
+  assert.match(out, /^UNKNOWN COMMAND  \(2\)   no package\.json, Makefile or composer\.json defines it$/m);
+  assert.match(out, /^  AGENTS\.md:12  npm run test:unit   ->  npm run test:units$/m);
+  assert.match(out, /^  AGENTS\.md:40  make deploy$/m);
+  assert.match(out, /\n3 to review$/);
+  const gh = renderGithub(result({ unknownCommands: [{ file: 'AGENTS.md', line: 12, cited: 'npm run test:unit', suggestion: 'npm run test:units' }] }));
+  assert.equal(gh, '::warning file=AGENTS.md,line=12::Unknown command: npm run test:unit — did you mean npm run test:units?');
+});
+
 test('the list stops at 25 unless --all, and says how many more there are', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ file: 'CLAUDE.md', line: i + 1, cited: `config/f${i}.php`, excerpt: 'x' }));
   const short = renderText(result({ missingPaths: many }));

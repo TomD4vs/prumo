@@ -155,7 +155,7 @@ Use `actions/checkout` as normal; prumo reads the git index, so a checkout that 
 | --- | --- |
 | [Reference](docs/reference.md) | Every option and exit code, what each finding means, how to silence one, what `--fix` touches |
 | [Agents](docs/agents.md) | Every integration in full: the MCP server, the `PostToolUse` hook for bash and PowerShell, the slash command |
-| [Design](docs/design.md) | Why only three checks: the measurement that removed the fourth, and the filters that keep the rest quiet |
+| [Design](docs/design.md) | Why so few checks: the measurement that removed the symbol checker, and the filters that keep the rest quiet |
 | [Troubleshooting](docs/troubleshooting.md) | Error messages, and the questions people ask before adopting it |
 | [API](docs/api.md) | Calling it from code, and running the test suite |
 

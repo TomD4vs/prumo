@@ -122,8 +122,8 @@ if (FIX && result.caseMismatch.length) {
   result = analyze({ repo, targets, config });
 }
 
-const { caseMismatch, brokenLinks, missingPaths, orphans, stats } = result;
-const total = caseMismatch.length + brokenLinks.length + missingPaths.length + orphans.length;
+const { caseMismatch, brokenLinks, missingPaths, unknownCommands, orphans, stats } = result;
+const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + orphans.length;
 
 if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(result, null, 2));
 

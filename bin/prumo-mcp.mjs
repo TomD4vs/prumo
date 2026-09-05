@@ -28,7 +28,7 @@ const TOOLS = [
   {
     name: 'prumo_check',
     description:
-      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]] and markdown links, paths that no longer exist, and notes an index never mentions. Nothing is written.',
+      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]], markdown links and heading anchors, paths that no longer exist, commands naming a script or target no package.json, Makefile or composer.json defines, and notes an index never mentions. Nothing is written.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG },
@@ -89,7 +89,7 @@ function handle(msg) {
       if (!TOOLS.some((t) => t.name === name)) return fail(-32602, `unknown tool: ${name}`);
       try {
         const { result, fixed } = run(name, args || {});
-        const total = result.caseMismatch.length + result.brokenLinks.length + result.missingPaths.length + result.orphans.length;
+        const total = result.caseMismatch.length + result.brokenLinks.length + result.missingPaths.length + result.unknownCommands.length + result.orphans.length;
         return reply({
           content: [{ type: 'text', text: renderText(result, { all: true, fixed }) }],
           structuredContent: { ...result, fixed, total },

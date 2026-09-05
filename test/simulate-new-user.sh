@@ -48,6 +48,7 @@ mk tickets
 mkdir -p backend/app/Models backend/tests frontend/src/components scripts docs/notes .cursor/rules .github .claude/skills/release/scripts
 for f in backend/app/main.py backend/app/db.py backend/app/Models/ticket.py backend/tests/test_api.py frontend/src/components/TicketList.tsx frontend/src/App.tsx scripts/seed_db.py Makefile .claude/skills/release/checklist.md .claude/skills/release/scripts/release.sh; do echo x > "$f"; done
 printf 'node_modules/\n' > .gitignore
+printf 'dev:\n\tuvicorn backend.app.main:app --reload\n' > Makefile
 cat > CLAUDE.md <<EOT
 # tickets
 
@@ -89,8 +90,8 @@ echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted sc
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
-chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,orphans,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 1' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,orphans,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
+echo "$J" | grep -q '"schemaVersion": 2' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -276,8 +277,19 @@ echo "$OUT" | grep -q "^  .claude/skills/deploy/SKILL.md:5$" && ok "the case mis
 echo "$OUT" | grep -q "steps/setup.md" && bad "the skill's own file beside it was reported" || ok "the file beside the skill is found on disk"
 echo "$OUT" | grep -q "^  .claude/commands/deploy.md:1  scripts/deploy.sh" && ok "a slash command citing a dead path is reported" || bad "command target: $OUT"
 
+echo; echo "########## N. A path the sentence writes, a source block, a script nothing defines, a heading anchor"
+mk verbs; mkdir -p docs lib; echo x > docs/README.md; echo x > lib/index.js; printf '# Setup\n\n## Database\n' > docs/setup.md
+printf '{"scripts":{"test:units":"x","build":"x"}}' > package.json
+printf '# app\n\nOutput: `docs/report.md`\n\nRead `docs/guide.md` and write the summary to `docs/summary.md`.\n\n```js\nconst x = require(%slib/gone.js%s);\n```\n\n```bash\nnpm run test:unit && npm run build\n```\n\nSee [the schema](docs/setup.md#schema) and [the table](docs/setup.md#database).\n' "'" "'" > CLAUDE.md; ci
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^MISSING PATH  (1)" && echo "$OUT" | grep -q "^  CLAUDE.md:5  docs/guide.md" && ok "a path a sentence says gets written is left alone, and the one it reads is reported" || bad "verbs: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
+echo "$OUT" | grep -q "gone.js" && bad "a js block was read" || ok "a fenced block in a programming language is not read"
+echo "$OUT" | grep -q "^UNKNOWN COMMAND  (1)" && echo "$OUT" | grep -q "^  CLAUDE.md:12  npm run test:unit   ->  npm run test:units" && ok "a script nothing defines is reported with the closest name" || bad "command: $(echo "$OUT" | grep -E 'UNKNOWN|npm' | tr '\n' '|')"
+echo "$OUT" | grep -q "^  CLAUDE.md:15  docs/setup.md#schema" && ! echo "$OUT" | grep -q "#database" && ok "a link to a heading the page lacks is a broken link, and one it has is not" || bad "anchor: $(echo "$OUT" | grep -E 'setup.md' | tr '\n' '|')"
+echo "$OUT" | grep -q "^3 to review" && chk "$RC" "1" "3 to review, exit 1" || bad "total: $(echo "$OUT" | tail -1)"
+
 if [ "$GLOBAL" = 1 ]; then
-  echo; echo "########## N. npm install -g (opt-in)"
+  echo; echo "########## O. npm install -g (opt-in)"
   npm install -g "$PKG" --silent --no-audit --no-fund >/dev/null 2>&1 && hash -r
   chk "$(prumo --version 2>&1)" "$VERSION" "'prumo --version' after a global install"
   npm uninstall -g @tomd4vs/prumo --silent >/dev/null 2>&1; hash -r

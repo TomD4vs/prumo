@@ -15,10 +15,11 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Filtro | Por que existe |
 | --- | --- |
 | Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. |
-| Bloco cercado lido como código, comentário não lido | Um caminho dentro de um bloco ```` ``` ```` é um comando ou uma árvore de arquivos e é checado como tal, com a frase acima do bloco como contexto. Um link ali está sendo citado, como qualquer coisa dentro de `<!-- -->`, e nenhum dos dois é checado. Uma linha de comentário dentro do bloco é o que um comando imprime, e `./nome` sem pasta é um argumento que o leitor fornece. |
+| Bloco cercado lido como código, comentário não lido | Um caminho dentro de um bloco ```` ``` ```` é um comando ou uma árvore de arquivos e é checado como tal, com a frase acima do bloco como contexto. Um link ali está sendo citado, como qualquer coisa dentro de `<!-- -->`, e nenhum dos dois é checado. Uma linha de comentário dentro do bloco é o que um comando imprime, e `./nome` sem pasta é um argumento que o leitor fornece. Um bloco numa linguagem de programação, `js` ou `python`, é código-fonte, e uma string ali é um especificador de módulo que a linguagem resolve, então ele não é lido. |
+| Um caminho que a frase diz que é escrito | *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* e *"`docs/run.log` é gerado pelo build"* nomeiam um arquivo que ainda não existe por definição. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* mantém `a` checado, e um verbo depois do caminho só conta na voz passiva, porque *"`x` cria usuários"* faz do caminho o autor. Uma lista, uma tabela ou um bloco cercado toma o veredito da frase que os apresenta ou do título da seção; num comando, um redirecionamento `>`, uma flag `-o` e `mkdir` marcam o que é escrito. Um caminho com a caixa errada é reportado diga a frase o que disser. |
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
-| Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. |
+| Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. Um link que resolve a partir da raiz do repositório e de nenhum outro lugar é lido a partir da raiz, como um agente o lê. |
 | Marcador de posição e identificador | `path/to/test.js` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
@@ -138,8 +139,11 @@ Posta ao lado da quarta passagem, essa não é uma versão piorando. A mesma ver
 64% no material da quarta e 13% no da quinta, então o que mudou foi o material, não a ferramenta. A
 afirmação honesta é condicional, e é o limite que vale conhecer antes de instalar: **num repositório
 que documenta código que existe, a maior parte do que o prumo diz está certa; num que documenta
-código que um gerador vai escrever, a maior parte não está.** Distinguir os dois é a próxima coisa a
-construir, e será medida em repositórios que nada disso usou.
+código que um gerador vai escrever, a maior parte não está.** Distinguir os dois é a regra que a 0.5.1
+acrescentou, pelo verbo que rege o caminho, e a oitava passagem abaixo mede essa regra em repositórios
+que nada disso usou. Neste quinto corpus mesmo, a 0.5.0 levantava 31 achados com 7 reais, 23%; a 0.5.1
+levanta 16, os mesmos 7 mais um script renomeado por baixo da nota, 50%, e os dezesseis que saíram são
+todos falsos.
 
 Veio então uma sexta passagem, em mais cinquenta repositórios, com o código congelado antes de rodar e
 sem permissão de mexer em filtro, desse no que desse:
@@ -162,9 +166,12 @@ versões, e em acervo fixo toda release removeu achado falso e manteve todos os 
 | --- | ---: | ---: |
 | 0.4.7 | 52% | 30% |
 | 0.4.10 | 86% | 32% |
+| 0.5.1 | 87% | 57% |
 
 Lendo uma coluna, a ferramenta melhorou. Lendo uma linha, o material é outro. As duas coisas são
-verdade, e só as colunas respondem se uma release ajudou.
+verdade, e só as colunas respondem se uma release ajudou. A última linha conta as três checagens que as
+linhas anteriores tinham, para as colunas continuarem comparáveis; as duas checagens que a 0.5.1
+acrescentou aparecem por conta própria na oitava passagem, abaixo.
 
 A distância entre 86% e 32% é o que o ajuste custa. Os filtros da coluna da esquerda foram construídos
 a partir daquele mesmo material; medido onde nada foi ajustado, o mais novo deles vale um achado em
@@ -195,6 +202,44 @@ repositórios e não levantou nada. `.claude/agents` foi testada do mesmo jeito 
 achados eram todos caminhos de exemplo dentro de definições de agente. Três regras saíram desse material, a
 variável de shell, o `e.g.` e uma pasta chamada `path`, então a próxima passagem precisa rodar em repositórios
 que nada disso tocou.
+
+Uma oitava passagem, para a 0.5.1, em sessenta repositórios achados buscando `SKILL.md` por "Output",
+"generates" e "Save to", nenhum em lista anterior: o material em que uma skill escreve arquivos, que é
+a forma que levou a quinta passagem a 13%. A regra que lê o verbo foi congelada antes de o corpus ser
+clonado. Quinze dos sessenta não têm arquivo de contexto que o prumo detecte, e dezessete são catálogos
+de skills para outros projetos, cada um com mais de cinquenta achados na 0.5.0, então ficam contados à
+parte:
+
+| Repositórios públicos, oitava passagem, 0.5.0 contra 0.5.1 | |
+| --- | ---: |
+| Repositórios checados | 45 |
+| Catálogos de skills, mais de cinquenta achados cada | 17 |
+| Achados nos catálogos na 0.5.0 | 29825 |
+| Achados nos catálogos na 0.5.1 | 29626 |
+| Removidos ali, de quarenta lidos à mão, falsos | 39 |
+| Os outros 28 repositórios, achados na 0.5.0 | 294 |
+| Reais | 133 |
+| Achados na 0.5.1 | 267 |
+| Reais | 134 |
+| Precisão, 0.5.0 | 45% |
+| Precisão, 0.5.1 | 50% |
+
+Real aqui quer dizer que o arquivo, o script ou o título não está lá, faça o mantenedor o que fizer com
+isso: uma skill copiada sem a pasta `references/` conta, como contou na sexta passagem. O que continua
+falso tem uma forma só, uma skill que documenta o projeto em que vai ser instalada, e nenhuma regra por
+frase alcança isso; um portão sobre o arquivo inteiro é a próxima coisa a medir. Três regras nasceram
+deste corpus e por isso não são medidas por ele: um link que resolve a partir da raiz do repositório e
+de nenhum outro lugar, a ferramenta depois de *"generated by"*, e `pnpm --dir` como comando que aponta
+para outro lugar. A única remoção lida à mão que estava errada virou a segunda delas.
+
+As duas checagens que a 0.5.1 acrescentou foram medidas em todo corpus no disco, e o retrato é o mesmo
+que os caminhos já davam. No quarto corpus, quarenta e cinco repositórios que documentam código que
+existe, a checagem de comandos levantou quatro achados e os quatro são reais, um script e um alvo
+renomeados por baixo da nota; a de âncoras levantou vinte e oito, todos sumários cujos links não rolam
+a página no GitHub, porque um título que abre com emoji ou número ganha uma âncora que o link escrito à
+mão não tem. No quinto corpus, o único comando levantado é real. No oitavo, os comandos levantados
+dentro dos catálogos nomeiam scripts dos projetos a que aquelas skills se destinam, que é a mesma
+família falsa dos caminhos.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
