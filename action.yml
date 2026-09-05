@@ -1,5 +1,5 @@
-name: prumo
-description: Checks the context files your coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md and the rest) against the git index, and fails the job when something needs review.
+name: prumo check
+description: Checks the context files your coding agent reads, CLAUDE.md, AGENTS.md, SKILL.md and the rest, against the git index.
 author: Elyton
 branding:
   icon: check-square
