@@ -33,9 +33,15 @@ echo "########## 0. Install as a user would"
 if [ "$REGISTRY" = 1 ]; then PKG="@tomd4vs/prumo@$VERSION"; echo "  package: $PKG from the registry"
 else TGZ=$(cd "$HERE" && npm pack --pack-destination "$U" 2>/dev/null | tail -1); PKG="$U/$TGZ"; echo "  package: $TGZ from npm pack"; fi
 mk consumer; printf '# app\n' > AGENTS.md; npm init -y >/dev/null 2>&1
-npm i "$PKG" --silent --no-audit --no-fund >/dev/null 2>&1; ci
+NPM_OUT=$(npm i "$PKG" --no-audit --no-fund 2>&1); ci
 PB="$U/consumer/node_modules/@tomd4vs/prumo/bin/prumo.mjs"; PR="node $PB"
-[ -f "$PB" ] && ok "installed" || { bad "install failed"; exit 1; }
+if [ -f "$PB" ]; then ok "installed"; else
+  # npm's reason, on the first error line that is not the code: "notarget No matching version found for ..." says more than "code ETARGET".
+  WHY=$(echo "$NPM_OUT" | grep -E '^npm (error|ERR!)' | grep -vE ' code [A-Z]' | head -1); [ -n "$WHY" ] || WHY=$(echo "$NPM_OUT" | tail -1)
+  bad "install failed: $WHY"
+  [ "$REGISTRY" = 1 ] && echo "         a version published minutes ago may not be served yet; wait and rerun"
+  exit 1
+fi
 chk "$($PR --version)" "$VERSION" "--version"
 H=$($PR --help); MISSING=""
 for s in USAGE ARGUMENTS OPTIONS CONFIG "SUPPRESSING ONE LINE" ENVIRONMENT "EXIT CODE" EXAMPLES; do echo "$H" | grep -q "^$s" || MISSING="$MISSING $s"; done
