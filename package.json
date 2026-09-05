@@ -1,7 +1,8 @@
 {
   "name": "@tomd4vs/prumo",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Is your documentation still true? Checks the context files your coding agent reads against the code. Five high-precision checks, two reports, zero dependencies.",
+  "mcpName": "io.github.TomD4vs/prumo",
   "type": "module",
   "bin": {
     "prumo": "bin/prumo.mjs",

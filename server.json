@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.TomD4vs/prumo",
+  "description": "Checks the context files a coding agent reads against the git index, and reports what drifted.",
+  "repository": {
+    "url": "https://github.com/TomD4vs/prumo",
+    "source": "github"
+  },
+  "version": "0.9.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@tomd4vs/prumo",
+      "version": "0.9.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "npx",
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y",
+          "isRequired": true
+        },
+        {
+          "type": "positional",
+          "value": "-p",
+          "isRequired": true
+        },
+        {
+          "type": "positional",
+          "value": "@tomd4vs/prumo",
+          "isRequired": true
+        },
+        {
+          "type": "positional",
+          "value": "prumo-mcp",
+          "isRequired": true
+        }
+      ]
+    }
+  ]
+}

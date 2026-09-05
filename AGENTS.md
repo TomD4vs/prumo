@@ -17,6 +17,7 @@ still match the code. Node 18+, ESM, no build step.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `action.yml` — the GitHub Action, `uses: TomD4vs/prumo@v1`: a composite step that runs the checked-out `bin/prumo.mjs`. Not in the npm tarball.
 - `.pre-commit-hooks.yaml` — the hook for the pre-commit framework; its `files:` regex is guarded by the same test as the hook in `docs/agents.md`.
+- `server.json` — the entry of the MCP server in the official MCP Registry, published with `mcp-publisher`; its `name` must equal `mcpName` in `package.json`, and both versions follow the package. Not in the npm tarball.
 - `docs/design.md` — **read this before changing behaviour.** Why there are so few checks,
   what was measured and rejected, what each filter defends against, and the order in which a
   path is resolved. `docs/api.md` has the development recipes.
