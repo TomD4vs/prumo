@@ -14,10 +14,11 @@ const result  = analyze({ repo: '.', targets });
 // com o baseline da raiz, e só os arquivos em stage para o commit:
 // analyze({ repo: '.', targets, baseline: loadBaseline('.'), only: { paths: changedFiles('.', { staged: true }), label: 'staged' } })
 
-console.log(result.schemaVersion);  // 8, sobe quando este formato muda
+console.log(result.schemaVersion);  // 9, sobe quando este formato muda
 console.log(result.prumoVersion);   // a versão que rodou
 console.log(result.repo);           // caminho absoluto do repositório checado
 console.log(result.checkedAt);      // quando, como data ISO 8601
+console.log(result.command);        // 'check'; os dois relatórios dizem 'drift' e 'budget'
 console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion, history? }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt, history? }]
@@ -28,7 +29,22 @@ console.log(result.elsewhere);      // [{ file, cited, absent, unit? }], file ".
 console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, cited, absent, only? }
 ```
 
-Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada; e para 5 com `stats.baselined`, os achados que um baseline reteve, `stats.baselineStale`, as entradas dele que não casam mais com nada, e `stats.only`, presente como `staged` ou `since REF` quando a rodada foi limitada ao que mudou; e para 6 com `history` num caminho ausente ou num link markdown, `{ event, to?, commit, date, when }`, em que `event` é `renamed`, com `to` o nome que existe agora, ou `deleted`, `commit` é o hash curto, `date` ISO 8601 e `when` a idade em palavras; e para 7 com `from` nesse `history`, o caminho pelo qual o git foi perguntado, que é o caminho citado a partir da raiz ou a partir da pasta da nota; e para 8 com `stats.cited` e `stats.absent`, os caminhos distintos que os arquivos detectados sozinhos citam e os que entre eles têm a pasta ausente, somados no repositório, que é o que o portão por repositório lê, e com `elsewhere` nomeando `.` quando esse portão reteve o repositório inteiro.
+Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada; e para 5 com `stats.baselined`, os achados que um baseline reteve, `stats.baselineStale`, as entradas dele que não casam mais com nada, e `stats.only`, presente como `staged` ou `since REF` quando a rodada foi limitada ao que mudou; e para 6 com `history` num caminho ausente ou num link markdown, `{ event, to?, commit, date, when }`, em que `event` é `renamed`, com `to` o nome que existe agora, ou `deleted`, `commit` é o hash curto, `date` ISO 8601 e `when` a idade em palavras; e para 7 com `from` nesse `history`, o caminho pelo qual o git foi perguntado, que é o caminho citado a partir da raiz ou a partir da pasta da nota; e para 8 com `stats.cited` e `stats.absent`, os caminhos distintos que os arquivos detectados sozinhos citam e os que entre eles têm a pasta ausente, somados no repositório, que é o que o portão por repositório lê, e com `elsewhere` nomeando `.` quando esse portão reteve o repositório inteiro; e para 9 com `command`, `check` neste resultado e `drift` ou `budget` nos dois relatórios, que compartilham o número de versão e os quatro primeiros campos.
+
+```js
+import { drift, budget } from '@tomd4vs/prumo';
+
+const d = drift({ repo: '.', targets });   // os mesmos quatro primeiros campos, depois command: 'drift'
+console.log(d.sections);                   // [{ file, line, section, since, age, cited, changed, commits }], o que mais se moveu primeiro
+console.log(d.stats);                      // { targets, sections, cited, quiet, uncommitted }
+
+const b = budget({ repo: '.', targets, since: 'v1.0.0' });   // since é opcional
+console.log(b.files);                      // [{ file, bytes, lines, words, tokens, before, delta, state }], o maior primeiro
+console.log(b.repeated);                   // [{ words, at: [{ file, line }, ...] }]
+console.log(b.stats);                      // { targets, tokens, before, since: { ref, date } | null, repeated: { paragraphs, copies, words } }
+```
+
+Numa seção do drift, `since` é a data do commit mais novo entre as linhas dela e `age` essa data em palavras, ou `not committed`; `cited`, `changed` e `commits` são os arquivos que ela cita e o repositório tem, quantos deles mudaram depois dessa data, e os commits distintos que mexeram neles. Num arquivo do budget, `state` é `changed`, `unchanged`, `new` ou `untracked`, e `before` e `delta` são null a menos que o arquivo existisse no commit comparado. `analyze({ collect: true })` é o que o drift lê: o resultado ganha `citations`, toda citação que chegou a um arquivo ou pasta que o git conhece, `{ file, line, cited, path }`, e `files`, os arquivos de contexto lidos.
 
 `renameFixes(result)` lista as reescritas que um resultado permite, uma por caminho ausente ou link markdown com um rename no histórico, e `applyFixes(changes, targets)` as aplica, ou as capitalizações erradas, no lugar; `applyCaseFixes` é o nome antigo da mesma função. Cada mudança carrega `why`, `case` ou `rename`, e um rename o seu `commit`.
 

@@ -9,9 +9,9 @@ import { execSync, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:path';
 
-const VERSION = createRequire(import.meta.url)('../package.json').version;
+export const VERSION = createRequire(import.meta.url)('../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -162,7 +162,7 @@ function globToRegExp(glob) {
 
 /** Builds the test for one config list. A pattern with no wildcard that names a folder
  *  covers everything under it, so `public/dist` reaches `public/dist/app.js`. */
-function makeMatcher(patterns = []) {
+export function makeMatcher(patterns = []) {
   const res = patterns.map(globToRegExp);
   const folders = patterns.filter((p) => !/[*?]/.test(p)).map((p) => p.replace(/\/+$/, '').toLowerCase() + '/');
   return (value) => res.some((re) => re.test(value)) || folders.some((f) => value.toLowerCase().startsWith(f));
@@ -223,7 +223,7 @@ export function baselineOf(result) {
 }
 
 /** How long ago a commit was, in the words a person uses. */
-function ageOf(seconds, now = Date.now() / 1000) {
+export function ageOf(seconds, now = Date.now() / 1000) {
   const days = Math.floor((now - seconds) / 86400);
   if (days < 1) return 'today';
   if (days === 1) return 'yesterday';
@@ -318,7 +318,7 @@ export function changedFiles(repo, { staged = false, since = '' } = {}) {
   return new Set(out.split('\0').filter(Boolean));
 }
 
-function readTextFile(path) {
+export function readTextFile(path) {
   try {
     if (statSync(path).size > 2_000_000) return null;
     return readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
@@ -469,7 +469,7 @@ const MOVES_OR_DELETES = /^(git\s+)?(mv|rm|del|rename)\b/i;
  * comment. A code line keeps the index of its opening fence, so the sentence that introduces the
  * block counts as its context.
  */
-function classifyLines(lines) {
+export function classifyLines(lines) {
   const out = [];
   let fence = null;
   let comment = false;
@@ -896,7 +896,9 @@ function resolvePath(index, p) {
     for (const base of [...tries]) for (const e of TRY_EXT) tries.push(base + e);
   }
   for (const t of tries) {
-    if (index.known.has(t) || endingIn(index, t, true)) return { state: 'ok' };
+    if (index.known.has(t)) return { state: 'ok', real: t };
+    const nested = endingIn(index, t, true);
+    if (nested) return { state: 'ok', real: nested };
   }
   for (const t of tries) {
     const low = t.toLowerCase();
@@ -1062,7 +1064,7 @@ function configFileIssues(rel, text, repo, index, ignored, resolveOnce) {
  * a commit or a branch touched. `baseline` holds back the findings it records, counted in `stats.baselined`.
  * @returns {{schemaVersion:number, prumoVersion:string, repo:string, checkedAt:string, caseMismatch:[], brokenLinks:[], missingPaths:[], orphans:[], stats:{}}}
  */
-export function analyze({ repo, targets, config = null, baseline = null, only = null }) {
+export function analyze({ repo, targets, config = null, baseline = null, only = null, collect = false }) {
   const index = buildIndex(repo);
   if (!index) throw new Error(`not a git repository: ${repo}`);
   if (!index.tracked.length) throw new Error('the git index is empty, so nothing can be checked against it. Commit or "git add" the files first.');
@@ -1081,11 +1083,15 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
   const names = new Set(checked.map((t) => t.label.replace(/\.(md|mdc)$/i, '')));
   const linkable = new Set(names);
+  const linkPath = new Map();
   for (const p of index.tracked) {
     if (!/.(md|mdc)$/i.test(p)) continue;
     const bare = p.replace(/.(md|mdc)$/i, '');
+    const short = bare.slice(bare.lastIndexOf('/') + 1);
     linkable.add(bare);
-    linkable.add(bare.slice(bare.lastIndexOf('/') + 1));
+    linkable.add(short);
+    if (!linkPath.has(bare)) linkPath.set(bare, p);
+    if (!linkPath.has(short)) linkPath.set(short, p);
   }
   const loose = new Map();
   for (const n of linkable) loose.set(n.toLowerCase().replace(/[_-]/g, ''), n);
@@ -1097,6 +1103,8 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
   const rulesFolders = new Map();
   const rulesElsewhere = (folder) => { let c = rulesFolders.get(folder); if (!c) { c = { cited: 0, absent: 0 }; rulesFolders.set(folder, c); } return c; };
   const relOf = new Map();
+  // With `collect`, every citation that reaches a file or a folder the index holds is kept, with the path git knows it by: what the drift report reads.
+  const citations = collect ? [] : null;
   const resolved = new Map();
   const resolveOnce = (p) => {
     let r = resolved.get(p);
@@ -1144,6 +1152,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
       citedHere.add(p);
       if (missing && !index.known.has(head) && !(isSkill && SKILL_BUNDLE.test(head.slice(head.lastIndexOf('/') + 1)))) absentHere.add(p);
     };
+    const record = (i, cited, path) => { if (citations && path !== target.label) citations.push({ file: target.label, line: i + 1, cited, path }); };
     const context = (i, anchor, before, after) => (anchor === i
       ? lines.slice(Math.max(0, i - before), i + after + 1)
       : lines.slice(Math.max(0, anchor - before), anchor).concat(lines.slice(Math.max(anchor + 1, i - before), i + 1))
@@ -1164,7 +1173,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
           if (p.startsWith('@/') && !index.aliasRoot) continue;
 
           const r = resolveOnce(p);
-          if (r.state === 'ok') { cite(p, false); continue; }
+          if (r.state === 'ok') { cite(p, false); record(i, p, r.real); continue; }
           if (r.state !== 'case' && LOCAL_FILE.test(p)) continue;
           if (r.state === 'missing' && installedElsewhere(p)) { cite(p, false); continue; }
           const paragraph = context(i, m.anchor, 2, 2);
@@ -1177,6 +1186,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
           if (r.state === 'case') {
             cite(p, false);
+            record(i, p, r.real);
             caseMismatch.push({ file: target.label, line: i + 1, cited: p, actual: r.real });
           } else if (!existsSync(join(repo, p)) && !existsSync(join(dirname(target.path), p))) {
             cite(p, true);
@@ -1214,7 +1224,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
       for (const l of prose.matchAll(/\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g)) {
         const to = l[1].trim();
-        if (linkable.has(to) || ignored(to)) { if (to.includes('/')) cite(to, false); continue; }
+        if (linkable.has(to) || ignored(to)) { if (to.includes('/')) cite(to, false); if (linkPath.has(to)) record(i, to, linkPath.get(to)); continue; }
         if (to.startsWith('@/') && !index.aliasRoot) continue;
         if (to !== l[1] || to.includes('.') || /[\w$]/.test(prose[l.index - 1] || '')) continue;
         if (to.includes('/')) cite(to, true);
@@ -1262,6 +1272,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
         };
         if (inside && index.known.has(rel)) {
           cite(rel, false);
+          record(i, to, rel);
           if (anchor && /\.(md|mdx)$/i.test(rel)) {
             const theirs = anchorsOf(abs);
             if (!theirs.has(anchor)) {
@@ -1277,6 +1288,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
             const fileDir = posix.dirname(relative(repo, target.path).split(sep).join('/'));
             const fixed = mdc ? `mdc:${real}` : atRoot ? real : posix.relative(fileDir, real);
             cite(rel, false);
+            record(i, to, real);
             caseMismatch.push({ file: target.label, line: i + 1, kind: 'link', cited: to, actual: href === to ? fixed : fixed.split(' ').join('%20') });
             continue;
           }
@@ -1440,6 +1452,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
     prumoVersion: VERSION,
     repo: resolve(repo),
     checkedAt: new Date().toISOString(),
+    command: 'check',
     caseMismatch,
     brokenLinks,
     missingPaths,
@@ -1447,6 +1460,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
     configIssues,
     orphans,
     elsewhere,
+    ...(citations ? { citations, files: checked.map((t) => ({ file: t.label, path: t.path })) } : {}),
     stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, cited: citedAll.size, absent: absentAll.size, ...(only ? { only: only.label } : {}) },
   };
 }

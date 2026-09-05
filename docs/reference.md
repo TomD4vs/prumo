@@ -10,6 +10,8 @@ Every argument, option and finding, plus how to silence one and how `--fix` deci
 
 ```
 prumo [repo] [target...] [options]
+prumo drift  [repo] [target...]
+prumo budget [repo] [target...] [--since REF]
 ```
 
 | Argument | Meaning |
@@ -20,7 +22,7 @@ prumo [repo] [target...] [options]
 | Option | Meaning |
 | --- | --- |
 | `--fix` | Correct case mismatches and the renames git recorded, in place; nothing else is touched |
-| `--format F` | `text` (default), `github`, `json`, or `sarif` |
+| `--format F` | `text` (default), `github`, `json`, or `sarif`; a report takes `text` or `json` |
 | `--sarif FILE` | Also write the findings to `FILE` as SARIF, for code scanning |
 | `--all` | Show every finding instead of the first 25 |
 | `--json FILE` | Also write the findings to `FILE` as JSON |
@@ -29,7 +31,7 @@ prumo [repo] [target...] [options]
 | `--baseline` | Record the current findings in `.prumo-baseline.json`; later runs fail only on what is new |
 | `--no-baseline` | Ignore `.prumo-baseline.json` for this run |
 | `--staged` | Check only the context files staged for commit |
-| `--since REF` | Check only the context files changed since `REF`, a commit or a branch |
+| `--since REF` | Check only the context files changed since `REF`, a commit or a branch; with `budget`, compare sizes with `REF` (default: the commit thirty days ago) |
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
@@ -83,7 +85,7 @@ prumo "C:/Users/me/My Project"
 
 | Code | Meaning |
 | :---: | --- |
-| `0` | Nothing to review |
+| `0` | Nothing to review, or a report: `drift` and `budget` always exit 0 |
 | `1` | Findings to review |
 | `2` | Bad usage: not a git repo, empty git index, no files found, unknown option |
 
@@ -249,3 +251,48 @@ Two things are rewritten, because only they have a correct value that is read ra
 Every way a path can be cited is rewritten where it stands: in backticks, inside a command, inside a fenced block, spelled with backslashes, followed by a line number, and in a link written as `[a](x)`, `[a](<x>)` or `[ref]: x`. A renamed path is written the way the citation was: from the root, from beside the note, with `/` or `mdc:` in front, or with its spaces as `%20`. A path cited on several lines is corrected on all of them in one pass.
 
 If a line changed between the scan and the fix, prumo leaves that line as it is and says so in the report.
+
+---
+
+## Two reports: drift and budget
+
+Neither is a check. A check says a citation is right or wrong, and the design page measures how often it is right. A report measures and orders, and no line of it can be a false alarm. Both exit 0 whatever they find, take `--format json` and `--json FILE`, and are tools of the MCP server as well, `prumo_drift` and `prumo_budget`.
+
+### `prumo drift`
+
+Which sections of the context files describe code that changed after the section was last written.
+
+```
+prumo — drift, 3 context files, 14 sections, 27 cited files
+
+DRIFT  (8)   commits to the files a section cites since the section last changed, most first
+  CLAUDE.md:12      Backend layout   8 months ago   5 of 6 cited files changed, 40 commits since
+  CLAUDE.md:40      Testing          3 months ago   1 of 3 cited files changed, 2 commits since
+  docs/agents.md:1  agents           2 days ago     0 of 4 cited files changed
+  …
+
+6 sections cite nothing the repository has
+```
+
+A section is the text under one heading, or the text above the first heading; a `#` inside a fenced block is code. Its date is the newest commit among its lines, read from `git blame`, so editing one line moves that section and no other; a line not committed yet makes the section as fresh as now, and the header counts the files that have one. What it cites is every path, link and wikilink that reaches a file or a folder the repository has, with the name git knows it by; a folder counts the commits under it, and a note citing itself does not count itself. The columns are how many of those files changed since that date and how many distinct commits touched them. The order is a reading order for a review, most moved first: a section whose files changed forty times may still be right, and one whose files never changed may be wrong, so the report says where to look and stops there.
+
+### `prumo budget`
+
+What each context file costs the agent that reads it at every session, how much that grew, and what is written twice.
+
+```
+prumo — budget, 6 context files, 14,200 tokens at four characters each
+        since a3f21c9, 2026-08-06: +1,900 tokens
+
+BUDGET  (6)   largest first
+  CLAUDE.md                         4,100 tokens   118 lines   +1,200 since 2026-08-06
+  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   new since 2026-08-06
+  AGENTS.md                         2,300 tokens    70 lines   unchanged
+  …
+
+REPEATED  (2)   a paragraph of twelve words or more written in more than one place
+  CLAUDE.md:12   also at .claude/skills/release/SKILL.md:8   210 words
+  CLAUDE.md:50   also at CLAUDE.md:88   40 words
+```
+
+Tokens are estimated at four characters each, which is what the model vendors quote for English prose, so the number is a size in the unit the agent pays in. A tokenizer would count differently, and more so for text that is not English. Growth compares each file with the same file at an earlier commit: the one thirty days ago, the first commit of a younger repository, or the `REF` given with `--since`; a file that was not there is `new`, and one git does not track is `not in git`. A repeated paragraph is a block of twelve words or more, separated by blank lines, that appears in more than one place, in two files or twice in the same one, compared without regard to letter case or spacing; a fenced block counts as one paragraph. Shorter blocks, headings and front matter are left out, since a list item or a title is written twice by anyone.

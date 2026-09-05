@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * prumo — MCP server over stdio, so an agent can ask for a check as a tool call.
- * Two tools: prumo_check (read only) and prumo_fix (rewrites case mismatches and the renames git recorded).
+ * Four tools: prumo_check (read only), prumo_fix (rewrites case mismatches and the renames git recorded),
+ * and the two reports, prumo_drift and prumo_budget (read only).
  * JSON-RPC 2.0, one message per line, no dependencies.
  */
 
@@ -9,7 +10,9 @@ import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { analyze, resolveTargets, loadConfig, loadBaseline, hasRootSkill } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
-import { renderText } from '../src/report.mjs';
+import { renderText, renderDrift, renderBudget } from '../src/report.mjs';
+import { drift } from '../src/drift.mjs';
+import { budget } from '../src/budget.mjs';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 const PROTOCOL = '2025-06-18';
@@ -45,10 +48,30 @@ const TOOLS = [
     },
     annotations: { title: 'prumo fix', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
+  {
+    name: 'prumo_drift',
+    description:
+      'Reports which sections of the context files describe code that changed after the section was last written: for every section that cites a file or a folder the repository has, when the section last changed according to git blame, how many of the files it cites changed since, and how many commits touched them. Sections come back ordered, the most moved first. It is a reading order for a review, never a finding: a section whose files changed may still be right. Nothing is written.',
+    inputSchema: {
+      type: 'object',
+      properties: { repo: REPO_ARG, targets: TARGETS_ARG },
+    },
+    annotations: { title: 'prumo drift', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: 'prumo_budget',
+    description:
+      'Reports what each context file costs the agent that reads it at every session: bytes, lines, words and an estimate of tokens at four characters each, largest first; how much each grew since an earlier commit, the one thirty days ago unless `since` names another; and the paragraphs of twelve words or more written in two places. It measures and counts; nothing here is a finding. Nothing is written.',
+    inputSchema: {
+      type: 'object',
+      properties: { repo: REPO_ARG, targets: TARGETS_ARG, since: { type: 'string', description: 'The commit or branch to compare sizes with. Omit for the commit thirty days ago, or the first commit of a younger repository.' } },
+    },
+    annotations: { title: 'prumo budget', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
 ];
 
-/** Runs one check, or one fix; throws with a message meant for the agent. */
-function run(name, { repo = '.', targets: explicit = [] } = {}) {
+/** Runs one check, one fix or one report; throws with a message meant for the agent. */
+function run(name, { repo = '.', targets: explicit = [], since = '' } = {}) {
   try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); }
   catch { throw new Error(`not a git repository: ${repo}`); }
   const config = loadConfig(repo);
@@ -57,6 +80,9 @@ function run(name, { repo = '.', targets: explicit = [] } = {}) {
   if (!targets.length) throw new Error(hasRootSkill(repo)
     ? 'no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Pass targets ["SKILL.md"] to check it.'
     : 'no context files found. Pass targets, or create a CLAUDE.md / AGENTS.md.');
+
+  if (name === 'prumo_drift') return { result: drift({ repo, targets, config }), fixed: null };
+  if (name === 'prumo_budget') return { result: budget({ repo, targets, config, since: String(since || '') }), fixed: null };
 
   const baseline = loadBaseline(repo);
   let result = analyze({ repo, targets, config, baseline });
@@ -82,7 +108,7 @@ function handle(msg) {
         protocolVersion: PROTOCOL,
         capabilities: { tools: {} },
         serverInfo: { name: 'prumo', version: VERSION },
-        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand.',
+        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand. Call prumo_drift to learn which sections describe code that changed since they were written, and prumo_budget to learn what each context file costs and what is written twice.',
       });
     case 'ping':
       return reply({});
@@ -93,6 +119,10 @@ function handle(msg) {
       if (!TOOLS.some((t) => t.name === name)) return fail(-32602, `unknown tool: ${name}`);
       try {
         const { result, fixed } = run(name, args || {});
+        if (result.command !== 'check') {
+          const render = result.command === 'drift' ? renderDrift : renderBudget;
+          return reply({ content: [{ type: 'text', text: render(result, { all: true }) }], structuredContent: result, isError: false });
+        }
         const total = result.caseMismatch.length + result.brokenLinks.length + result.missingPaths.length + result.unknownCommands.length + result.configIssues.length + result.orphans.length;
         return reply({
           content: [{ type: 'text', text: renderText(result, { all: true, fixed }) }],

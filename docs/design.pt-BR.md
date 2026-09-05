@@ -559,6 +559,10 @@ Um caminho é reportado em toda linha que o cita, então um `--fix` corrige toda
 
 ---
 
+## Dois relatórios que não são checagens
+
+O `prumo drift` e o `prumo budget` vieram por último, de propósito. Uma checagem responde certo ou errado para uma citação, então um acervo consegue dizer com que frequência ela acerta, e toda regra acima foi medida assim antes de sair. Um relatório não tem resposta certa contra a qual medir: que uma seção tem oito meses e os cinco arquivos que ela nomeia mudaram quarenta vezes desde então é um fato do git, e se a seção está errada é o leitor quem diz. Por isso os dois ficam separados das checagens, saem com código 0 seja qual for o resultado, e não afirmam nada além da contagem. O que fez valer a pena construí-los é que cada um chega perto de uma pergunta que as checagens não conseguem fazer sem um modelo: o drift de *"isso ainda é verdade"*, ordenando onde o código mais se moveu debaixo de uma nota que ficou parada, e o budget de *"esta nota vale o que custa"*, dando um tamanho ao que o agente lê a cada sessão e nomeando o que ele lê duas vezes. Nenhum dos dois tem número de precisão nesta página, e nenhum vai ter. O que eles precisam conquistar é outra coisa, que o topo da ordem seja onde um mantenedor teria olhado primeiro, e isso só aparece com gente usando.
+
 ## Sobre o nome
 
 *Prumo* é o fio de prumo, o peso pendurado num barbante que o pedreiro encosta na parede para saber se ela ainda está **no lugar**. Em inglês essa mesma ideia se diz *true*, que também quer dizer "verdadeiro".

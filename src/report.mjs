@@ -134,6 +134,104 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   return out.join('\n');
 }
 
+const count = (n) => n.toLocaleString('en-US');
+const cell = (s, w) => s + ' '.repeat(Math.max(0, w - s.length));
+const right = (s, w) => ' '.repeat(Math.max(0, w - s.length)) + s;
+const widest = (list, of) => list.reduce((w, o) => Math.max(w, of(o).length), 0);
+
+/**
+ * Renders the drift report: the sections that cite a file the repository has, ordered by the
+ * commits that touched what they cite since the section itself last changed.
+ * @param {object} result   what drift() returned
+ * @param {object} [opts]   `all`, `color` and `jsonPath`, as for renderText()
+ */
+export function renderDrift(result, { all = false, color = false, jsonPath = null } = {}) {
+  const { sections, stats } = result;
+  const { bold, dim, teal, badge } = palette(color);
+  const out = [];
+  const title = (label, code, n, caption) => (color
+    ? `${badge(code, label)} ${bold(String(n))}   ${dim(caption)}`
+    : `${label}  (${n})   ${caption}`);
+
+  out.push(bold('prumo') + dim(` — drift, ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.sections, 'section', 'sections')}, ${plural(stats.cited, 'cited file', 'cited files')}`));
+  if (stats.uncommitted) out.push(dim(`        ${plural(stats.uncommitted, 'context file', 'context files')} with lines not committed yet`));
+  out.push('');
+
+  if (sections.length) {
+    out.push(title('DRIFT', PAINT.blue, sections.length, 'commits to the files a section cites since the section last changed, most first'));
+    const shown = all ? sections : sections.slice(0, 25);
+    const name = (o) => o.section || '(top)';
+    const w1 = Math.min(50, widest(shown, (o) => `${o.file}:${o.line}`));
+    const w2 = Math.min(40, widest(shown, name));
+    const w3 = widest(shown, (o) => o.age);
+    for (const o of shown) {
+      const moved = `${o.changed} of ${plural(o.cited, 'cited file', 'cited files')} changed${o.commits ? `, ${plural(o.commits, 'commit', 'commits')} since` : ''}`;
+      out.push(`  ${bold(cell(`${o.file}:${o.line}`, w1))}  ${cell(name(o).slice(0, 40), w2)}   ${dim(cell(o.age, w3))}   ${o.commits ? teal(moved) : dim(moved)}`);
+    }
+    if (!all && sections.length > 25) out.push(dim(`  … ${sections.length - 25} more (use --all)`));
+    out.push('');
+  } else out.push(teal('no section cites a file the repository has.'), '');
+
+  if (stats.quiet) out.push(dim(`${plural(stats.quiet, 'section cites', 'sections cite')} nothing the repository has`));
+  if (jsonPath) out.push(dim(`json: ${jsonPath}`));
+  return out.join('\n').trimEnd();
+}
+
+/**
+ * Renders the budget report: each context file with its estimated tokens, largest first, the
+ * growth since an earlier commit, and the paragraphs written twice.
+ * @param {object} result   what budget() returned
+ * @param {object} [opts]   `all`, `color` and `jsonPath`, as for renderText()
+ */
+export function renderBudget(result, { all = false, color = false, jsonPath = null } = {}) {
+  const { files, repeated, stats } = result;
+  const { bold, dim, teal, orange, badge } = palette(color);
+  const out = [];
+  const title = (label, code, n, caption) => (color
+    ? `${badge(code, label)} ${bold(String(n))}   ${dim(caption)}`
+    : `${label}  (${n})   ${caption}`);
+
+  out.push(bold('prumo') + dim(` — budget, ${plural(stats.targets, 'context file', 'context files')}, ${count(stats.tokens)} tokens at four characters each`));
+  if (stats.since) {
+    const grown = stats.tokens - stats.before;
+    out.push(dim(`        since ${stats.since.ref}, ${stats.since.date}: ${grown > 0 ? '+' : ''}${count(grown)} tokens`));
+  } else out.push(dim('        no earlier commit to compare with'));
+  out.push('');
+
+  if (files.length) {
+    out.push(title('BUDGET', PAINT.blue, files.length, 'largest first'));
+    const shown = all ? files : files.slice(0, 25);
+    const w1 = widest(shown, (o) => o.file);
+    const w2 = widest(shown, (o) => count(o.tokens));
+    const w3 = widest(shown, (o) => count(o.lines));
+    const growth = (o) => {
+      if (!stats.since) return '';
+      if (o.state === 'changed') return `${o.delta > 0 ? '+' : ''}${count(o.delta)} since ${stats.since.date}`;
+      if (o.state === 'new') return `new since ${stats.since.date}`;
+      if (o.state === 'untracked') return 'not in git';
+      return 'unchanged';
+    };
+    for (const o of shown) {
+      const g = growth(o);
+      out.push(`  ${bold(cell(o.file, w1))}   ${right(count(o.tokens), w2)} tokens   ${right(count(o.lines), w3)} lines${g ? `   ${o.state === 'changed' && o.delta > 0 ? orange(g) : dim(g)}` : ''}`);
+    }
+    if (!all && files.length > 25) out.push(dim(`  … ${files.length - 25} more (use --all)`));
+    out.push('');
+  }
+
+  if (repeated.length) {
+    out.push(title('REPEATED', PAINT.yellow, repeated.length, 'a paragraph of twelve words or more written in more than one place'));
+    const shown = all ? repeated : repeated.slice(0, 25);
+    const where = (p) => `${p.file}:${p.line}`;
+    for (const r of shown) out.push(`  ${bold(where(r.at[0]))}   ${dim('also at')} ${r.at.slice(1).map(where).join(', ')}   ${teal(`${count(r.words)} words`)}`);
+    if (!all && repeated.length > 25) out.push(dim(`  … ${repeated.length - 25} more (use --all)`));
+    out.push('');
+  } else out.push(teal('nothing written twice.'), '');
+
+  if (jsonPath) out.push(dim(`json: ${jsonPath}`));
+  return out.join('\n').trimEnd();
+}
+
 /** What git recorded about the path, as a parenthesis for the one-line formats. */
 const historyNote = (o) => (o.history ? ` (${o.history.event === 'renamed' ? `renamed to ${o.history.to}` : 'deleted'} in ${o.history.commit}, ${o.history.when})` : '');
 

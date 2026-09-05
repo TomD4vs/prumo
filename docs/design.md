@@ -546,6 +546,10 @@ A path is reported on every line that cites it, so one `--fix` corrects all of t
 
 ---
 
+## Two reports that are not checks
+
+`prumo drift` and `prumo budget` came last, and on purpose. A check answers right or wrong for one citation, so a corpus can say how often it is right, and every rule above was measured that way before it shipped. A report has no right answer to measure against: that a section is eight months old and the five files it names changed forty times since is a fact from git, and whether the section is wrong is for the reader. So the two are kept apart from the checks, exit 0 whatever they find, and claim nothing beyond the count. What made them worth building is that each gets close to a question the checks cannot ask without a model: drift to *"is this still true"*, by ranking where the code moved most under a note that stayed still, and budget to *"is this note worth its cost"*, by putting a size on what the agent reads at every session and naming what it reads twice. Neither has a precision number on this page, and neither will. What they have to earn is a different thing, that the top of the ranking is where a maintainer would have looked first, and that shows only with people using them.
+
 ## About the name
 
 *Prumo* is Portuguese for a plumb line, the weighted string a mason hangs against a wall to find out whether it is still **true**, which in English is also the carpentry word for aligned.

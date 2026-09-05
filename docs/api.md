@@ -14,10 +14,11 @@ const result  = analyze({ repo: '.', targets });
 // with the baseline at the root, and only the files staged for commit:
 // analyze({ repo: '.', targets, baseline: loadBaseline('.'), only: { paths: changedFiles('.', { staged: true }), label: 'staged' } })
 
-console.log(result.schemaVersion);  // 8, bumped when this shape changes
+console.log(result.schemaVersion);  // 9, bumped when this shape changes
 console.log(result.prumoVersion);   // the version that ran
 console.log(result.repo);           // absolute path of the repository checked
 console.log(result.checkedAt);      // when, as an ISO 8601 date
+console.log(result.command);        // 'check'; the two reports say 'drift' and 'budget'
 console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion, history? }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt, history? }]
@@ -28,7 +29,22 @@ console.log(result.elsewhere);      // [{ file, cited, absent, unit? }], file ".
 console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, cited, absent, only? }
 ```
 
-The first four fields identify the run. A consumer can tell a change of shape from a breakage, and a report about one repository from a report about another. `--format json`, `--json FILE` and the MCP server's structured content carry them too. A path cited on several lines is one finding per line. `schemaVersion` went from 1 to 2 when `unknownCommands` arrived, to 3 with `elsewhere`: the auto-detected files whose findings were held back because most of their cited paths start in folders the repository does not have, with the two counts, and to 4 with `configIssues`, whose `kind` is `glob`, `skill-description` or `config-path`, `stats.configs`, the JSON configuration files read, and `unit` on an `elsewhere` entry, present as `rules` when what was held back is a rules folder most of whose rules match nothing; and to 5 with `stats.baselined`, the findings a baseline held back, `stats.baselineStale`, its entries that match nothing now, and `stats.only`, present as `staged` or `since REF` when the run was limited to what changed; and to 6 with `history` on a missing path or a markdown link, `{ event, to?, commit, date, when }`, where `event` is `renamed`, with `to` the name that exists now, or `deleted`, `commit` is the short hash, `date` ISO 8601 and `when` the age in words; and to 7 with `from` on that `history`, the path git was asked about, which is the cited path from the root or from beside the note; and to 8 with `stats.cited` and `stats.absent`, the distinct paths the auto-detected files cite and the ones among them whose folder is absent, pooled over the repository, which is what the repository-level gate reads, and with `elsewhere` naming `.` when that gate held the whole repository back.
+The first four fields identify the run. A consumer can tell a change of shape from a breakage, and a report about one repository from a report about another. `--format json`, `--json FILE` and the MCP server's structured content carry them too. A path cited on several lines is one finding per line. `schemaVersion` went from 1 to 2 when `unknownCommands` arrived, to 3 with `elsewhere`: the auto-detected files whose findings were held back because most of their cited paths start in folders the repository does not have, with the two counts, and to 4 with `configIssues`, whose `kind` is `glob`, `skill-description` or `config-path`, `stats.configs`, the JSON configuration files read, and `unit` on an `elsewhere` entry, present as `rules` when what was held back is a rules folder most of whose rules match nothing; and to 5 with `stats.baselined`, the findings a baseline held back, `stats.baselineStale`, its entries that match nothing now, and `stats.only`, present as `staged` or `since REF` when the run was limited to what changed; and to 6 with `history` on a missing path or a markdown link, `{ event, to?, commit, date, when }`, where `event` is `renamed`, with `to` the name that exists now, or `deleted`, `commit` is the short hash, `date` ISO 8601 and `when` the age in words; and to 7 with `from` on that `history`, the path git was asked about, which is the cited path from the root or from beside the note; and to 8 with `stats.cited` and `stats.absent`, the distinct paths the auto-detected files cite and the ones among them whose folder is absent, pooled over the repository, which is what the repository-level gate reads, and with `elsewhere` naming `.` when that gate held the whole repository back; and to 9 with `command`, `check` on this result and `drift` or `budget` on the two reports, which share the version number and the first four fields.
+
+```js
+import { drift, budget } from '@tomd4vs/prumo';
+
+const d = drift({ repo: '.', targets });   // the same first four fields, then command: 'drift'
+console.log(d.sections);                   // [{ file, line, section, since, age, cited, changed, commits }], most moved first
+console.log(d.stats);                      // { targets, sections, cited, quiet, uncommitted }
+
+const b = budget({ repo: '.', targets, since: 'v1.0.0' });   // since is optional
+console.log(b.files);                      // [{ file, bytes, lines, words, tokens, before, delta, state }], largest first
+console.log(b.repeated);                   // [{ words, at: [{ file, line }, ...] }]
+console.log(b.stats);                      // { targets, tokens, before, since: { ref, date } | null, repeated: { paragraphs, copies, words } }
+```
+
+In a drift section, `since` is the date of the newest commit among its lines and `age` that date in words, or `not committed`; `cited`, `changed` and `commits` are the files it cites that the repository has, how many of them changed after that date, and the distinct commits that touched them. In a budget file, `state` is `changed`, `unchanged`, `new` or `untracked`, and `before` and `delta` are null unless the file existed at the commit compared with. `analyze({ collect: true })` is what drift reads: the result gains `citations`, every citation that reached a file or a folder git knows, `{ file, line, cited, path }`, and `files`, the context files read.
 
 `renameFixes(result)` lists the rewrites a result allows, one per missing path or markdown link with a rename in its history, and `applyFixes(changes, targets)` applies them, or case mismatches, in place; `applyCaseFixes` is the older name of the same function. Each change carries `why`, `case` or `rename`, and a rename its `commit`.
 

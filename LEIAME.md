@@ -80,6 +80,19 @@ Todo achado traz arquivo, número da linha e a correção, e um caminho ausente 
 
 ---
 
+## Dois relatórios
+
+Além das checagens, dois comandos medem em vez de julgar, e saem com código 0 seja qual for o resultado:
+
+```bash
+prumo drift     # quais seções descrevem código que mudou depois que foram escritas
+prumo budget    # quanto cada arquivo de contexto custa ao agente, e o que está escrito duas vezes
+```
+
+O `drift` lê no `git blame` quando cada seção foi escrita pela última vez, conta os commits que mexeram nos arquivos que ela cita desde então, e lista primeiro as seções que mais se moveram: uma ordem de leitura para uma revisão, já que uma seção cujos arquivos mudaram quarenta vezes pode continuar certa. O `budget` estima os tokens que cada arquivo custa a cada sessão, quanto isso cresceu desde um commit, e quais parágrafos estão escritos em mais de um lugar. Os dois estão na [referência](docs/reference.pt-BR.md#dois-relatórios-drift-e-budget), e os dois são ferramentas do servidor MCP.
+
+---
+
 ## O que ele não faz
 
 Três limites, escolhidos de propósito e explicados em [Design](docs/design.pt-BR.md):
@@ -109,7 +122,7 @@ O prumo é uma CLI comum, então qualquer agente com acesso a shell consegue rod
 
 **Peça ao agente para rodar.** `npx @tomd4vs/prumo` funciona em qualquer repositório git, e cobre sozinho as skills instaladas em `.claude/skills/`. Para um repositório que é ele mesmo uma skill, nomeie o arquivo: `npx @tomd4vs/prumo . SKILL.md`. A saída em texto traz arquivo, linha e correção, o que basta para um agente agir sem precisar interpretar nada. `--format json` devolve os mesmos achados como dados estruturados.
 
-**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com duas ferramentas: `prumo_check`, que só lê, e `prumo_fix`, que reescreve a capitalização e os renames que o git registrou. No Claude Code:
+**Exponha como ferramenta.** O pacote também traz o `prumo-mcp`, um servidor MCP por stdio com quatro ferramentas: `prumo_check`, que só lê, `prumo_fix`, que reescreve a capitalização e os renames que o git registrou, e os dois relatórios, `prumo_drift` e `prumo_budget`, que também só leem. No Claude Code:
 
 ```bash
 claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp

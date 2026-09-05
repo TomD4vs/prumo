@@ -10,6 +10,8 @@ Todo argumento, opção e achado, mais como silenciar um e como o `--fix` decide
 
 ```
 prumo [repo] [alvo...] [opções]
+prumo drift  [repo] [alvo...]
+prumo budget [repo] [alvo...] [--since REF]
 ```
 
 | Argumento | Significado |
@@ -20,7 +22,7 @@ prumo [repo] [alvo...] [opções]
 | Opção | Significado |
 | --- | --- |
 | `--fix` | Corrige capitalização e os renames que o git registrou, no lugar; nada mais é tocado |
-| `--format F` | `text` (padrão), `github`, `json` ou `sarif` |
+| `--format F` | `text` (padrão), `github`, `json` ou `sarif`; um relatório aceita `text` ou `json` |
 | `--sarif ARQ` | Também grava os achados em `ARQ` como SARIF, para o code scanning |
 | `--all` | Mostra todos os achados em vez dos 25 primeiros |
 | `--json ARQ` | Também grava os achados em `ARQ` como JSON |
@@ -29,7 +31,7 @@ prumo [repo] [alvo...] [opções]
 | `--baseline` | Grava os achados atuais em `.prumo-baseline.json`; as rodadas seguintes só falham no que é novo |
 | `--no-baseline` | Ignora o `.prumo-baseline.json` nesta rodada |
 | `--staged` | Checa só os arquivos de contexto preparados para o commit |
-| `--since REF` | Checa só os arquivos de contexto alterados desde `REF`, um commit ou um branch |
+| `--since REF` | Checa só os arquivos de contexto alterados desde `REF`, um commit ou um branch; com `budget`, compara os tamanhos com `REF` (padrão: o commit de trinta dias atrás) |
 | `-h`, `--help` | Mostra a ajuda |
 | `-v`, `--version` | Mostra a versão |
 
@@ -83,7 +85,7 @@ prumo "C:/Users/eu/Meu Projeto"
 
 | Código | Significado |
 | :---: | --- |
-| `0` | Nada a revisar |
+| `0` | Nada a revisar, ou um relatório: `drift` e `budget` saem sempre com 0 |
 | `1` | Achados para revisar |
 | `2` | Uso incorreto: não é repositório git, nenhum arquivo encontrado, opção desconhecida |
 
@@ -249,3 +251,48 @@ Duas coisas são reescritas, porque só nelas o valor correto é lido em vez de 
 Toda forma de citar um caminho é reescrita onde está: entre crases, dentro de um comando, dentro de um bloco de código cercado, escrita com barra invertida, seguida de número de linha, e num link escrito como `[a](x)`, `[a](<x>)` ou `[ref]: x`. Um caminho renomeado é escrito do jeito que a citação era: a partir da raiz, a partir da pasta da nota, com `/` ou `mdc:` na frente, ou com os espaços como `%20`. Um caminho citado em várias linhas é corrigido em todas elas numa passada só.
 
 Se uma linha mudou entre a varredura e o `--fix`, o prumo deixa a linha como está e avisa no relatório.
+
+---
+
+## Dois relatórios: drift e budget
+
+Nenhum dos dois é uma checagem. Uma checagem diz que uma citação está certa ou errada, e a página de design mede com que frequência ela acerta. Um relatório mede e ordena, e nenhuma linha dele pode ser alarme falso. Os dois saem com código 0 seja qual for o resultado, aceitam `--format json` e `--json ARQ`, e também são ferramentas do servidor MCP, `prumo_drift` e `prumo_budget`.
+
+### `prumo drift`
+
+Quais seções dos arquivos de contexto descrevem código que mudou depois que a seção foi escrita pela última vez.
+
+```
+prumo — drift, 3 context files, 14 sections, 27 cited files
+
+DRIFT  (8)   commits to the files a section cites since the section last changed, most first
+  CLAUDE.md:12      Backend layout   8 months ago   5 of 6 cited files changed, 40 commits since
+  CLAUDE.md:40      Testing          3 months ago   1 of 3 cited files changed, 2 commits since
+  docs/agents.md:1  agents           2 days ago     0 of 4 cited files changed
+  …
+
+6 sections cite nothing the repository has
+```
+
+Uma seção é o texto sob um título, ou o texto acima do primeiro título; um `#` dentro de um bloco cercado é código. A data dela é o commit mais novo entre as suas linhas, lido do `git blame`, então editar uma linha move essa seção e nenhuma outra; uma linha ainda não commitada deixa a seção tão nova quanto agora, e o cabeçalho conta os arquivos que têm uma. O que ela cita é todo caminho, link e wikilink que chega a um arquivo ou a uma pasta que o repositório tem, com o nome pelo qual o git o conhece; uma pasta conta os commits dentro dela, e uma nota que cita a si mesma não conta a si mesma. As colunas são quantos desses arquivos mudaram desde essa data e quantos commits distintos mexeram neles. A ordem é uma ordem de leitura para uma revisão, o que mais se moveu primeiro: uma seção cujos arquivos mudaram quarenta vezes pode continuar certa, e uma cujos arquivos nunca mudaram pode estar errada, então o relatório diz onde olhar e para por aí.
+
+### `prumo budget`
+
+Quanto cada arquivo de contexto custa ao agente que o lê a cada sessão, quanto isso cresceu, e o que está escrito duas vezes.
+
+```
+prumo — budget, 6 context files, 14,200 tokens at four characters each
+        since a3f21c9, 2026-08-06: +1,900 tokens
+
+BUDGET  (6)   largest first
+  CLAUDE.md                         4,100 tokens   118 lines   +1,200 since 2026-08-06
+  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   new since 2026-08-06
+  AGENTS.md                         2,300 tokens    70 lines   unchanged
+  …
+
+REPEATED  (2)   a paragraph of twelve words or more written in more than one place
+  CLAUDE.md:12   also at .claude/skills/release/SKILL.md:8   210 words
+  CLAUDE.md:50   also at CLAUDE.md:88   40 words
+```
+
+Os tokens são estimados a quatro caracteres cada, que é o que os fornecedores de modelo citam para prosa em inglês, então o número é um tamanho na unidade que o agente paga. Um tokenizador contaria diferente, e mais ainda para texto que não é inglês. O crescimento compara cada arquivo com o mesmo arquivo num commit anterior: o de trinta dias atrás, o primeiro commit de um repositório mais novo que isso, ou o `REF` dado com `--since`; um arquivo que não existia lá é `new`, e um que o git não rastreia é `not in git`. Um parágrafo repetido é um bloco de doze palavras ou mais, separado por linhas em branco, que aparece em mais de um lugar, em dois arquivos ou duas vezes no mesmo, comparado sem distinguir capitalização nem espaçamento; um bloco cercado conta como um parágrafo. Blocos menores, títulos e front matter ficam de fora, já que um item de lista ou um título qualquer um escreve duas vezes.
