@@ -1515,3 +1515,27 @@ test('pnpm version is a builtin, a Chinese sentence that says the file was delet
   assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['pnpm run release'], 'pnpm version is pnpm itself, and only the script nothing defines is reported');
   assert.deepEqual(r.missingPaths.map((o) => o.cited), ['src/gone.ts'], 'the lines that say deleted or removed in Chinese are quiet, and the path with markup glued on resolves');
 });
+
+test('a file each machine writes for itself, and a skill cited by its install path, are not missing paths', () => {
+  const r = run({
+    'CLAUDE.md': '# app\n\nConfig lives in \x60.claude/content-os.local.md\x60 and [here](.claude/settings.local.json); see \x60config/app.local.php\x60 and \x60config/gone.php\x60.\n\n## Layout\n\nThe real script is \x60scripts/real.sh\x60.\n',
+    'plugins/flow/skills/connect/SKILL.md': '---\nname: connect\ndescription: c\n---\nRead \x60.claude/skills/component/SKILL.md\x60 first, run \x60python .claude/skills/connect/scripts/sync.py\x60, then \x60.claude/skills/other/SKILL.md\x60.\n',
+    'plugins/flow/skills/component/SKILL.md': '---\nname: component\ndescription: d\n---\nSteps.\n',
+    'plugins/flow/skills/connect/scripts/sync.py': '',
+    'package.json': '{"name":"x","scripts":{"build":"tsc"}}\n',
+    'config/app.php': '',
+  });
+  assert.deepEqual(r.missingPaths.map((o) => `${o.file}:${o.line} ${o.cited}`), [
+    'CLAUDE.md:3 config/gone.php',
+    'CLAUDE.md:7 scripts/real.sh',
+    'plugins/flow/skills/connect/SKILL.md:5 .claude/skills/other/SKILL.md',
+  ], 'the .local files and the two install paths that exist beside the skill are quiet; the rest is reported');
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), [], 'the .local link is quiet');
+});
+
+test('a file: link is an address, like a file:// path in prose, and is not a broken link', () => {
+  const r = run({
+    'CLAUDE.md': '# app\n\nSee [the rules](file:///C:/Users/me/project/.agents/skills/rules/SKILL.md) and [gone](docs/gone.md).\n',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['docs/gone.md']);
+});

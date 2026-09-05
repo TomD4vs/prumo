@@ -26,6 +26,8 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | A project-name prefix resolved | `myapp/app/api/route.ts` when the repository holds `app/api/route.ts` and has no `myapp/` folder. Only an exact nested match counts, so a wrongly cased first segment is still a case mismatch. |
 | A path that belongs to another repository | A note that names `github.com/other/project` a few lines above the path, and an `@/` alias in a repository holding none of the folders an alias resolves against. Both describe code that lives somewhere else. |
 | A package import is not a path | `@scope/package/style.css` is something npm resolves, not a file here. An `@/` alias keeps its slash right after the `@`, so it is still checked. |
+| A file each machine writes for itself | `CLAUDE.local.md`, `settings.local.json`, `.env.local`: a name with `.local` before its extension is written per machine and never committed, so a note that tells the agent to read it names a file that is absent on purpose. On the twelfth pass one repository cited such a file seven times. |
+| A skill cited by its install path | `.claude/skills/deploy/scripts/x.sh` is where a host installs the skill; the skill itself lives in a plugin folder, a docs folder or another host's folder, and its script is there. When the same file exists beside a `SKILL.md` somewhere in the repository, the citation resolves. |
 | Anything only the author knows is fine | `.prumorc.json`, the `prumo-ignore` markers and, for a repository with a backlog, the baseline that holds back what was there when it was recorded. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
 
 Same tool, same files, with and without the filters:
@@ -426,6 +428,48 @@ it: `pnpm version` is pnpm itself, a sentence that says deleted, removed or reti
 a negation like its English and Portuguese counterparts, and an emphasis mark glued after a path,
 `scripts/sync.mjs._`, is not part of the path. They removed nine findings, eight false and one real
 that sat beside a Chinese negation, which is the same trade the paragraph rule has always made.
+
+A thirteenth pass, for 0.8.2, on sixty repositories from the same searches, none on any earlier list.
+It measures the three rules built from the twelfth corpus, and two more built there for 0.8.2: a
+file each machine writes for itself, with `.local` before its extension, and a skill cited by the
+path a host installs it under when the same file exists beside a `SKILL.md` in the repository.
+On the twelfth those two removed twenty findings outside the catalogues, all but two of them false,
+and the two, a skills folder that had moved from one host's folder to another's and a skill moved
+into a plugin, are the mild kind of stale, where the file the note means is there under another
+name. A third rule was tried and dropped: a heading that says the section shows examples would
+govern the paths under it, but the sample skill that motivated it carries its own `#` title,
+which ends the section, and on a catalogue the rule silenced citations that read as real. Three
+clones failed, twelve hold no context file prumo detects, four are catalogues above fifty, and
+twenty-eight came back clean:
+
+| Public repositories, thirteenth pass, 0.8.0 to 0.8.2 | |
+| --- | ---: |
+| Repositories checked | 57 |
+| Findings outside the catalogues, under 0.8.0 | 83 |
+| Real | 18 |
+| Precision | 22% |
+| Removed by the five rules of 0.8.1 and 0.8.2, all fitted elsewhere | 1 |
+| Of those, real | 0 |
+| Findings under 0.8.2, the same 18 real | 82 |
+| `AGENT CONFIG` findings, all real | 1 |
+
+The five rules measured here had almost nothing to remove: the install-path rule cleared one
+citation of an archived skill by its install path, false, and the other four met no line at all,
+which says only that they are narrow. The fifth check read eight repositories with a
+configuration JSON and reported one thing, an `.mcp.json` naming a server script that is not in
+the repository; with the twelfth, that is five reports on material that shaped none of its rules,
+all real. The real findings are seven sibling skills a plugin links and never added, a doc cited by
+its package name where the package lives one folder deeper, a database library cited without its
+version folder, a workflow doc and a preflight script that are gone, and two rule files linking
+docs one folder too shallow. The false ones sit in three repositories, fifty of the sixty-four: a
+contributor plugin shipped in three copies for three hosts, whose skills link the files of the
+database shell it is meant to run inside; an agent-skills repository whose notes link the pages of
+a wiki kept elsewhere; and skills that document a framework the repository depends on. Each of
+their files cites too few paths for the file gate, and together they say where the next rule is: a
+repository whose cited paths are mostly absent across all its files documents another project as a
+whole. That rule is not built yet, so that it can be measured on material it did not come from. One
+rule was built from this corpus and is fitted to it: a link with a `file:` scheme is an address,
+as the prose rule already said, and it cleared two.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case and the renames git itself recorded, since a note corrected wrongly is worse than a stale one, and those two are the only corrections read from git rather than guessed. And it makes no network calls at all.
 

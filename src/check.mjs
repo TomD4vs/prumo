@@ -50,6 +50,10 @@ const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::?[A-Za-z_$][\w.$]*(\(\))?)$/;
 const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 /** `path/to/thing.js`, `tests/path/test.py` and `src/foo/bar.test.ts` are how an example spells its argument, not files in this repository. */
 const PLACEHOLDER_PATH = /(^|[/])(path[/]|(foo|bar|baz)([/.]|$))/i;
+/** A file each machine writes for itself and never commits: `CLAUDE.local.md`, `settings.local.json`, `.env.local`. */
+const LOCAL_FILE = /(^|\/)[^/]*\.local(\.[A-Za-z0-9]+)?$/i;
+/** A skill's path under the folder a host installs it in, cited from wherever the skill actually lives. */
+const SKILL_INSTALL = /^\.(?:claude|agents|cursor|codex|windsurf|gemini)\/skills\/(.+)$/;
 /** `myplugin.md`, `src/mytopic/mycommand.ts` and `your-app/` are how an example names the thing the reader will create. */
 const EXAMPLE_NAME = /(^|[/])(my|your)-?(app|plugin|topic|command|provider|project|skill|module|component|service|feature|package|file|folder|dir|script|tool|agent|repo|lib|api|test|example|org|name|site)s?([/.]|$)/i;
 /** `@scope/package/file.css` is an npm import specifier. An `@/` alias keeps its slash right after the `@`, so it is not one. */
@@ -1122,6 +1126,12 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
     if (isHistorical) historical++;
     const marked = classifyLines(lines);
     const headings = headingsAbove(lines, marked);
+    const installedElsewhere = (p) => {
+      const m = p.match(SKILL_INSTALL);
+      if (!m) return false;
+      const tail = `skills/${m[1]}`;
+      return index.known.has(tail) || index.tracked.some((t) => t.endsWith(`/${tail}`));
+    };
     const excused = new Set();
     const opened = { caseMismatch: caseMismatch.length, brokenLinks: brokenLinks.length, missingPaths: missingPaths.length, unknownCommands: unknownCommands.length };
     const citedHere = new Set(), absentHere = new Set();
@@ -1152,6 +1162,9 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
 
           const r = resolveOnce(p);
           if (r.state === 'ok') { cite(p, false); continue; }
+          // A case mismatch is reported wherever it sits; only a path that is absent can be a per-machine file or an install path.
+          if (r.state !== 'case' && LOCAL_FILE.test(p)) continue;
+          if (r.state === 'missing' && installedElsewhere(p)) { cite(p, false); continue; }
           const paragraph = context(i, m.anchor, 2, 2);
           if (NEGATION.test(paragraph) || namesAnotherRepo(context(i, m.anchor, 6, 1), own) || (!code && conditionalExistence(m.text, at, len))) { excused.add(p); continue; }
           if (r.state !== 'case') {
@@ -1225,7 +1238,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
         }
         if (!CODE_EXT.test(to) && !LINK_EXT.test(to)) continue;
         if (WILDCARD.test(to) || HOSTNAME.test(to) || PLACEHOLDER_PATH.test(to) || EXAMPLE_NAME.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
-        if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
+        if (/^(https?:|file:|\/\/)/i.test(to) || ignored(to)) continue;
         const mdc = /^mdc:/i.test(to);
         const href = mdc ? '/' + decodeLink(to.slice(4)).replace(/^\.?\//, '') : decodeLink(to);
         let abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(target.path), href);
@@ -1257,6 +1270,8 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
           }
         }
         if (existsSync(abs)) { if (inside) cite(rel, false); continue; }
+        if (LOCAL_FILE.test(to)) continue;
+        if (inside && installedElsewhere(rel)) { cite(rel, false); continue; }
         const bare = href.slice(href.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
         const finding = {
           file: target.label,

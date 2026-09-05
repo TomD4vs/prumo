@@ -26,6 +26,8 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
+| Um arquivo que cada máquina escreve para si | `CLAUDE.local.md`, `settings.local.json`, `.env.local`: um nome com `.local` antes da extensão é escrito por máquina e nunca entra no commit, então uma nota que manda o agente lê-lo nomeia um arquivo ausente de propósito. Na décima segunda passagem um repositório citou um arquivo assim sete vezes. |
+| Uma skill citada pelo caminho de instalação | `.claude/skills/deploy/scripts/x.sh` é onde um host instala a skill; a skill em si mora numa pasta de plugin, numa pasta de docs ou na pasta de outro host, e o script está lá. Quando o mesmo arquivo existe ao lado de um `SKILL.md` em algum lugar do repositório, a citação resolve. |
 | Algo que só o autor sabe estar certo | `.prumorc.json`, os marcadores `prumo-ignore` e, num repositório com passivo, o baseline que retém o que existia quando foi gravado. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
 
 Mesma ferramenta, mesmos arquivos, com e sem os filtros:
@@ -436,6 +438,49 @@ apagado, removido ou desativado em chinês é negação como as equivalentes em 
 uma marca de ênfase colada depois de um caminho, `scripts/sync.mjs._`, fica de fora dele. Elas
 removeram nove achados, oito falsos e um real que estava ao lado de uma negação em chinês, a mesma
 troca que a regra de parágrafo sempre fez.
+
+Uma décima terceira passagem, para a 0.8.2, em sessenta repositórios das mesmas buscas, nenhum em
+lista anterior. Ela mede as três regras nascidas do décimo segundo corpus, e mais duas nascidas ali
+para a 0.8.2: um arquivo que cada máquina escreve para si, com `.local` antes da extensão, e uma
+skill citada pelo caminho em que um host a instala quando o mesmo arquivo existe ao lado de um
+`SKILL.md` no repositório. No décimo segundo as duas removeram vinte achados fora dos catálogos,
+todos falsos menos dois, e os dois, uma pasta de skills que se mudou da pasta de um host para a de
+outro e uma skill movida para dentro de um plugin, são o tipo brando de envelhecido, em que o
+arquivo que a nota quer dizer está lá com outro nome. Uma terceira regra foi tentada e descartada:
+um título que diz que a seção mostra exemplos governaria os caminhos abaixo dele, mas a skill de
+amostra que a motivou carrega o próprio título `#`, que encerra a seção, e num catálogo a regra
+calou citações que se leem como reais. Três clones falharam, doze não têm arquivo de contexto que o
+prumo detecte, quatro são catálogos acima de cinquenta, e vinte e oito vieram limpos:
+
+| Repositórios públicos, décima terceira passagem, 0.8.0 a 0.8.2 | |
+| --- | ---: |
+| Repositórios checados | 57 |
+| Achados fora dos catálogos, na 0.8.0 | 83 |
+| Reais | 18 |
+| Precisão | 22% |
+| Removidos pelas cinco regras da 0.8.1 e da 0.8.2, todas ajustadas em outro lugar | 1 |
+| Desses, reais | 0 |
+| Achados na 0.8.2, os mesmos 18 reais | 82 |
+| Achados de `AGENT CONFIG`, todos reais | 1 |
+
+As cinco regras medidas aqui quase não tiveram o que remover: a regra do caminho de instalação
+limpou uma citação de uma skill arquivada pelo caminho de instalação, falsa, e as outras quatro não
+encontraram linha nenhuma, o que só diz que elas são estreitas. A quinta checagem leu oito
+repositórios com JSON de configuração e reportou uma coisa, um `.mcp.json` nomeando um script de
+servidor que não está no repositório; com o décimo segundo, são cinco reportes em material que não
+moldou regra nenhuma dela, todos reais. Os achados reais são sete skills irmãs que um plugin linka e
+nunca acrescentou, um doc citado pelo nome do pacote onde o pacote mora uma pasta mais fundo, uma
+biblioteca de banco citada sem a pasta de versão, um doc de workflow e um script de preflight que
+sumiram, e dois arquivos de regra linkando docs uma pasta rasos demais. Os falsos ficam em três
+repositórios, cinquenta dos sessenta e quatro: um plugin de contribuição publicado em três cópias
+para três hosts, cujas skills linkam os arquivos do shell de banco em que ele deve rodar; um
+repositório de skills de agente cujas notas linkam as páginas de um wiki guardado em outro lugar; e
+skills que documentam um framework do qual o repositório depende. Cada arquivo deles cita caminhos
+de menos para o portão por arquivo, e juntos dizem onde está a próxima regra: um repositório cujos
+caminhos citados são em maioria ausentes em todos os arquivos documenta outro projeto por inteiro.
+Essa regra não foi construída ainda, para que possa ser medida em material de onde não veio. Uma
+regra nasceu deste corpus e é ajustada a ele: um link com esquema `file:` é um endereço, como a
+regra da prosa já dizia, e ela limpou dois.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 
