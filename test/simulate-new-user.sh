@@ -122,7 +122,8 @@ P4='{"tool_name":"Write","tool_input":{"file_path":"/home/me/t/.claude/commands/
 echo "$P4" | bash -c "$HC" 2>&1 | grep -q "^prumo —" && ok "bash hook: a slash command file runs prumo" || bad "bash hook P4"
 echo "$P1" | bash -c "$HC" >/dev/null 2>&1; chk "$?" "0" "bash hook exits 0 despite findings, so the agent is not blocked"
 if command -v powershell >/dev/null 2>&1; then
-  echo "$P1" | powershell -NoProfile -ExecutionPolicy Bypass -File hook-ps1.ps1 2>&1 | grep -q "^prumo —" && ok "PowerShell hook: Write CLAUDE.md runs prumo" || bad "PowerShell hook P1"
+  PS1=$(echo "$P1" | powershell -NoProfile -ExecutionPolicy Bypass -File hook-ps1.ps1 2>&1)
+  echo "$PS1" | grep -q "^prumo —" && ok "PowerShell hook: Write CLAUDE.md runs prumo" || bad "PowerShell hook P1: $(echo "$PS1" | head -4 | tr '\n' '|')"
   [ -z "$(echo "$P2" | powershell -NoProfile -ExecutionPolicy Bypass -File hook-ps1.ps1 2>&1)" ] && ok "PowerShell hook: Edit main.py stays silent" || bad "PowerShell hook P2"
 else echo "  (no powershell here: PowerShell hook skipped)"; fi
 rm -f hook-bash.txt hook-ps1.ps1
