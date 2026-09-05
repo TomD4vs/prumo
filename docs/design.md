@@ -21,7 +21,7 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | Historical notes exempt | An entry titled *phase 3 complete* cites what was later removed. That is its subject, not a defect. |
 | Transient artifacts ignored | `public/build`, `.vite`, `node_modules`, `dist` are born and die outside git. |
 | Aliases, short paths and the emitted extension resolved | `@/utils/foo.js` and `tests/Concerns/ReadsPdf` are real references written in shorthand. `@/` is tried against the repository root as well as `src`, `app` and the others, and a TypeScript project that writes `./logger.js` for the `logger.ts` git holds is matched to its source. A link that resolves from the repository root and from nowhere else is read from the root, as an agent reads it. |
-| Placeholders and identifiers | `path/to/test.js` and `src/foo/bar.test.ts` in a command example, `chapters/ch01-<slug>.md` and `.agents/commands/[name].md` in a template, `reports/review-YYYY-MM-DD.md` and `shots/shot_NN.md` for a file yet to be written, and `server/discover` beside `tools/list` are not files. Neither is `constants.hpp/.cpp`, which is two files in one token, nor `docs.example.com/guide.md`, which is a web address without its scheme. A name with no extension is a path only when the folder it starts with exists here. |
+| Placeholders and identifiers | `path/to/test.js`, `src/foo/bar.test.ts` and `src/plugins/myplugin.ts` in a command example, `chapters/ch01-<slug>.md` and `.agents/commands/[name].md` in a template, `reports/review-YYYY-MM-DD.md` and `shots/shot_NN.md` for a file yet to be written, and `server/discover` beside `tools/list` are not files. Neither is `constants.hpp/.cpp`, which is two files in one token, nor `docs.example.com/guide.md`, which is a web address without its scheme. A name with no extension is a path only when the folder it starts with exists here. |
 | A project-name prefix resolved | `myapp/app/api/route.ts` when the repository holds `app/api/route.ts` and has no `myapp/` folder. Only an exact nested match counts, so a wrongly cased first segment is still a case mismatch. |
 | A path that belongs to another repository | A note that names `github.com/other/project` a few lines above the path, and an `@/` alias in a repository holding none of the folders an alias resolves against. Both describe code that lives somewhere else. |
 | A package import is not a path | `@scope/package/style.css` is something npm resolves, not a file here. An `@/` alias keeps its slash right after the `@`, so it is still checked. |
@@ -165,6 +165,7 @@ versions, and on a fixed corpus every release has removed false findings and kep
 | 0.4.10 | 86% | 32% |
 | 0.5.1 | 87% | 57% |
 | 0.5.2 | 92% | 57% |
+| 0.5.3 | 92% | 62% |
 
 Read down a column and the tool improved. Read across a row and the material differs. Both are true,
 and only the columns answer whether a release helped. The last row counts the three checks the earlier
@@ -269,6 +270,45 @@ to"* another file. The three rules 0.5.1 built from the eighth corpus changed no
 eighth corpus this release removes twenty more findings outside the catalogues, all false, 267 to
 247 and 50% to 54%, and 3807 inside them; on the fourth it removes the two hosts read as folders,
 a family named there and untouched since, and the three checks it shares with 0.4.7 stand at 92%.
+
+A tenth pass, for 0.5.3, on sixty repositories from the same searches, none on any earlier list. It
+answers two questions. The six rules 0.5.2 had built from the ninth corpus, run here as 0.5.1
+against 0.5.2, remove 67 findings and add none, all false: 61 are hosts written without a scheme in
+a second repository of German legal skills, the same family the ninth had shown, and the rest are a
+*"moved"*, three *"if `x` exists"* and a `[[tool.mypy.overrides]]`. The four rules this release adds
+from the ninth's leftovers were worth twelve findings on the ninth, where they were found, one on
+the sixth and one here. Nine of the sixty carry no context file prumo detects, two are catalogues,
+and the other forty-nine are counted apart:
+
+| Public repositories, tenth pass, 0.5.1 to 0.5.3 | |
+| --- | ---: |
+| Repositories checked | 51 |
+| Findings under 0.5.1 | 582 |
+| Removed by the six rules 0.5.2 built from the ninth, all false | 67 |
+| Of those, hosts written without a scheme | 61 |
+| Findings under 0.5.2 | 515 |
+| The 49 repositories outside the catalogues, under 0.5.2 | 143 |
+| Real | 45 |
+| Precision | 31% |
+| Removed there by the four rules of 0.5.3 | 0 |
+| Removed there by five rules built from this corpus, all false | 18 |
+| Findings under 0.5.3, the same 45 real | 125 |
+| Precision | 36% |
+
+The real ones are the shapes the earlier passes knew: cross-references between skills of one
+repository whose names changed, a module documented under `docs/` that `src/` no longer holds, a
+file table with line counts naming three files that moved, and vendored skills linking siblings that
+were never copied. The false ones are skills vendored for another project, a Laravel one, a Convex
+one, a code reviewer with its own `npm run preflight`, plus user-level config locations, template
+wikilinks such as `[[Person Name]]`, and rename notes written as *"(was `x`)"*. The five rules built
+from this corpus, and therefore unmeasured: the condition may follow the path, *"read `x` if it
+exists"*; `managed_components/` is a vendor folder, so a component's own context files are not
+targets; `YYYYMMDD` and `YYYY-MM` stencils; `foo.py`; and `:initConfig()` after a path. On the fixed
+corpora this release changes one finding, the sixth loses *"No project skills found"* and stands at
+62%; the fourth and the fifth are untouched, and the ninth's forty-four go from 69 findings to 57
+with the same 29 real, 42% to 51%. Inside the catalogues of the eighth and the ninth a file that
+loses an example path to the placeholder rule can fall below the gate, and its other findings
+reappear: twenty-eight there and seven here, runtime files and another project's paths, none real.
 
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 

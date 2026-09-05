@@ -1104,6 +1104,38 @@ test('a host written without its scheme, a file:// address, a path:symbol, a NN 
   assert.deepEqual(symbol.missingPaths.map((f) => f.cited), ['src/gone.ts']);
 });
 
+test('the same script shown under several package managers is a list of alternatives, and an example name is not a path', () => {
+  const r = run({
+    'AGENTS.md': [
+      'No project skills found. Add skills to any of `.claude/skills/` or `.agents/skills/`.',
+      '',
+      '',
+      '',
+      '| npm | `npm run test:coverage` | `npm run lint` |',
+      '| pnpm | `pnpm test:coverage` | `pnpm lint` |',
+      '| yarn | `yarn test:coverage` | `yarn lint` |',
+      '',
+      'Then run `npm run deploy:prod`. Add your plugin at `src/plugins/myplugin.ts` and a page at `my-app/pages/index.tsx`.',
+      '',
+    ].join('\n'),
+    'package.json': JSON.stringify({ scripts: { build: 'x' } }),
+    'src/index.ts': '',
+  });
+  assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['npm run deploy:prod']);
+  assert.equal(r.missingPaths.length, 0);
+});
+
+test('the condition may follow the path, a vendored component is not a target, and three more stencils', () => {
+  const r = run({
+    'AGENTS.md': 'Read `.omo/boulder.json` if it exists, and `architecture/profile.yaml` when present. Config loads in `cmd/root.go:initConfig()`. Scan `src/foo.py` and `Memory/YYYYMMDD-update/index.md`.\n',
+    'cmd/root.go': '',
+    'src/index.py': '',
+    'managed_components/vendor__lib/CLAUDE.md': 'See `tools/build.py`.\n',
+  });
+  assert.equal(r.missingPaths.length, 0);
+  assert.equal(r.stats.targets, 1);
+});
+
 test('a fenced block in a programming language is not read', () => {
   const r = run({
     'AGENTS.md': '```js\nconst x = require(\'lib/gone.js\');\n```\n\n```python\nopen("lib/gone.py")\n```\n\n```bash\nnode lib/gone.js\n```\n',

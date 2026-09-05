@@ -45,10 +45,12 @@ const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:|file:|\$)/;
 /** `docs.example.com/page.md` and `gesetze-im-internet.de/x.html` start with a host, which is a web address written without its scheme. */
 const HOSTNAME = /^[\w-]+(\.[\w-]+)*\.(com|org|net|io|dev|ai|app|co|edu|gov|de|br|uk|fr|es|it|nl|ch|at|eu|me|info|xyz)\//i;
 /** What a note appends to a path to point inside the file: a line number, a GitHub `#L10` anchor, a `::symbol` or a `:symbol`. */
-const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::?[A-Za-z_$][\w.$]*)$/;
+const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::?[A-Za-z_$][\w.$]*(\(\))?)$/;
 const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 /** `path/to/thing.js`, `tests/path/test.py` and `src/foo/bar.test.ts` are how an example spells its argument, not files in this repository. */
-const PLACEHOLDER_PATH = /(^|[/])(path|foo|bar|baz)[/]/i;
+const PLACEHOLDER_PATH = /(^|[/])(path[/]|(foo|bar|baz)([/.]|$))/i;
+/** `myplugin.md`, `src/mytopic/mycommand.ts` and `your-app/` are how an example names the thing the reader will create. */
+const EXAMPLE_NAME = /(^|[/])(my|your)-?(app|plugin|topic|command|provider|project|skill|module|component|service|feature|package|file|folder|dir|script|tool|agent|repo|lib|api|test|example|org|name|site)s?([/.]|$)/i;
 /** `@scope/package/file.css` is an npm import specifier. An `@/` alias keeps its slash right after the `@`, so it is not one. */
 const SCOPED_PACKAGE = /^@[^/]+\//;
 /**
@@ -96,7 +98,7 @@ const CONSUMES_ALL = new RegExp(CONSUMES.source, 'gi');
 const LIST_ITEM = /^(\s*)(?:[-*+]|\d+[.)])\s+/;
 const TABLE_ROW = /^\s*\|/;
 /** `report-YYYY-MM-DD.md`, `product/vX.Y.Z/` and `shots/shot_NN.md` name a file to be created, not one that is here. */
-const TEMPLATE_TOKEN = /\bYYYY[-_]MM[-_]DD\b|\bv?X\.Y\.Z\b|(^|[_\-/])N{2,}([_\-.]|$)/;
+const TEMPLATE_TOKEN = /\bYYYY(?:[-_]?MM(?:[-_]?DD)?)?\b|\bv?X\.Y\.Z\b|(^|[_\-/])N{2,}([_\-.]|$)/;
 /** `src/common/constants.hpp/.cpp` is two files written as one token, never a path. */
 const COMPOUND_EXT = /\.[a-z0-9]{1,5}\/\.[a-z0-9]{1,5}$/i;
 /** What a markdown link may point at besides code and markdown: the images and documents a note embeds. */
@@ -112,7 +114,7 @@ const NEGATION = new RegExp(
     'exclu[ií]d', '\\bsumi', 'deixou de', 'foi renomead', 'virou', 'passou a ser',
     'hist[óo]ric', 'obsolet', 'superad', 'revertid', 'substitu[íi]d',
     'antes (era|fazia|chamava)', '\\berrad', 'min[úu]scul', 'mai[úu]scul', 'caixa',
-    '\\bcitad', 'exemplo', 'placeholder', 'example', '\\be\\.g\\.', 'gitignor',
+    '\\bcitad', 'exemplo', 'placeholder', 'example', '\\be\\.g\\.', 'gitignor', '\\bno\\b[^.\\n]{0,40}\\bfound\\b',
   ].join('|'),
   'i'
 );
@@ -120,7 +122,7 @@ const NEGATION = new RegExp(
 const HISTORICAL_NAME = /((phase|fase)[_\- ]?\d*[_\- ]?(done|complete|conclu)|[_-](superseded|superad|historic|revertid|reverted))/i;
 const HISTORICAL_DESC = /^description:.*(historical|superseded|reverted|hist[óo]ric|SUPERAD|REVERTID)/im;
 
-const TRANSIENT = /^(public\/(hot|build|storage)|bootstrap\/cache|scratchpad|storage|vendor|target)(\/|$)|(^|\/)(\.vite|dist|coverage|\.next|\.nuxt|node_modules|__pycache__)(\/|$)/i;
+const TRANSIENT = /^(public\/(hot|build|storage)|bootstrap\/cache|scratchpad|storage|vendor|managed_components|target)(\/|$)|(^|\/)(\.vite|dist|coverage|\.next|\.nuxt|node_modules|__pycache__)(\/|$)/i;
 
 const IGNORE_LINE = /<!--\s*prumo-ignore\s*-->/;
 const IGNORE_NEXT = /<!--\s*prumo-ignore-next-line\s*-->/;
@@ -375,7 +377,7 @@ const ELSEWHERE_FLAG = /^(-w|--workspaces?|-C|--directory|--dir|-f|--file|--filt
 const YARN_BUILTIN = new Set('access add audit autoclean bin cache check config constraints create dedupe dlx exec explain generate-lock-entry global help import info init install licenses link list login logout node outdated owner pack patch patch-commit plugin policies publish rebuild remove run search set stage tag team unlink unplug up upgrade upgrade-interactive version versions why workspace workspaces'.split(' '));
 const PNPM_BUILTIN = new Set('add install i update up upgrade remove rm uninstall un link unlink import rebuild rb prune fetch dedupe patch patch-commit patch-remove audit licenses outdated list ls why run exec dlx create publish pack recursive server store env setup init deploy doctor config cat-file cat-index find-hash approve-builds ignored-builds self-update root bin help'.split(' '));
 const COMPOSER_BUILTIN = new Set('about archive audit browse bump check-platform-reqs clear-cache clearcache cc completion config create-project depends diagnose dump-autoload dumpautoload exec fund global help home init install i licenses list outdated prohibits reinstall remove require run run-script search self-update selfupdate show status suggests update u upgrade validate why why-not'.split(' '));
-const KNOWN_BIN = new Set(['tsc', 'tsserver', 'playwright', 'commitlint', 'changeset', 'svelte-kit', 'ng', 'sb']);
+const KNOWN_BIN = new Set(['tsc', 'tsserver', 'playwright', 'commitlint', 'changeset', 'svelte-kit', 'ng', 'sb', 'nest', 'remix', 'eas', 'firebase', 'netlify', 'biome']);
 
 /**
  * Splits a command into its arguments, marking the one a redirect, an output flag or a creating
@@ -395,7 +397,7 @@ function pathsAmong(tokens) {
   const found = [];
   for (const { tok: raw, out } of tokens) {
     const tok = raw.includes('\\') ? raw.split('\\').join('/') : raw;
-    if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || HOSTNAME.test(tok) || PLACEHOLDER_PATH.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
+    if (WILDCARD.test(tok) || OUTSIDE_REPO.test(tok) || HOSTNAME.test(tok) || PLACEHOLDER_PATH.test(tok) || EXAMPLE_NAME.test(tok) || SCOPED_PACKAGE.test(tok)) continue;
     if (TEMPLATE_TOKEN.test(tok) || COMPOUND_EXT.test(tok)) continue;
     if (!(ROOTS.test(tok) || (tok.includes('/') && CODE_EXT.test(tok)))) continue;
     found.push({ p: tok.replace(/^\.\//, '').replace(INSIDE_FILE, '').replace(/\/$/, ''), out });
@@ -517,8 +519,10 @@ function governs(text, at, len) {
 function conditionalExistence(text, at, len) {
   const s = sentenceAround(text, at, len);
   const plain = masked(s.text);
-  return /\b(if|when|whether|unless|se|caso|quando)\b[^.;!?]{0,60}$/i.test(plain.slice(0, s.at))
-    && /^[^.;!?]{0,40}\b(exists?|present|available|found|missing|absent|existir|existirem|exista|existe|presente|ausente|faltar)\b/i.test(plain.slice(s.at + len));
+  const state = '(exists?|present|available|found|missing|absent|existir|existirem|exista|existe|presente|ausente|faltar)';
+  const after = plain.slice(s.at + len);
+  return (/\b(if|when|whether|unless|se|caso|quando)\b[^.;!?]{0,60}$/i.test(plain.slice(0, s.at)) && new RegExp('^[^.;!?]{0,40}\\b' + state + '\\b', 'i').test(after))
+    || new RegExp('^[^.;!?]{0,40}\\b(if|when|whether|unless|se|caso|quando)\\b[^.;!?]{0,40}\\b' + state + '\\b', 'i').test(after);
 }
 
 /** What a heading or a block's introduction says about the paths under it: a producing verb anywhere wins, since *"Output path | When to use"* is about outputs. */
@@ -931,7 +935,7 @@ export function analyze({ repo, targets, config = null }) {
           continue;
         }
         if (!CODE_EXT.test(to) && !LINK_EXT.test(to)) continue;
-        if (WILDCARD.test(to) || HOSTNAME.test(to) || PLACEHOLDER_PATH.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
+        if (WILDCARD.test(to) || HOSTNAME.test(to) || PLACEHOLDER_PATH.test(to) || EXAMPLE_NAME.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
         if (/^(https?:|\/\/)/i.test(to) || ignored(to)) continue;
         const href = decodeLink(to);
         let abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(target.path), href);
@@ -975,6 +979,17 @@ export function analyze({ repo, targets, config = null }) {
         brokenLinks.push(finding);
       }
     });
+
+    const runners = new Map();
+    for (const c of unknownCommands.slice(opened.unknownCommands)) {
+      const set = runners.get(c.name) || new Set();
+      set.add(c.cited.split(' ')[0]);
+      runners.set(c.name, set);
+    }
+    if ([...runners.values()].some((set) => set.size > 1)) {
+      const kept = unknownCommands.slice(opened.unknownCommands).filter((c) => runners.get(c.name).size < 2);
+      unknownCommands.splice(opened.unknownCommands, unknownCommands.length, ...kept);
+    }
 
     if (!target.explicit && absentHere.size >= 4 && absentHere.size >= citedHere.size * 0.6) {
       elsewhere.push({ file: target.label, cited: citedHere.size, absent: absentHere.size });

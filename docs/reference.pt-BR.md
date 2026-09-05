@@ -51,7 +51,7 @@ No terminal, o relatório abre com o nome em letras grandes, a versão e a pági
 | Agent Skills, qualquer host | `SKILL.md` em qualquer subpasta, como `.claude/skills/deploy/`, rastreado pelo git ou não |
 | Qualquer um | `MEMORY.md`, `COPILOT.md` |
 
-`CLAUDE.md`, `AGENTS.md` e `SKILL.md` também são recolhidos de subpastas, então `packages/api/AGENTS.md` e `.claude/skills/deploy/SKILL.md` são lidos igual a um arquivo da raiz. Pastas como `vendor/` e `node_modules/` ficam de fora, porque um arquivo de contexto ali documenta uma dependência.
+`CLAUDE.md`, `AGENTS.md` e `SKILL.md` também são recolhidos de subpastas, então `packages/api/AGENTS.md` e `.claude/skills/deploy/SKILL.md` são lidos igual a um arquivo da raiz. Pastas como `vendor/`, `node_modules/` e `managed_components/` ficam de fora, porque um arquivo de contexto ali documenta uma dependência.
 
 Uma skill em `.claude/skills/` ou `.agents/skills/` é lida mesmo quando o git não a rastreia, como costuma acontecer com uma skill instalada. O cabeçalho conta os arquivos lidos desse jeito. Os arquivos ao lado dessa skill são procurados no disco, já que o índice não os tem, então uma capitalização errada num deles passa despercebida.
 
@@ -123,15 +123,15 @@ Centenas desses geralmente têm uma causa sistemática só. Numa execução medi
 
 ### `MISSING PATH`
 
-A nota cita um arquivo que não existe mais em lugar nenhum do repositório. Atualize o caminho, ou reescreva a frase se o ponto dela for justamente que o arquivo sumiu. O prumo reconhece construções como *"foi removido"*, *"não existe mais"*, *"renomeado para"*, *"migrated from"* e *"moved to"*, e se cala quando encontra uma.
+A nota cita um arquivo que não existe mais em lugar nenhum do repositório. Atualize o caminho, ou reescreva a frase se o ponto dela for justamente que o arquivo sumiu. O prumo reconhece construções como *"foi removido"*, *"não existe mais"*, *"renomeado para"*, *"migrated from"*, *"moved to"* e *"no skills found"*, e se cala quando encontra uma.
 
-Também reconhece uma frase que diz que o arquivo é escrito, como *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* ou *"`docs/run.log` é gerado pelo build"*, e deixa esse caminho em paz. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* continua checando `a`. Uma lista ou uma tabela toma o veredito da frase que as apresenta, ou do título da seção, e num comando um redirecionamento `>`, uma flag `-o` ou `mkdir` marca o que é escrito. Uma frase que faz da existência do arquivo uma condição, *"se `docs/contexto.md` existir, leia"*, também fica em paz. Um caminho com a caixa errada é reportado diga a frase o que disser.
+Também reconhece uma frase que diz que o arquivo é escrito, como *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* ou *"`docs/run.log` é gerado pelo build"*, e deixa esse caminho em paz. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* continua checando `a`. Uma lista ou uma tabela toma o veredito da frase que as apresenta, ou do título da seção, e num comando um redirecionamento `>`, uma flag `-o` ou `mkdir` marca o que é escrito. Uma frase que faz da existência do arquivo uma condição, *"se `docs/contexto.md` existir, leia"* ou *"leia `docs/contexto.md` se existir"*, também fica em paz. Um caminho com a caixa errada é reportado diga a frase o que disser.
 
 Um caminho coberto pelo `.gitignore` está ausente de propósito, então fica isento desta checagem e da de links quebrados. O cabeçalho conta essas isenções, para que um repositório que depende delas nunca pareça limpo por acidente.
 
 ### `UNKNOWN COMMAND`
 
-A nota manda o agente rodar `npm run test:unit`, `yarn build`, `make deploy` ou `composer lint`, e nenhum `package.json`, `Makefile` ou `composer.json` rastreado pelo git define um script ou alvo com esse nome. Script é renomeado com mais frequência do que arquivo, e um agente que roda o nome antigo para ali mesmo. Todo manifesto do repositório conta, então a nota de um monorepo pode nomear o script de qualquer pacote, e `yarn x` e `pnpm x` aceitam também o nome de uma dependência, porque rodam o binário dela. Um comando apontado para outro lugar, com `-w`, `--filter` ou `make -C`, fica em paz, assim como o `make` quando um alvo é montado a partir de variável, porque aí a lista não pode ser lida. Quando o prumo imprime `-> sugestão`, aquele é o nome definido mais próximo do citado.
+A nota manda o agente rodar `npm run test:unit`, `yarn build`, `make deploy` ou `composer lint`, e nenhum `package.json`, `Makefile` ou `composer.json` rastreado pelo git define um script ou alvo com esse nome. Script é renomeado com mais frequência do que arquivo, e um agente que roda o nome antigo para ali mesmo. Todo manifesto do repositório conta, então a nota de um monorepo pode nomear o script de qualquer pacote, e `yarn x` e `pnpm x` aceitam também o nome de uma dependência, porque rodam o binário dela. Um comando apontado para outro lugar, com `-w`, `--filter` ou `make -C`, fica em paz, assim como o `make` quando um alvo é montado a partir de variável, porque aí a lista não pode ser lida. Uma nota que mostra o mesmo script sob vários gerenciadores de pacote, `npm run lint` numa linha e `pnpm lint` na seguinte, está listando alternativas, e nenhuma delas é reportada. Quando o prumo imprime `-> sugestão`, aquele é o nome definido mais próximo do citado.
 
 ### `ANOTHER PROJECT`
 

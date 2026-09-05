@@ -21,7 +21,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
 | Artefato transitório ignorado | `public/build`, `.vite`, `node_modules`, `dist` nascem e morrem fora do git. |
 | Alias, caminho curto e extensão emitida resolvidos | `@/utils/foo.js` e `tests/Concerns/LeTextoDePdf` são referências reais escritas em forma curta. O `@/` é testado contra a raiz do repositório além de `src`, `app` e os demais, e um projeto TypeScript que escreve `./logger.js` para o `logger.ts` que o git guarda é casado com a fonte. Um link que resolve a partir da raiz do repositório e de nenhum outro lugar é lido a partir da raiz, como um agente o lê. |
-| Marcador de posição e identificador | `path/to/test.js` e `src/foo/bar.test.ts` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` e `shots/shot_NN.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só, nem `docs.exemplo.com/guia.md`, que é um endereço da web sem o esquema. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
+| Marcador de posição e identificador | `path/to/test.js`, `src/foo/bar.test.ts` e `src/plugins/myplugin.ts` num exemplo de comando, `chapters/ch01-<slug>.md` e `.agents/commands/[name].md` num template, `reports/review-YYYY-MM-DD.md` e `shots/shot_NN.md` para um arquivo ainda a escrever, e `server/discover` ao lado de `tools/list` não são arquivos. Nem `constants.hpp/.cpp`, que são dois arquivos num token só, nem `docs.exemplo.com/guia.md`, que é um endereço da web sem o esquema. Um nome sem extensão só é caminho quando a pasta com que ele começa existe ali. |
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
@@ -169,6 +169,7 @@ versões, e em acervo fixo toda release removeu achado falso e manteve todos os 
 | 0.4.10 | 86% | 32% |
 | 0.5.1 | 87% | 57% |
 | 0.5.2 | 92% | 57% |
+| 0.5.3 | 92% | 62% |
 
 Lendo uma coluna, a ferramenta melhorou. Lendo uma linha, o material é outro. As duas coisas são
 verdade, e só as colunas respondem se uma release ajudou. A última linha conta as três checagens que as
@@ -276,6 +277,47 @@ não mudaram nada aqui. No oitavo corpus esta release remove mais vinte achados 
 todos falsos, 267 para 247 e 50% para 54%, e 3807 dentro deles; no quarto remove os dois hosts lidos
 como pasta, família nomeada ali e intocada desde então, e as três checagens que ela divide com a
 0.4.7 ficam em 92%.
+
+Uma décima passagem, para a 0.5.3, em sessenta repositórios das mesmas buscas, nenhum em lista
+anterior. Ela responde duas perguntas. As seis regras que a 0.5.2 tinha tirado do nono corpus,
+rodadas aqui como 0.5.1 contra 0.5.2, removem 67 achados e não acrescentam nenhum, todos falsos: 61
+são hosts escritos sem esquema num segundo repositório de skills jurídicas alemãs, a mesma família
+que o nono tinha mostrado, e o resto é um *"moved"*, três *"if `x` exists"* e um
+`[[tool.mypy.overrides]]`. As quatro regras que esta release acrescenta das sobras do nono valeram
+doze achados no nono, onde foram encontradas, um no sexto e um aqui. Nove dos sessenta não têm
+arquivo de contexto que o prumo detecte, dois são catálogos, e os outros quarenta e nove ficam
+contados à parte:
+
+| Repositórios públicos, décima passagem, 0.5.1 a 0.5.3 | |
+| --- | ---: |
+| Repositórios checados | 51 |
+| Achados na 0.5.1 | 582 |
+| Removidos pelas seis regras que a 0.5.2 tirou do nono, todos falsos | 67 |
+| Desses, hosts escritos sem esquema | 61 |
+| Achados na 0.5.2 | 515 |
+| Os 49 repositórios fora dos catálogos, na 0.5.2 | 143 |
+| Reais | 45 |
+| Precisão | 31% |
+| Removidos ali pelas quatro regras da 0.5.3 | 0 |
+| Removidos ali por cinco regras nascidas deste corpus, todos falsos | 18 |
+| Achados na 0.5.3, os mesmos 45 reais | 125 |
+| Precisão | 36% |
+
+Os reais têm as formas que as passagens anteriores já conheciam: referências cruzadas entre skills
+de um mesmo repositório cujos nomes mudaram, um módulo documentado em `docs/` que `src/` não tem
+mais, uma tabela de arquivos com contagem de linhas nomeando três arquivos que se moveram, e skills
+copiadas linkando vizinhas que nunca foram copiadas. Os falsos são skills copiadas para outro
+projeto, uma de Laravel, uma de Convex, um revisor de código com seu próprio `npm run preflight`,
+mais locais de configuração do usuário, wikilinks de template como `[[Person Name]]`, e notas de
+renomeação escritas como *"(was `x`)"*. As cinco regras nascidas deste corpus, e por isso sem
+medida: a condição pode vir depois do caminho, *"read `x` if it exists"*; `managed_components/` é
+pasta de dependência, então os arquivos de contexto de um componente não são alvos; estênceis
+`YYYYMMDD` e `YYYY-MM`; `foo.py`; e `:initConfig()` depois de um caminho. Nos corpora fixos esta
+release muda um achado, o sexto perde o *"No project skills found"* e fica em 62%; o quarto e o
+quinto seguem intocados, e os quarenta e quatro do nono vão de 69 achados para 57 com os mesmos 29
+reais, 42% para 51%. Dentro dos catálogos do oitavo e do nono, um arquivo que perde um caminho de
+exemplo para a regra de marcador pode cair abaixo do portão, e seus outros achados reaparecem:
+vinte e oito lá e sete aqui, arquivos de execução e caminhos de outro projeto, nenhum real.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
