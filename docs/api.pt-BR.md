@@ -12,7 +12,7 @@ import { analyze, resolveTargets } from '@tomd4vs/prumo';
 const targets = resolveTargets('.', []);          // [] = detectar sozinho
 const result  = analyze({ repo: '.', targets });
 
-console.log(result.schemaVersion);  // 3, sobe quando este formato muda
+console.log(result.schemaVersion);  // 4, sobe quando este formato muda
 console.log(result.prumoVersion);   // a versão que rodou
 console.log(result.repo);           // caminho absoluto do repositório checado
 console.log(result.checkedAt);      // quando, como data ISO 8601
@@ -20,12 +20,13 @@ console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
 console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
 console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
 console.log(result.unknownCommands); // [{ file, line, cited, name, source, suggestion, excerpt }]
+console.log(result.configIssues);   // [{ file, line, kind, cited, message }]
 console.log(result.orphans);        // ['nota-que-ninguem-linka.md']
-console.log(result.elsewhere);      // [{ file, cited, absent }]
-console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked }
+console.log(result.elsewhere);      // [{ file, cited, absent, unit? }]
+console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs }
 ```
 
-Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, e para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens.
+Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada.
 
 `kind` é `wikilink`, `link` ou `anchor`, este último um link para um título que a página de destino não tem. Num case mismatch ele só aparece quando o caminho veio de um link markdown, e aí `actual` é relativo ao arquivo que contém o link, como o próprio link. Num comando desconhecido, `cited` é o comando como a nota o escreve, `name` o script ou alvo que ele nomeia, `source` o tipo de arquivo que deveria defini-lo, e `suggestion` o mesmo comando com o nome definido mais próximo.
 

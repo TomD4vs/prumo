@@ -61,7 +61,8 @@ test('piped output opens with the header line, and only PRUMO_BANNER=1 puts the 
   writeFileSync(join(repo, 'CLAUDE.md'), 'See `src/index.ts`.\n');
   writeFileSync(join(repo, 'src/index.ts'), '');
   execSync('git init -q && git add -A', { cwd: repo, stdio: 'ignore' });
-  const run = (env) => execSync('node ' + JSON.stringify(BIN) + ' .', { cwd: repo, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  // A FORCE_COLOR in the shell that runs the suite would paint the piped output; each run starts without it.
+  const run = (env) => execSync('node ' + JSON.stringify(BIN) + ' .', { cwd: repo, env: { ...process.env, FORCE_COLOR: '', ...env }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
 
   const plain = run({ PRUMO_BANNER: '' });
   assert.match(plain, /^prumo — 1 context file, 2 files in the git index\n/);

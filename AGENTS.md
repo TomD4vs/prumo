@@ -7,7 +7,7 @@ still match the code. Node 18+, ESM, no build step.
 
 - `bin/prumo.mjs` — CLI: argument parsing, then the report. No analysis lives here.
 - `bin/prumo-mcp.mjs` — MCP server over stdio, two tools, same analysis and same report.
-- `src/check.mjs` — the four checks, exported as `analyze()` and `resolveTargets()`.
+- `src/check.mjs` — the five checks, exported as `analyze()` and `resolveTargets()`.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.

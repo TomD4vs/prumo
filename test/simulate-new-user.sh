@@ -9,6 +9,8 @@
 #   bash test/simulate-new-user.sh --global     also try npm install -g (touches the machine)
 #   KEEP=1 bash test/simulate-new-user.sh       leave the temp folder behind
 set +e
+# The shell that runs this may carry FORCE_COLOR, NO_COLOR or PRUMO_BANNER; every comparison below reads the plain output the docs show.
+unset FORCE_COLOR NO_COLOR PRUMO_BANNER
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 command -v cygpath >/dev/null 2>&1 && HERE=$(cygpath -m "$HERE")
 VERSION=$(node -p "require('$HERE/package.json').version")
@@ -90,8 +92,8 @@ echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted sc
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
-chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,orphans,elsewhere,stats gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 3' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
+echo "$J" | grep -q '"schemaVersion": 4' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -300,6 +302,14 @@ OUT=$($PR 2>&1); RC=$?
 echo "$OUT" | grep -q "^ANOTHER PROJECT  (1)" && echo "$OUT" | grep -q "^  CLAUDE.md   4 of 5 cited paths" && chk "$RC" "0" "a file whose paths start in folders the repository lacks is held back, exit 0" || bad "elsewhere: $(echo "$OUT" | grep -E 'ANOTHER|CLAUDE' | tr '\n' '|')"
 OUT=$($PR . CLAUDE.md 2>&1); RC=$?
 echo "$OUT" | grep -q "^MISSING PATH  (4)" && chk "$RC" "1" "naming the file checks it in full" || bad "named: $(echo "$OUT" | grep -E 'MISSING|ANOTHER' | tr '\n' '|')"
+mk agentconfig; mkdir -p .cursor/rules .claude/skills/deploy backend scripts; echo x > backend/app.py; echo x > scripts/live.mjs
+printf -- '---\nglobs: legacy/**\n---\nRules.\n' > .cursor/rules/gone.mdc
+printf -- '---\nname: deployer\n---\nSteps.\n' > .claude/skills/deploy/SKILL.md
+printf '{"mcpServers":{"local":{"command":"node","args":["scripts/server.mjs"]},"here":{"command":"node","args":["scripts/live.mjs"]}}}\n' > .mcp.json
+printf '# app\n' > CLAUDE.md; ci
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^AGENT CONFIG  (3)" && echo "$OUT" | grep -q "^  .mcp.json:1  scripts/server.mjs" && chk "$RC" "1" "a dead glob, a skill without description and an MCP script that is not here: AGENT CONFIG (3), exit 1" || bad "agent config: $(echo "$OUT" | grep -E 'AGENT|mdc|SKILL|mcp' | tr '\n' '|')"
+OUT=$($PR . CLAUDE.md 2>&1); echo "$OUT" | grep -q "AGENT CONFIG" && bad "config files checked on an explicit run" || ok "naming a target leaves the JSON configs alone"
 
 if [ "$GLOBAL" = 1 ]; then
   echo; echo "########## O. npm install -g (opt-in)"

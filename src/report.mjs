@@ -31,8 +31,8 @@ function palette(color) {
  * @param {boolean} [opts.color]   paint it for a terminal
  */
 export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false } = {}) {
-  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, elsewhere = [], stats } = result;
-  const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + orphans.length;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], configIssues = [], orphans, elsewhere = [], stats } = result;
+  const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + configIssues.length + orphans.length;
   const { bold, dim, teal, orange, badge } = palette(color);
   const out = [];
   const cap = (list) => (all ? list : list.slice(0, 25));
@@ -91,9 +91,15 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     out.push(...rest(unknownCommands));
   }
 
+  if (configIssues.length) {
+    out.push(title('AGENT CONFIG', PAINT.yellow, configIssues.length, 'a setting that points at nothing fails in silence'));
+    for (const o of cap(configIssues)) out.push(`  ${at(o)}  ${orange(o.cited)}   ${dim(o.message)}`);
+    out.push(...rest(configIssues));
+  }
+
   if (elsewhere.length) {
     out.push(title('ANOTHER PROJECT', PAINT.blue, elsewhere.length, 'its paths start in folders this repository does not have, so its findings are held back'));
-    for (const o of cap(elsewhere)) out.push(`  ${bold(o.file)}   ${dim(`${o.absent} of ${o.cited} cited paths; name the file to check it in full`)}`);
+    for (const o of cap(elsewhere)) out.push(`  ${bold(o.file)}   ${dim(`${o.absent} of ${o.cited} ${o.unit || 'cited paths'}; name ${o.unit ? 'a rule' : 'the file'} to check it in full`)}`);
     out.push(...rest(elsewhere));
   }
 
@@ -106,6 +112,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
       orphans.length && plural(orphans.length, 'note not in the index', 'notes not in the index'),
       missingPaths.length && plural(missingPaths.length, 'missing path', 'missing paths'),
       unknownCommands.length && plural(unknownCommands.length, 'unknown command', 'unknown commands'),
+      configIssues.length && plural(configIssues.length, 'config issue', 'config issues'),
     ].filter(Boolean);
     out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}`));
   }
@@ -119,6 +126,7 @@ const SARIF_RULES = {
   'broken-link': ['warning', 'A wikilink, a markdown link or a heading anchor that points at nothing.'],
   'missing-path': ['warning', 'A path the note cites that no longer exists in the repository.'],
   'unknown-command': ['warning', 'A command naming a script or target that no package.json, Makefile or composer.json defines.'],
+  'agent-config': ['warning', 'A setting in the agent configuration that points at nothing: a rule whose globs match no file, a skill without a description, an MCP server or a hook naming a script that is not here.'],
   'not-in-index': ['note', 'A note in a folder whose index never mentions it.'],
   'another-project': ['note', 'A context file whose cited paths start in folders this repository does not have. Its findings are held back.'],
 };
@@ -136,8 +144,9 @@ export function renderSarif(result) {
   for (const o of result.brokenLinks) at('broken-link', o, `${o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
   for (const o of result.missingPaths) at('missing-path', o, o.cited);
   for (const o of result.unknownCommands || []) at('unknown-command', o, `${o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
+  for (const o of result.configIssues || []) at('agent-config', o, `${o.cited}: ${o.message}`);
   for (const file of result.orphans) at('not-in-index', { file }, `${file} is not referenced by the index beside it`);
-  for (const o of result.elsewhere || []) at('another-project', o, `${o.absent} of ${o.cited} cited paths start in folders this repository does not have; findings held back`);
+  for (const o of result.elsewhere || []) at('another-project', o, `${o.absent} of ${o.cited} ${o.unit || 'cited paths'} ${o.unit ? 'reach no file here' : 'start in folders this repository does not have'}; findings held back`);
   return JSON.stringify({
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
     version: '2.1.0',
@@ -157,10 +166,11 @@ export function renderSarif(result) {
 
 /** GitHub Actions annotations, one per finding. */
 export function renderGithub(result) {
-  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], orphans, elsewhere = [] } = result;
+  const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], configIssues = [], orphans, elsewhere = [] } = result;
   const lines = [];
   const say = (level, o, msg) => lines.push(`::${level} file=${o.file},line=${o.line}::${msg}`);
-  for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} cited paths start in folders this repository does not have; findings held back`);
+  for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} ${o.unit || 'cited paths'} ${o.unit ? 'reach no file here' : 'start in folders this repository does not have'}; findings held back`);
+  for (const o of configIssues) say('warning', o, `Agent config: ${o.cited} ${o.message}`);
   for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);
   for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}`);

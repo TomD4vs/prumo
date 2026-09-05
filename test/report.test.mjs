@@ -67,6 +67,15 @@ test('an unknown command and a heading anchor render like the other findings, an
   assert.equal(gh, '::warning file=AGENTS.md,line=12::Unknown command: npm run test:unit — did you mean npm run test:units?');
 });
 
+test('a config issue renders with its message, counts in the total, and annotates the line', () => {
+  const issue = { file: '.mcp.json', line: 4, kind: 'config-path', cited: 'scripts/server.mjs', message: 'named by the MCP server "local", not here' };
+  const out = renderText(result({ configIssues: [issue] }));
+  assert.match(out, /^AGENT CONFIG  \(1\)   a setting that points at nothing fails in silence$/m);
+  assert.match(out, /^  \.mcp\.json:4  scripts\/server\.mjs   named by the MCP server "local", not here$/m);
+  assert.match(out, /\n1 to review$/);
+  assert.equal(renderGithub(result({ configIssues: [issue] })), '::warning file=.mcp.json,line=4::Agent config: scripts/server.mjs named by the MCP server "local", not here');
+});
+
 test('a file held back as documenting another project is listed without counting', () => {
   const out = renderText(result({ elsewhere: [{ file: '.claude/skills/deploy/SKILL.md', cited: 14, absent: 12 }] }));
   assert.match(out, /^ANOTHER PROJECT  \(1\)   its paths start in folders this repository does not have, so its findings are held back$/m);
@@ -89,7 +98,7 @@ test('SARIF carries one result per finding, with the rule, the level, the file a
   const run = sarif.runs[0];
   assert.equal(run.tool.driver.name, 'prumo');
   assert.equal(run.tool.driver.version, '9.9.9');
-  assert.equal(run.tool.driver.rules.length, 6);
+  assert.equal(run.tool.driver.rules.length, 7);
   assert.deepEqual(run.results.map((r) => [r.ruleId, r.level, r.locations[0].physicalLocation.artifactLocation.uri, r.locations[0].physicalLocation.region?.startLine]), [
     ['case-mismatch', 'error', 'CLAUDE.md', 18],
     ['broken-link', 'warning', 'CLAUDE.md', 21],

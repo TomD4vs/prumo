@@ -16,6 +16,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | --- | --- |
 | Negação, lida no parágrafo | *"o projeto não publica `config/x.php`"* nomeia um arquivo que **não pode** existir. O grep vê caminho morto; quem lê vê frase certa. Uma frase que faz da existência uma condição, *"se `docs/contexto.md` existir, leia"*, diz o mesmo sobre o arquivo que nomeia. |
 | Um arquivo que documenta outro projeto | Um arquivo de contexto cujos caminhos citados começam, na maior parte, em pastas que este repositório não tem é um modelo, ou uma skill escrita para a base de código em que vai ser instalada. Seus achados ficam retidos atrás de uma linha que o nomeia, e um arquivo nomeado na linha de comando é sempre checado por inteiro. Na quarta passagem, dezenove dos vinte e nove falsos estavam em seis repositórios onde nada era real, e na oitava todo falso que sobrou fora dos catálogos tinha essa forma. A pasta é o sinal porque uma nota envelhecida ainda cita as pastas que o repositório tem. |
+| Uma regra viva por um glob, uma pasta de regras guardada para várias stacks | Uma regra do Cursor ou uma instrução do Copilot se acopla quando qualquer um de seus globs casa, então um glob morto ao lado de um vivo fica em paz; só uma regra em que nenhum glob alcança um arquivo é reportada. E uma pasta de regras em que a maioria das regras não casa com nada aqui é um catálogo escrito para os projetos em que vai ser copiado, retido como fica um arquivo que documenta outro projeto. Na décima primeira passagem, todo glob que uma primeira versão reportou um a um estava ao lado de um vivo. |
 | Bloco cercado lido como código, comentário não lido | Um caminho dentro de um bloco ```` ``` ```` é um comando ou uma árvore de arquivos e é checado como tal, com a frase acima do bloco como contexto. Um link ali está sendo citado, como qualquer coisa dentro de `<!-- -->`, e nenhum dos dois é checado. Uma linha de comentário dentro do bloco é o que um comando imprime, e `./nome` sem pasta é um argumento que o leitor fornece. Um bloco numa linguagem de programação, `js` ou `python`, é código-fonte, e uma string ali é um especificador de módulo que a linguagem resolve, então ele não é lido. |
 | Um caminho que a frase diz que é escrito | *"Output: `docs/report.md`"*, *"salve o plano em `docs/plano.md`"* e *"`docs/run.log` é gerado pelo build"* nomeiam um arquivo que ainda não existe por definição. O verbo mais perto do caminho na frase decide, então *"leia `a` e escreva o resultado em `b`"* mantém `a` checado, e um verbo depois do caminho só conta na voz passiva, porque *"`x` cria usuários"* faz do caminho o autor. Uma lista, uma tabela ou um bloco cercado toma o veredito da frase que os apresenta ou do título da seção; num comando, um redirecionamento `>`, uma flag `-o` e `mkdir` marcam o que é escrito. Um caminho com a caixa errada é reportado diga a frase o que disser. |
 | Nota histórica é isenta | Uma entrada chamada *fase 3 concluída* cita o que foi removido depois. Esse é o assunto dela, não um defeito. |
@@ -318,6 +319,46 @@ quinto seguem intocados, e os quarenta e quatro do nono vão de 69 achados para 
 reais, 42% para 51%. Dentro dos catálogos do oitavo e do nono, um arquivo que perde um caminho de
 exemplo para a regra de marcador pode cair abaixo do portão, e seus outros achados reaparecem:
 vinte e oito lá e sete aqui, arquivos de execução e caminhos de outro projeto, nenhum real.
+
+Uma décima primeira passagem, para a 0.7.0, é a primeira medição da quinta checagem, e rodou em
+todos os corpora de uma vez, os oito acima, porque a checagem é nova e as três mais antigas não
+mudaram: nos corpora fixos esta release não remove nem acrescenta nada fora da seção nova. A
+primeira versão da checagem, rodada antes de qualquer decisão, levantou mais de cinco mil achados
+nos oito, quase todos errados dos mesmos poucos jeitos, e as seis decisões que vieram depois foram
+tomadas sobre esse material, então o número abaixo é ajustado; um décimo segundo corpus seria o
+primeiro número honesto desta checagem. O `name` de uma skill era cobrado contra a pasta, e só o
+oitavo corpus tinha 3767 skills com nome diferente da pasta sob um host que trata o nome como
+rótulo, então a comparação foi retirada. Cada glob de uma regra era reportado um a um, e cada um dos
+oito reportados no nono e no décimo primeiro estava ao lado de um glob vivo na mesma regra, então
+uma regra só é reportada quando nenhum de seus globs casa. Uma `description:` espalhada por uma
+segunda linha indentada era lida como vazia. Uma pasta de regras escrita para várias stacks tinha a
+maioria das regras morta, 14 de 16 e 5 de 7 no quinto, e agora fica retida como fica um arquivo que
+documenta outro projeto. Um glob escrito como extensão nua, `.cpp`, num repositório com duzentos
+arquivos `.cpp`, é lido como qualquer arquivo `.cpp`. E um `SKILL.md` fora da pasta de skills de
+um host cujo frontmatter segue outro esquema, 48 no oitavo com `metadata:` ou `slug:` e sem
+`name`, deixou de ser lido como skill.
+
+| Repositórios públicos, décima primeira passagem, a checagem de configuração do agente, 0.6.0 a 0.7.0 | |
+| --- | ---: |
+| Repositórios checados | 443 |
+| Com `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` ou `.claude/settings.json` rastreado | 64 |
+| Regras com globs, em `.cursor/rules/` e `.github/instructions/` | 939 |
+| Arquivos `SKILL.md` que o git rastreia sob uma pasta `skills/` | 103786 |
+| Desses, sob `.claude/skills/` ou `.agents/skills/` | 13409 |
+| Achados | 689 |
+| Num único repositório cujas 666 skills não têm frontmatter | 666 |
+| Fora dele | 23 |
+| Reais | 23 |
+| Regras reportadas mortas, fora da pasta retida | 0 |
+| Scripts nomeados por um servidor ou um hook e ausentes | 0 |
+
+Cada um dos vinte e três é um `SKILL.md` sob `.claude/skills/` ou `.agents/skills/` sem
+frontmatter nenhum, em sete repositórios: dez deles são um acidente só, arquivos achatados numa
+única linha sem nenhuma quebra, e dois são um `AGENTS.md` e um `CLAUDE.md` copiados com nome de
+skill. O que a passagem diz sobre as outras formas é só que elas são raras no material público.
+Nenhuma regra foi reportada morta fora da pasta retida, e nenhum servidor ou hook nomeou script
+ausente nos sessenta e quatro repositórios que configuram um, então para essas duas formas os testes
+unitários e a simulação são a única evidência, e a precisão delas segue sem medida.
 
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
