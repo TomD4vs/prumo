@@ -25,6 +25,10 @@ inputs:
     description: Whether the step fails when there is something to review. Set to false to only annotate.
     required: false
     default: 'true'
+  since:
+    description: Check only the context files changed since this commit or branch, such as origin/main. Needs a checkout with the history that reaches it.
+    required: false
+    default: ''
 outputs:
   total:
     description: How many findings there were.
@@ -40,16 +44,16 @@ runs:
         PRUMO_FORMAT: ${{ inputs.format }}
         PRUMO_SARIF: ${{ inputs.sarif-file }}
         PRUMO_FAIL: ${{ inputs.fail-on-findings }}
+        PRUMO_SINCE: ${{ inputs.since }}
       run: |
         set +e
         json="$RUNNER_TEMP/prumo-$RANDOM.json"
-        if [ -n "$PRUMO_SARIF" ]; then
-          node "$GITHUB_ACTION_PATH/bin/prumo.mjs" "$PRUMO_PATH" $PRUMO_TARGETS --format "$PRUMO_FORMAT" --json "$json" --sarif "$PRUMO_SARIF"
-        else
-          node "$GITHUB_ACTION_PATH/bin/prumo.mjs" "$PRUMO_PATH" $PRUMO_TARGETS --format "$PRUMO_FORMAT" --json "$json"
-        fi
+        args=("$PRUMO_PATH" $PRUMO_TARGETS --format "$PRUMO_FORMAT" --json "$json")
+        if [ -n "$PRUMO_SARIF" ]; then args+=(--sarif "$PRUMO_SARIF"); fi
+        if [ -n "$PRUMO_SINCE" ]; then args+=(--since "$PRUMO_SINCE"); fi
+        node "$GITHUB_ACTION_PATH/bin/prumo.mjs" "${args[@]}"
         code=$?
-        total=$(node -e "const r=require(process.argv[1]);console.log(r.caseMismatch.length+r.brokenLinks.length+r.missingPaths.length+r.unknownCommands.length+r.orphans.length)" "$json" 2>/dev/null || echo 0)
+        total=$(node -e "const r=require(process.argv[1]);console.log(r.caseMismatch.length+r.brokenLinks.length+r.missingPaths.length+r.unknownCommands.length+(r.configIssues||[]).length+r.orphans.length)" "$json" 2>/dev/null || echo 0)
         echo "total=$total" >> "$GITHUB_OUTPUT"
         if [ "$code" = 2 ]; then exit 2; fi
         if [ "$PRUMO_FAIL" = "true" ]; then exit "$code"; fi

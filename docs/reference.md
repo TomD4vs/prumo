@@ -26,6 +26,10 @@ prumo [repo] [target...] [options]
 | `--json FILE` | Also write the findings to `FILE` as JSON |
 | `--quiet` | Print nothing; use the exit code |
 | `--no-config` | Ignore `.prumorc.json` |
+| `--baseline` | Record the current findings in `.prumo-baseline.json`; later runs fail only on what is new |
+| `--no-baseline` | Ignore `.prumo-baseline.json` for this run |
+| `--staged` | Check only the context files staged for commit |
+| `--since REF` | Check only the context files changed since `REF`, a commit or a branch |
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
@@ -164,6 +168,7 @@ Three ways in, all the same check.
     format: github             # github annotates the pull request; text, json and sarif are the others
     sarif-file: ''             # also write SARIF here, for the upload below
     fail-on-findings: 'true'   # 'false' only annotates
+    since: ''                  # check only the context files changed since this commit or branch
 ```
 
 Every value above is the default, so the one-line form in the README is this same step. The step's `total` output is the number of findings.
@@ -177,15 +182,17 @@ Every value above is the default, so the one-line form in the README is this sam
   with: { sarif_file: prumo.sarif }
 ```
 
-**pre-commit.** The repository ships a hook for the [pre-commit](https://pre-commit.com) framework. It runs when a staged file is one prumo auto-detects, checks the whole repository, since a note can point at any file, and blocks the commit on a finding:
+**pre-commit.** The repository ships a hook for the [pre-commit](https://pre-commit.com) framework. It runs when a staged file is one prumo auto-detects, checks the staged context files against the whole index, and blocks the commit on a finding:
 
 ```yaml
 repos:
   - repo: https://github.com/TomD4vs/prumo
-    rev: v0.6.0
+    rev: v0.7.1
     hooks:
       - id: prumo
 ```
+
+**Only what changed.** `--staged` checks the context files staged for commit and nothing else, and `--since REF` the ones changed since a commit or a branch, `--since origin/main` on a pull request. The checks still run against the whole index, so a staged note that cites a file the commit does not touch is checked in full; what neither limit sees is a note left untouched while the file it cites was renamed, which is why the full run belongs on the main branch or on a schedule. The header says which limit applied, and a run that reaches no context file exits 0. The action takes the same limit through its `since` input, and the checkout then needs the history that reaches the branch, `fetch-depth: 0` on `actions/checkout`.
 
 ## Silencing a finding
 
@@ -215,7 +222,11 @@ Placed on the line before a fenced block, `<!-- prumo-ignore-next-line -->` sile
 }
 ```
 
-`ignore`, `exclude` and `transient` accept globs (`*`, `**`, `?`); a pattern with no wildcard that names a folder covers everything under it. `--no-config` bypasses the file for one run. Suppressions are counted in the header, so a silenced repository never reads as a clean one.
+`ignore`, `exclude` and `transient` accept globs (`*`, `**`, `?`); a pattern with no wildcard that names a folder covers everything under it. `--no-config` bypasses the file for one run.
+
+A baseline, for a repository with a backlog. `prumo --baseline` records every finding of the run in `.prumo-baseline.json` at the repository root, and from then on a run holds those back, fails only on what is new, and says in the header how many it held. Commit the file, so CI and the hooks read the same baseline. A finding is recorded by its kind, its file and the path it cites, with how many lines cite it; line numbers are left out, since they move with every edit. When a held finding is fixed, the header says that an entry matches nothing now, and running `--baseline` again rewrites the file with what remains. `--no-baseline` ignores the file for one run, `--fix` touches only what is reported, and the MCP server applies the baseline it finds but never writes one, since holding a finding back is a decision for a person.
+
+Suppressions and the baseline are counted in the header, so a silenced repository never reads as a clean one.
 
 ---
 

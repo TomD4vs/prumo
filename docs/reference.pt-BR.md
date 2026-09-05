@@ -26,6 +26,10 @@ prumo [repo] [alvo...] [opções]
 | `--json ARQ` | Também grava os achados em `ARQ` como JSON |
 | `--quiet` | Não imprime nada; use o código de saída |
 | `--no-config` | Ignora o `.prumorc.json` |
+| `--baseline` | Grava os achados atuais em `.prumo-baseline.json`; as rodadas seguintes só falham no que é novo |
+| `--no-baseline` | Ignora o `.prumo-baseline.json` nesta rodada |
+| `--staged` | Checa só os arquivos de contexto preparados para o commit |
+| `--since REF` | Checa só os arquivos de contexto alterados desde `REF`, um commit ou um branch |
 | `-h`, `--help` | Mostra a ajuda |
 | `-v`, `--version` | Mostra a versão |
 
@@ -164,6 +168,7 @@ Três portas de entrada, a mesma checagem.
     format: github             # github anota o pull request; text, json e sarif são os outros
     sarif-file: ''             # também grava SARIF aqui, para o envio abaixo
     fail-on-findings: 'true'   # 'false' só anota
+    since: ''                  # checa só os arquivos de contexto alterados desde este commit ou branch
 ```
 
 Todo valor acima é o padrão, então a forma de uma linha do README é este mesmo passo. A saída `total` do passo é o número de achados.
@@ -177,15 +182,17 @@ Todo valor acima é o padrão, então a forma de uma linha do README é este mes
   with: { sarif_file: prumo.sarif }
 ```
 
-**pre-commit.** O repositório traz um hook para o framework [pre-commit](https://pre-commit.com). Ele roda quando um arquivo em stage é um dos que o prumo detecta sozinho, checa o repositório inteiro, porque uma nota pode apontar para qualquer arquivo, e bloqueia o commit quando há achado:
+**pre-commit.** O repositório traz um hook para o framework [pre-commit](https://pre-commit.com). Ele roda quando um arquivo em stage é um dos que o prumo detecta sozinho, checa os arquivos de contexto em stage contra o índice inteiro, e bloqueia o commit quando há achado:
 
 ```yaml
 repos:
   - repo: https://github.com/TomD4vs/prumo
-    rev: v0.6.0
+    rev: v0.7.1
     hooks:
       - id: prumo
 ```
+
+**Só o que mudou.** `--staged` checa os arquivos de contexto em stage para o commit e nada mais, e `--since REF` os alterados desde um commit ou um branch, `--since origin/main` num pull request. As checagens continuam rodando contra o índice inteiro, então uma nota em stage que cita um arquivo que o commit não toca é checada por inteiro; o que nenhum dos dois limites enxerga é uma nota intocada enquanto o arquivo que ela cita foi renomeado, e por isso a rodada completa pertence ao branch principal ou a um agendamento. O cabeçalho diz qual limite valeu, e uma rodada que não alcança arquivo de contexto nenhum sai com 0. A action recebe o mesmo limite pela entrada `since`, e o checkout então precisa do histórico que alcança o branch, `fetch-depth: 0` no `actions/checkout`.
 
 ## Silenciando um achado
 
@@ -215,7 +222,11 @@ Colocado na linha anterior a um bloco de código cercado, o `<!-- prumo-ignore-n
 }
 ```
 
-`ignore`, `exclude` e `transient` aceitam globs (`*`, `**`, `?`); um padrão sem curinga que nomeia uma pasta cobre tudo o que está dentro dela. O `--no-config` ignora o arquivo por uma execução. As supressões são contadas no cabeçalho, então um repositório silenciado nunca se parece com um limpo.
+`ignore`, `exclude` e `transient` aceitam globs (`*`, `**`, `?`); um padrão sem curinga que nomeia uma pasta cobre tudo o que está dentro dela. O `--no-config` ignora o arquivo por uma execução.
+
+Um baseline, para um repositório com passivo. `prumo --baseline` grava todo achado da rodada em `.prumo-baseline.json` na raiz do repositório, e daí em diante uma rodada retém esses, falha só no que é novo, e diz no cabeçalho quantos reteve. Faça commit do arquivo, para que o CI e os hooks leiam o mesmo baseline. Um achado é gravado pelo tipo, pelo arquivo e pelo caminho que cita, com quantas linhas o citam; o número da linha fica de fora, porque muda a cada edição. Quando um achado retido é corrigido, o cabeçalho diz que uma entrada não casa mais com nada, e rodar `--baseline` de novo reescreve o arquivo com o que sobrou. O `--no-baseline` ignora o arquivo por uma execução, o `--fix` toca só o que foi reportado, e o servidor MCP aplica o baseline que encontra mas nunca grava um, porque reter um achado é decisão de uma pessoa.
+
+As supressões e o baseline são contados no cabeçalho, então um repositório silenciado nunca se parece com um limpo.
 
 ---
 

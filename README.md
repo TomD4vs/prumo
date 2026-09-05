@@ -143,7 +143,7 @@ jobs:
       - uses: TomD4vs/prumo@v1
 ```
 
-It annotates the exact line of the pull request and fails the job when something needs review. `npx @tomd4vs/prumo --quiet` after `actions/setup-node` does the same in any pipeline. Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. `--sarif FILE` writes the findings for code scanning, and `.pre-commit-hooks.yaml` runs the same check before each commit through the pre-commit framework. The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
+It annotates the exact line of the pull request and fails the job when something needs review. `npx @tomd4vs/prumo --quiet` after `actions/setup-node` does the same in any pipeline. Use `actions/checkout` as normal; prumo reads the git index, so a checkout that omits it will not work. In a repository with a backlog, `npx @tomd4vs/prumo --baseline` records what is there once, and later runs fail only on what is new; on a pull request, `--since origin/main` checks only the context files the branch touched. `--sarif FILE` writes the findings for code scanning, and `.pre-commit-hooks.yaml` runs the same check before each commit through the pre-commit framework. The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
 
 ---
 

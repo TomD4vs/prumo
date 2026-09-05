@@ -64,7 +64,7 @@ test('prumo_check returns the text report and the findings as structured content
   assert.equal(s.fixed, null);
   assert.equal(s.caseMismatch[0].cited, 'layouts/App.vue');
   assert.equal(s.brokenLinks[0].cited, 'gone-note');
-  assert.equal(s.schemaVersion, 4);
+  assert.equal(s.schemaVersion, 5);
   assert.equal(typeof s.prumoVersion, 'string');
 });
 

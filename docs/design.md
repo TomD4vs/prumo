@@ -26,7 +26,7 @@ What shipped does the opposite: only the checks that are almost always right, wi
 | A project-name prefix resolved | `myapp/app/api/route.ts` when the repository holds `app/api/route.ts` and has no `myapp/` folder. Only an exact nested match counts, so a wrongly cased first segment is still a case mismatch. |
 | A path that belongs to another repository | A note that names `github.com/other/project` a few lines above the path, and an `@/` alias in a repository holding none of the folders an alias resolves against. Both describe code that lives somewhere else. |
 | A package import is not a path | `@scope/package/style.css` is something npm resolves, not a file here. An `@/` alias keeps its slash right after the `@`, so it is still checked. |
-| Anything only the author knows is fine | `.prumorc.json` and the `prumo-ignore` markers. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
+| Anything only the author knows is fine | `.prumorc.json`, the `prumo-ignore` markers and, for a repository with a backlog, the baseline that holds back what was there when it was recorded. Every suppression is counted in the header, so a silenced repository never reads as a clean one. |
 
 Same tool, same files, with and without the filters:
 

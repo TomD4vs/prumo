@@ -3,6 +3,8 @@
  * text the README shows and every pipe receives; colour is for a terminal only.
  */
 
+import { BASELINE_FILE } from './check.mjs';
+
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 const ESC = '\x1b[';
@@ -29,8 +31,9 @@ function palette(color) {
  * @param {object}  [opts.fixed]   what applyCaseFixes() returned, when --fix ran
  * @param {string}  [opts.jsonPath] file the findings were also written to
  * @param {boolean} [opts.color]   paint it for a terminal
+ * @param {number}  [opts.baselineWritten] how many findings --baseline just recorded
  */
-export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false } = {}) {
+export function renderText(result, { all = false, fixed = null, jsonPath = null, color = false, baselineWritten = null } = {}) {
   const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], configIssues = [], orphans, elsewhere = [], stats } = result;
   const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + configIssues.length + orphans.length;
   const { bold, dim, teal, orange, badge } = palette(color);
@@ -47,6 +50,8 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   if (stats.suppressed) out.push(dim(`        ${plural(stats.suppressed, 'line or file', 'lines or files')} suppressed by a prumo-ignore marker`));
   if (stats.gitignored) out.push(dim(`        ${plural(stats.gitignored, 'path', 'paths')} under .gitignore exempt from path checks`));
   if (stats.untracked) out.push(dim(`        ${plural(stats.untracked, 'context file', 'context files')} not tracked by git`));
+  if (stats.only) out.push(dim(`        only the context files ${stats.only === 'staged' ? 'staged for commit' : `changed ${stats.only}`}`));
+  if (stats.baselined) out.push(dim(`        ${plural(stats.baselined, 'finding', 'findings')} held in ${BASELINE_FILE}${stats.baselineStale ? `; ${plural(stats.baselineStale, 'entry there matches', 'entries there match')} nothing now` : ''}`));
   out.push('');
 
   if (fixed) {
@@ -116,6 +121,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     ].filter(Boolean);
     out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}`));
   }
+  if (baselineWritten !== null) out.push(dim(`baseline: ${BASELINE_FILE}, ${plural(baselineWritten, 'finding', 'findings')} recorded`));
   if (jsonPath) out.push(dim(`json: ${jsonPath}`));
   return out.join('\n');
 }
@@ -169,6 +175,7 @@ export function renderGithub(result) {
   const { caseMismatch, brokenLinks, missingPaths, unknownCommands = [], configIssues = [], orphans, elsewhere = [] } = result;
   const lines = [];
   const say = (level, o, msg) => lines.push(`::${level} file=${o.file},line=${o.line}::${msg}`);
+  if (result.stats && result.stats.baselined) lines.push(`::notice::Baseline: ${plural(result.stats.baselined, 'finding', 'findings')} held in ${BASELINE_FILE}`);
   for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} ${o.unit || 'cited paths'} ${o.unit ? 'reach no file here' : 'start in folders this repository does not have'}; findings held back`);
   for (const o of configIssues) say('warning', o, `Agent config: ${o.cited} ${o.message}`);
   for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);

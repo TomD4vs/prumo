@@ -26,7 +26,7 @@ O que foi lançado faz o contrário: só as checagens que quase sempre acertam, 
 | Prefixo com o nome do projeto resolvido | `meuapp/app/api/route.ts` quando o repositório guarda `app/api/route.ts` e não tem pasta `meuapp/`. Só vale casamento exato e aninhado, então um primeiro segmento com a caixa errada continua sendo case mismatch. |
 | Caminho que pertence a outro repositório | Uma nota que nomeia `github.com/outro/projeto` algumas linhas acima do caminho, e um alias `@/` num repositório que não tem nenhuma das pastas contra as quais um alias resolve. Os dois descrevem código que mora em outro lugar. |
 | Import de pacote não é caminho | `@escopo/pacote/style.css` é algo que o npm resolve, não um arquivo daqui. Um alias `@/` mantém a barra logo depois do `@`, então continua sendo checado. |
-| Algo que só o autor sabe estar certo | `.prumorc.json` e os marcadores `prumo-ignore`. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
+| Algo que só o autor sabe estar certo | `.prumorc.json`, os marcadores `prumo-ignore` e, num repositório com passivo, o baseline que retém o que existia quando foi gravado. Toda supressão é contada no cabeçalho, então um repositório silenciado nunca se parece com um limpo. |
 
 Mesma ferramenta, mesmos arquivos, com e sem os filtros:
 

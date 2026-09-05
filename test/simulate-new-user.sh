@@ -92,8 +92,8 @@ echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted sc
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
-chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 4' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats baselineStale,baselined,configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
+echo "$J" | grep -q '"schemaVersion": 5' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -311,8 +311,36 @@ OUT=$($PR 2>&1); RC=$?
 echo "$OUT" | grep -q "^AGENT CONFIG  (3)" && echo "$OUT" | grep -q "^  .mcp.json:1  scripts/server.mjs" && chk "$RC" "1" "a dead glob, a skill without description and an MCP script that is not here: AGENT CONFIG (3), exit 1" || bad "agent config: $(echo "$OUT" | grep -E 'AGENT|mdc|SKILL|mcp' | tr '\n' '|')"
 OUT=$($PR . CLAUDE.md 2>&1); echo "$OUT" | grep -q "AGENT CONFIG" && bad "config files checked on an explicit run" || ok "naming a target leaves the JSON configs alone"
 
+echo; echo "########## O. A baseline for a legacy repository, and only what a commit or a branch touched"
+mk legado; mkdir -p src docs; echo x > src/app.js
+printf '# app\n\nSee \x60src/App.js\x60 and \x60config/old.php\x60.\n' > CLAUDE.md
+printf '# docs\n\nRead \x60docs/gone.md\x60.\n' > AGENTS.md; ci
+OUT=$($PR --baseline 2>&1); RC=$?
+echo "$OUT" | grep -q "^baseline: .prumo-baseline.json, 3 findings recorded" && [ -f .prumo-baseline.json ] && chk "$RC" "0" "--baseline records the 3 findings in .prumo-baseline.json and exits 0" || bad "baseline write: $(echo "$OUT" | tail -2 | tr '\n' '|') rc=$RC"
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^        3 findings held in .prumo-baseline.json" && echo "$OUT" | grep -q "^nothing to review" && chk "$RC" "0" "the next run holds them back, says so in the header, exit 0" || bad "baseline hold: $(echo "$OUT" | tr '\n' '|')"
+printf 'And \x60docs/new.md\x60.\n' >> CLAUDE.md
+OUT=$($PR 2>&1); RC=$?
+echo "$OUT" | grep -q "^MISSING PATH  (1)" && echo "$OUT" | grep -q "docs/new.md" && echo "$OUT" | grep -q "^1 to review" && chk "$RC" "1" "a new finding fails the run; the held ones stay held" || bad "baseline new: $(echo "$OUT" | tr '\n' '|')"
+OUT=$($PR --no-baseline 2>&1); RC=$?
+echo "$OUT" | grep -q "^4 to review" && chk "$RC" "1" "--no-baseline reports all four" || bad "no-baseline: $(echo "$OUT" | grep 'to review')"
+mkdir -p config; echo x > config/old.php; git add -A >/dev/null 2>&1
+OUT=$($PR 2>&1); echo "$OUT" | grep -q "^        2 findings held in .prumo-baseline.json; 1 entry there matches nothing now" && ok "a resolved finding shows as an entry that matches nothing now" || bad "stale: $(echo "$OUT" | grep held)"
+ci
+J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===5?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 5 in the JSON" || bad "json baseline stats"
+printf 'Read \x60docs/also-gone.md\x60.\n' >> AGENTS.md; git add AGENTS.md >/dev/null 2>&1
+OUT=$($PR --staged 2>&1); RC=$?
+echo "$OUT" | grep -q "^prumo — 1 context file, " && echo "$OUT" | grep -q "^        only the context files staged for commit" && echo "$OUT" | grep -q "docs/also-gone.md" && ! echo "$OUT" | grep -q "docs/new.md" && chk "$RC" "1" "--staged checks the staged AGENTS.md alone" || bad "staged: $(echo "$OUT" | tr '\n' '|')"
+ci
+FIRST=$(git rev-list --max-parents=0 HEAD)
+OUT=$($PR --since "$FIRST" 2>&1); RC=$?
+echo "$OUT" | grep -q "^        only the context files changed since $FIRST" && echo "$OUT" | grep -q "^prumo — 2 context files, " && chk "$RC" "1" "--since REF checks the context files changed since it" || bad "since: $(echo "$OUT" | head -3 | tr '\n' '|')"
+OUT=$($PR --since nope 2>&1); RC=$?; echo "$OUT" | grep -q 'git does not know "nope"' && chk "$RC" "2" "--since with a revision git does not know: message and exit 2" || bad "since unknown: $OUT rc=$RC"
+OUT=$($PR --staged 2>&1); RC=$?; echo "$OUT" | grep -q "^prumo — 0 context files, " && chk "$RC" "0" "--staged with nothing staged checks nothing and exits 0" || bad "staged empty: $(echo "$OUT" | head -2 | tr '\n' '|')"
+grep -q "args: \['--staged'\]" "$HERE/.pre-commit-hooks.yaml" && grep -q '^  since:' "$HERE/action.yml" && ok "the pre-commit hook passes --staged, and the action takes since" || bad "hook args / action since"
+
 if [ "$GLOBAL" = 1 ]; then
-  echo; echo "########## O. npm install -g (opt-in)"
+  echo; echo "########## P. npm install -g (opt-in)"
   npm install -g "$PKG" --silent --no-audit --no-fund >/dev/null 2>&1 && hash -r
   chk "$(prumo --version 2>&1)" "$VERSION" "'prumo --version' after a global install"
   npm uninstall -g @tomd4vs/prumo --silent >/dev/null 2>&1; hash -r

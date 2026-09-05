@@ -5,7 +5,8 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
+import { join } from 'node:path';
+import { analyze, resolveTargets, loadConfig, loadBaseline, baselineOf, changedFiles, hasRootSkill, BASELINE_FILE } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
@@ -37,6 +38,10 @@ OPTIONS
   --sarif F     also write the findings to F as SARIF, for code scanning
   --quiet       print nothing; use the exit code
   --no-config   ignore .prumorc.json
+  --baseline    record the current findings in .prumo-baseline.json; later runs fail only on what is new
+  --no-baseline ignore .prumo-baseline.json for this run
+  --staged      check only the context files staged for commit
+  --since REF   check only the context files changed since REF, a commit or a branch
   -h, --help
   -v, --version
 
@@ -61,6 +66,7 @@ EXAMPLES
   prumo . docs/notes
   prumo --fix
   prumo --format github
+  prumo --since origin/main
 `;
 
 const argv = process.argv.slice(2);
@@ -76,9 +82,12 @@ const valueAt = (flag) => {
 const jsonArg = valueAt('--json');
 const sarifArg = valueAt('--sarif');
 const formatArg = valueAt('--format');
+const sinceArg = valueAt('--since');
 
 if (argv.includes('--json') && !jsonArg.value) { console.error('prumo: --json needs a file path'); process.exit(2); }
 if (argv.includes('--sarif') && !sarifArg.value) { console.error('prumo: --sarif needs a file path'); process.exit(2); }
+if (argv.includes('--since') && !sinceArg.value) { console.error('prumo: --since needs a commit or a branch'); process.exit(2); }
+if (argv.includes('--since') && argv.includes('--staged')) { console.error('prumo: use --staged or --since, one at a time'); process.exit(2); }
 
 const FORMAT = formatArg.value || 'text';
 if (!['text', 'github', 'json', 'sarif'].includes(FORMAT)) {
@@ -86,8 +95,8 @@ if (!['text', 'github', 'json', 'sarif'].includes(FORMAT)) {
   process.exit(2);
 }
 
-const KNOWN = new Set(['--all', '--json', '--sarif', '--quiet', '--fix', '--format', '--no-config', '--help', '--version', '-h', '-v']);
-const valueIndexes = new Set([jsonArg.index, sarifArg.index, formatArg.index].filter((i) => i > 0));
+const KNOWN = new Set(['--all', '--json', '--sarif', '--quiet', '--fix', '--format', '--no-config', '--baseline', '--no-baseline', '--staged', '--since', '--help', '--version', '-h', '-v']);
+const valueIndexes = new Set([jsonArg.index, sarifArg.index, formatArg.index, sinceArg.index].filter((i) => i > 0));
 const unknown = argv.find((a, i) => a.startsWith('-') && !valueIndexes.has(i) && !KNOWN.has(a));
 if (unknown) {
   console.error(`prumo: unknown option "${unknown}". Run "prumo --help" to see the options.`);
@@ -97,10 +106,12 @@ if (unknown) {
 const ALL = argv.includes('--all');
 const QUIET = argv.includes('--quiet');
 const FIX = argv.includes('--fix');
+const STAGED = argv.includes('--staged');
+const WRITE_BASELINE = argv.includes('--baseline');
 const positional = argv.filter((a, i) => !a.startsWith('-') && !valueIndexes.has(i));
 const repo = positional[0] || '.';
 
-let result, targets, config;
+let result, targets, config, baseline = null, only = null;
 try {
   config = argv.includes('--no-config') ? {} : loadConfig(repo);
   const explicit = positional.slice(1).length ? positional.slice(1) : (config.targets || []);
@@ -113,7 +124,9 @@ try {
       : 'prumo: no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');
     process.exit(2);
   }
-  result = analyze({ repo, targets, config });
+  if (STAGED || sinceArg.value) only = { paths: changedFiles(repo, { staged: STAGED, since: sinceArg.value || '' }), label: STAGED ? 'staged' : `since ${sinceArg.value}` };
+  if (!WRITE_BASELINE && !argv.includes('--no-baseline')) baseline = loadBaseline(repo);
+  result = analyze({ repo, targets, config, baseline, only });
 } catch (err) {
   console.error(`prumo: ${err.message}`);
   process.exit(2);
@@ -122,11 +135,18 @@ try {
 let fixed = null;
 if (FIX && result.caseMismatch.length) {
   fixed = applyCaseFixes(result.caseMismatch, targets);
-  result = analyze({ repo, targets, config });
+  result = analyze({ repo, targets, config, baseline, only });
 }
 
 const { caseMismatch, brokenLinks, missingPaths, unknownCommands, configIssues, orphans, stats } = result;
 const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + configIssues.length + orphans.length;
+
+let recorded = null;
+if (WRITE_BASELINE) {
+  const b = baselineOf(result);
+  writeFileSync(join(repo, BASELINE_FILE), JSON.stringify(b, null, 2) + '\n');
+  recorded = b.findings.reduce((n, e) => n + e.count, 0);
+}
 
 if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(result, null, 2));
 if (sarifArg.value) writeFileSync(sarifArg.value, renderSarif(result));
@@ -141,7 +161,7 @@ if (!QUIET && FORMAT === 'json') {
 } else if (!QUIET) {
   const color = wantsColor();
   const head = wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '';
-  console.log(head + renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value, color }));
+  console.log(head + renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value, color, baselineWritten: recorded }));
 }
 
-process.exit(total ? 1 : 0);
+process.exit(WRITE_BASELINE ? 0 : total ? 1 : 0);

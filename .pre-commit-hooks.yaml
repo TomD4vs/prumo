@@ -2,16 +2,17 @@
 #
 #   repos:
 #     - repo: https://github.com/TomD4vs/prumo
-#       rev: v0.6.0
+#       rev: v0.7.1
 #       hooks:
 #         - id: prumo
 #
-# The hook runs when a staged file is one prumo auto-detects, and checks the whole repository,
-# since a note can point at any file. Exit code 1 blocks the commit until the findings are reviewed.
+# The hook runs when a staged file is one prumo auto-detects, and checks the staged context files
+# against the whole git index. Exit code 1 blocks the commit until the findings are reviewed.
 - id: prumo
   name: prumo
   description: Checks the context files your coding agent reads against the git index.
   entry: prumo
+  args: ['--staged']
   language: node
   pass_filenames: false
   files: '(^|[/])(CLAUDE([.]local)?[.]md|AGENTS?[.]md|(GEMINI|COPILOT|JULES|CONVENTIONS|MEMORY)[.]md|[.](cursor|cline|windsurf)rules|copilot-instructions[.]md)$|(^|[/])[.](cursor|windsurf|roo)[/]rules[/]|(^|[/])[.]github[/]instructions[/]|(^|[/])[.]claude[/]commands[/]|[/]SKILL[.]md$'

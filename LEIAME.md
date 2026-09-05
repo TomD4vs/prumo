@@ -143,7 +143,7 @@ jobs:
       - uses: TomD4vs/prumo@v1
 ```
 
-Ela anota a linha exata do pull request e faz o job falhar quando há algo a revisar. `npx @tomd4vs/prumo --quiet` depois do `actions/setup-node` faz o mesmo em qualquer pipeline. Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. `--sarif ARQ` grava os achados para o code scanning, e o `.pre-commit-hooks.yaml` roda a mesma checagem antes de cada commit pelo framework pre-commit. As entradas da action, o envio do SARIF e o bloco do pre-commit estão na [referência](docs/reference.pt-BR.md#integração-contínua).
+Ela anota a linha exata do pull request e faz o job falhar quando há algo a revisar. `npx @tomd4vs/prumo --quiet` depois do `actions/setup-node` faz o mesmo em qualquer pipeline. Use o `actions/checkout` normalmente; o prumo lê o índice do git, então um checkout que o dispense não funciona. Num repositório com passivo, `npx @tomd4vs/prumo --baseline` grava o que existe uma vez, e as rodadas seguintes só falham no que é novo; num pull request, `--since origin/main` checa só os arquivos de contexto que o branch tocou. `--sarif ARQ` grava os achados para o code scanning, e o `.pre-commit-hooks.yaml` roda a mesma checagem antes de cada commit pelo framework pre-commit. As entradas da action, o envio do SARIF e o bloco do pre-commit estão na [referência](docs/reference.pt-BR.md#integração-contínua).
 
 ---
 

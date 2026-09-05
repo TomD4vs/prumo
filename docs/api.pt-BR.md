@@ -7,12 +7,14 @@
 ## Uso programático
 
 ```js
-import { analyze, resolveTargets } from '@tomd4vs/prumo';
+import { analyze, resolveTargets, loadBaseline, changedFiles } from '@tomd4vs/prumo';
 
 const targets = resolveTargets('.', []);          // [] = detectar sozinho
 const result  = analyze({ repo: '.', targets });
+// com o baseline da raiz, e só os arquivos em stage para o commit:
+// analyze({ repo: '.', targets, baseline: loadBaseline('.'), only: { paths: changedFiles('.', { staged: true }), label: 'staged' } })
 
-console.log(result.schemaVersion);  // 4, sobe quando este formato muda
+console.log(result.schemaVersion);  // 5, sobe quando este formato muda
 console.log(result.prumoVersion);   // a versão que rodou
 console.log(result.repo);           // caminho absoluto do repositório checado
 console.log(result.checkedAt);      // quando, como data ISO 8601
@@ -23,10 +25,12 @@ console.log(result.unknownCommands); // [{ file, line, cited, name, source, sugg
 console.log(result.configIssues);   // [{ file, line, kind, cited, message }]
 console.log(result.orphans);        // ['nota-que-ninguem-linka.md']
 console.log(result.elsewhere);      // [{ file, cited, absent, unit? }]
-console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs }
+console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, only? }
 ```
 
-Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada.
+Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada; e para 5 com `stats.baselined`, os achados que um baseline reteve, `stats.baselineStale`, as entradas dele que não casam mais com nada, e `stats.only`, presente como `staged` ou `since REF` quando a rodada foi limitada ao que mudou.
+
+`loadBaseline(repo)` lê o `.prumo-baseline.json` da raiz do repositório, ou devolve null; `baselineOf(result)` monta o objeto que o `--baseline` grava; `changedFiles(repo, { staged: true })` ou `changedFiles(repo, { since: REF })` é o conjunto de caminhos que o `only` recebe, ao lado de um `label` para o cabeçalho; e `BASELINE_FILE` é o nome do arquivo.
 
 `kind` é `wikilink`, `link` ou `anchor`, este último um link para um título que a página de destino não tem. Num case mismatch ele só aparece quando o caminho veio de um link markdown, e aí `actual` é relativo ao arquivo que contém o link, como o próprio link. Num comando desconhecido, `cited` é o comando como a nota o escreve, `name` o script ou alvo que ele nomeia, `source` o tipo de arquivo que deveria defini-lo, e `suggestion` o mesmo comando com o nome definido mais próximo.
 

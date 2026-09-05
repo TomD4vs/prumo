@@ -5,13 +5,13 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:path';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const DEFAULT_TARGETS = [
   'CLAUDE.md',
@@ -178,6 +178,55 @@ export function loadConfig(repo) {
   } catch {
     throw new Error('.prumorc.json is not valid JSON');
   }
+}
+
+/** The baseline: findings recorded once, at the repository root, and held back on later runs so only what is new fails. */
+export const BASELINE_FILE = '.prumo-baseline.json';
+
+/** What each list of findings is called in the baseline, in SARIF and in the GitHub output. */
+const KIND_OF = { caseMismatch: 'case-mismatch', brokenLinks: 'broken-link', missingPaths: 'missing-path', unknownCommands: 'unknown-command', configIssues: 'agent-config' };
+
+/** The identity of a finding across runs: its kind, its file and what it cites. Line numbers move, so they are left out. */
+const keyOf = (kind, file, cited) => `${kind}\0${file}\0${cited}`;
+
+/**
+ * Reads the baseline from the repository root. Absent means none. Invalid is an error rather than a
+ * silent nothing, since a baseline that failed to load would make every finding it holds fail again.
+ */
+export function loadBaseline(repo) {
+  const path = join(repo, BASELINE_FILE);
+  if (!existsSync(path)) return null;
+  let raw;
+  try { raw = JSON.parse(readTextFile(path)); } catch { throw new Error(`${BASELINE_FILE} is not valid JSON`); }
+  if (!raw || !Array.isArray(raw.findings)) throw new Error(`${BASELINE_FILE} has no "findings" list`);
+  return raw;
+}
+
+/** The baseline a result leaves behind: one entry per kind, file and cited path, with how many lines cite it, in a stable order. */
+export function baselineOf(result) {
+  const entries = new Map();
+  const note = (kind, file, cited) => {
+    const k = keyOf(kind, file, cited);
+    const e = entries.get(k) || { kind, file, cited, count: 0 };
+    e.count++;
+    entries.set(k, e);
+  };
+  for (const [list, kind] of Object.entries(KIND_OF)) for (const o of result[list] || []) note(kind, o.file, o.cited);
+  for (const file of result.orphans || []) note('not-in-index', file, '');
+  const findings = [...entries.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.file.localeCompare(b.file) || a.cited.localeCompare(b.cited));
+  return { prumoVersion: VERSION, recordedAt: new Date().toISOString(), findings };
+}
+
+/**
+ * The files a commit would carry, with `staged`, or the ones changed since a revision, as paths
+ * relative to the repository root. Deleted files are left out, since there is nothing to check in them.
+ */
+export function changedFiles(repo, { staged = false, since = '' } = {}) {
+  const args = staged ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'] : ['diff', '--name-only', '--diff-filter=ACMR', '-z', since];
+  let out;
+  try { out = execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }); }
+  catch (e) { throw new Error(since ? `--since: git does not know "${since}"` : `git diff failed: ${String(e.stderr || e.message).trim()}`); }
+  return new Set(out.split('\0').filter(Boolean));
 }
 
 function readTextFile(path) {
@@ -918,9 +967,11 @@ function configFileIssues(rel, text, repo, index, ignored, resolveOnce) {
  * not only at the notes being checked, so `linkable` is built from the whole index.
  * A path is reported on every line that cites it, and a path that a sentence excuses stays
  * excused on the lines of that file that follow, since they speak of the same file.
+ * `only` limits the targets and the configuration files to the paths it holds, for a run over what
+ * a commit or a branch touched. `baseline` holds back the findings it records, counted in `stats.baselined`.
  * @returns {{schemaVersion:number, prumoVersion:string, repo:string, checkedAt:string, caseMismatch:[], brokenLinks:[], missingPaths:[], orphans:[], stats:{}}}
  */
-export function analyze({ repo, targets, config = null }) {
+export function analyze({ repo, targets, config = null, baseline = null, only = null }) {
   const index = buildIndex(repo);
   if (!index) throw new Error(`not a git repository: ${repo}`);
   if (!index.tracked.length) throw new Error('the git index is empty, so nothing can be checked against it. Commit or "git add" the files first.');
@@ -930,7 +981,7 @@ export function analyze({ repo, targets, config = null }) {
   const ignored = makeMatcher(settings.ignore);
   const excluded = makeMatcher(settings.exclude);
   const extraTransient = makeMatcher(settings.transient);
-  const checked = targets.filter((t) => !excluded(t.label));
+  const checked = targets.filter((t) => !excluded(t.label) && (!only || only.paths.has(t.label)));
   const inIndex = (t) => {
     const rel = relative(repo, t.path).split(sep).join('/');
     return index.known.has(rel) || index.lower.has(rel.toLowerCase());
@@ -1168,7 +1219,7 @@ export function analyze({ repo, targets, config = null }) {
 
   if (autoRun) {
     for (const rel of CONFIG_FILES) {
-      if (!index.known.has(rel) || excluded(rel)) continue;
+      if (!index.known.has(rel) || excluded(rel) || (only && !only.paths.has(rel))) continue;
       const text = readTextFile(join(repo, rel));
       if (text === null) continue;
       configs++;
@@ -1199,6 +1250,32 @@ export function analyze({ repo, targets, config = null }) {
     }
   }
 
+  let baselined = 0, baselineStale = 0;
+  if (baseline) {
+    const left = new Map();
+    for (const e of baseline.findings) if (e && typeof e.kind === 'string' && typeof e.file === 'string') left.set(keyOf(e.kind, e.file, e.cited ?? ''), Math.max(1, Number(e.count) || 1));
+    const met = new Set();
+    const held = (kind, file, cited) => {
+      const k = keyOf(kind, file, cited);
+      const n = left.get(k);
+      if (!n) return false;
+      left.set(k, n - 1);
+      met.add(k);
+      baselined++;
+      return true;
+    };
+    const lists = { caseMismatch, brokenLinks, missingPaths, unknownCommands, configIssues };
+    for (const [name, kind] of Object.entries(KIND_OF)) {
+      const kept = lists[name].filter((o) => !held(kind, o.file, o.cited));
+      lists[name].length = 0;
+      lists[name].push(...kept);
+    }
+    const keptOrphans = orphans.filter((file) => !held('not-in-index', file, ''));
+    orphans.length = 0;
+    orphans.push(...keptOrphans);
+    for (const k of left.keys()) if (!met.has(k)) baselineStale++;
+  }
+
   return {
     schemaVersion: SCHEMA_VERSION,
     prumoVersion: VERSION,
@@ -1211,6 +1288,6 @@ export function analyze({ repo, targets, config = null }) {
     configIssues,
     orphans,
     elsewhere,
-    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked, configs },
+    stats: { tracked: index.tracked.length, targets: checked.length, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, ...(only ? { only: only.label } : {}) },
   };
 }

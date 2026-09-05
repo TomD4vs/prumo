@@ -7,7 +7,7 @@
 
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { analyze, resolveTargets, loadConfig, hasRootSkill } from '../src/check.mjs';
+import { analyze, resolveTargets, loadConfig, loadBaseline, hasRootSkill } from '../src/check.mjs';
 import { applyCaseFixes } from '../src/fix.mjs';
 import { renderText } from '../src/report.mjs';
 
@@ -28,7 +28,7 @@ const TOOLS = [
   {
     name: 'prumo_check',
     description:
-      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]], markdown links and heading anchors, paths that no longer exist, commands naming a script or target no package.json, Makefile or composer.json defines, agent configuration that points at nothing (a rule whose globs match no file, a skill without a description, an MCP server or a hook naming a missing script), and notes an index never mentions. Nothing is written.',
+      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]], markdown links and heading anchors, paths that no longer exist, commands naming a script or target no package.json, Makefile or composer.json defines, agent configuration that points at nothing (a rule whose globs match no file, a skill without a description, an MCP server or a hook naming a missing script), and notes an index never mentions. Findings recorded in a .prumo-baseline.json at the repository root are held back and counted in stats.baselined. Nothing is written.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG },
@@ -58,11 +58,12 @@ function run(name, { repo = '.', targets: explicit = [] } = {}) {
     ? 'no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Pass targets ["SKILL.md"] to check it.'
     : 'no context files found. Pass targets, or create a CLAUDE.md / AGENTS.md.');
 
-  let result = analyze({ repo, targets, config });
+  const baseline = loadBaseline(repo);
+  let result = analyze({ repo, targets, config, baseline });
   let fixed = null;
   if (name === 'prumo_fix' && result.caseMismatch.length) {
     fixed = applyCaseFixes(result.caseMismatch, targets);
-    result = analyze({ repo, targets, config });
+    result = analyze({ repo, targets, config, baseline });
   }
   return { result, fixed };
 }
