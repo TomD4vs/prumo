@@ -76,7 +76,7 @@ MISSING PATH  (1)   paths cited to say they are gone were filtered out
 4 to review                                                   ← 1 + 2 + 1
 ```
 
-Todo achado traz arquivo, número da linha e a correção. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.
+Todo achado traz arquivo, número da linha e a correção, e um caminho ausente diz para onde o git o moveu quando o histórico guarda um rename. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.
 
 ---
 

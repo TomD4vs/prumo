@@ -68,12 +68,20 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     out.push(...rest(caseMismatch));
   }
 
+  const history = (o) => {
+    if (!o.history) return [];
+    const h = o.history;
+    return h.event === 'renamed'
+      ? [`      ${teal('->')}  ${teal(h.to)}   ${dim(`renamed in ${h.commit}, ${h.when}`)}`]
+      : [`      ${dim(`deleted in ${h.commit}, ${h.when}`)}`];
+  };
+
   if (brokenLinks.length) {
     const withHint = brokenLinks.filter((l) => l.suggestion).length;
     out.push(title('BROKEN LINK', PAINT.yellow, brokenLinks.length, withHint ? `${withHint} with a likely destination` : ''));
     for (const o of cap(brokenLinks)) {
       const shown = o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited;
-      out.push(`  ${at(o)}  ${orange(shown)}${o.suggestion ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`);
+      out.push(`  ${at(o)}  ${orange(shown)}${o.suggestion && !o.history ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`, ...history(o));
     }
     out.push(...rest(brokenLinks));
   }
@@ -86,7 +94,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
   if (missingPaths.length) {
     out.push(title('MISSING PATH', PAINT.yellow, missingPaths.length, 'paths cited to say they are gone were filtered out'));
-    for (const o of cap(missingPaths)) out.push(`  ${at(o)}  ${orange(o.cited)}`, `      ${dim(o.excerpt)}`);
+    for (const o of cap(missingPaths)) out.push(`  ${at(o)}  ${orange(o.cited)}`, `      ${dim(o.excerpt)}`, ...history(o));
     out.push(...rest(missingPaths));
   }
 
@@ -126,6 +134,9 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   return out.join('\n');
 }
 
+/** What git recorded about the path, as a parenthesis for the one-line formats. */
+const historyNote = (o) => (o.history ? ` (${o.history.event === 'renamed' ? `renamed to ${o.history.to}` : 'deleted'} in ${o.history.commit}, ${o.history.when})` : '');
+
 /** What each finding is called in SARIF, how serious it is there, and the sentence that describes the rule. */
 const SARIF_RULES = {
   'case-mismatch': ['error', 'A path spelled with different letter case than the git index holds. It resolves on Windows and macOS and breaks on Linux and CI.'],
@@ -147,8 +158,8 @@ export function renderSarif(result) {
     locations: [{ physicalLocation: { artifactLocation: { uri: o.file, uriBaseId: '%SRCROOT%' }, ...(o.line ? { region: { startLine: o.line } } : {}) } }],
   });
   for (const o of result.caseMismatch) at('case-mismatch', o, `${o.cited} should be ${o.actual}`);
-  for (const o of result.brokenLinks) at('broken-link', o, `${o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
-  for (const o of result.missingPaths) at('missing-path', o, o.cited);
+  for (const o of result.brokenLinks) at('broken-link', o, `${o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited}${o.history ? historyNote(o) : o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
+  for (const o of result.missingPaths) at('missing-path', o, `${o.cited}${historyNote(o)}`);
   for (const o of result.unknownCommands || []) at('unknown-command', o, `${o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
   for (const o of result.configIssues || []) at('agent-config', o, `${o.cited}: ${o.message}`);
   for (const file of result.orphans) at('not-in-index', { file }, `${file} is not referenced by the index beside it`);
@@ -179,8 +190,8 @@ export function renderGithub(result) {
   for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} ${o.unit || 'cited paths'} ${o.unit ? 'reach no file here' : 'start in folders this repository does not have'}; findings held back`);
   for (const o of configIssues) say('warning', o, `Agent config: ${o.cited} ${o.message}`);
   for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);
-  for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
-  for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}`);
+  for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.history ? historyNote(o) : o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
+  for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}${historyNote(o)}`);
   for (const o of unknownCommands) say('warning', o, `Unknown command: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of orphans) lines.push(`::notice::Not in index: ${o}`);
   return lines.join('\n');

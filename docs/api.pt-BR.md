@@ -14,13 +14,13 @@ const result  = analyze({ repo: '.', targets });
 // com o baseline da raiz, e só os arquivos em stage para o commit:
 // analyze({ repo: '.', targets, baseline: loadBaseline('.'), only: { paths: changedFiles('.', { staged: true }), label: 'staged' } })
 
-console.log(result.schemaVersion);  // 5, sobe quando este formato muda
+console.log(result.schemaVersion);  // 6, sobe quando este formato muda
 console.log(result.prumoVersion);   // a versão que rodou
 console.log(result.repo);           // caminho absoluto do repositório checado
 console.log(result.checkedAt);      // quando, como data ISO 8601
 console.log(result.caseMismatch);   // [{ file, line, cited, actual, kind? }]
-console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion }]
-console.log(result.missingPaths);   // [{ file, line, cited, excerpt }]
+console.log(result.brokenLinks);    // [{ file, line, kind, cited, suggestion, history? }]
+console.log(result.missingPaths);   // [{ file, line, cited, excerpt, history? }]
 console.log(result.unknownCommands); // [{ file, line, cited, name, source, suggestion, excerpt }]
 console.log(result.configIssues);   // [{ file, line, kind, cited, message }]
 console.log(result.orphans);        // ['nota-que-ninguem-linka.md']
@@ -28,7 +28,7 @@ console.log(result.elsewhere);      // [{ file, cited, absent, unit? }]
 console.log(result.stats);          // { tracked, targets, historical, suppressed, gitignored, untracked, configs, baselined, baselineStale, only? }
 ```
 
-Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada; e para 5 com `stats.baselined`, os achados que um baseline reteve, `stats.baselineStale`, as entradas dele que não casam mais com nada, e `stats.only`, presente como `staged` ou `since REF` quando a rodada foi limitada ao que mudou.
+Os quatro primeiros campos identificam a rodada. Quem consome o JSON distingue uma mudança de formato de uma quebra, e o relatório de um repositório do relatório de outro. `--format json`, `--json ARQ` e o conteúdo estruturado do servidor MCP também os carregam. Um caminho citado em várias linhas é um achado por linha. O `schemaVersion` passou de 1 para 2 quando `unknownCommands` chegou, para 3 com `elsewhere`: os arquivos detectados sozinhos cujos achados ficaram retidos porque a maior parte dos caminhos que citam começa em pastas que o repositório não tem, com as duas contagens, e para 4 com `configIssues`, cujo `kind` é `glob`, `skill-description` ou `config-path`, `stats.configs`, os arquivos JSON de configuração lidos, e `unit` numa entrada de `elsewhere`, presente como `rules` quando o que ficou retido é uma pasta de regras em que a maioria das regras não casa com nada; e para 5 com `stats.baselined`, os achados que um baseline reteve, `stats.baselineStale`, as entradas dele que não casam mais com nada, e `stats.only`, presente como `staged` ou `since REF` quando a rodada foi limitada ao que mudou; e para 6 com `history` num caminho ausente ou num link markdown, `{ event, to?, commit, date, when }`, em que `event` é `renamed`, com `to` o nome que existe agora, ou `deleted`, `commit` é o hash curto, `date` ISO 8601 e `when` a idade em palavras.
 
 `loadBaseline(repo)` lê o `.prumo-baseline.json` da raiz do repositório, ou devolve null; `baselineOf(result)` monta o objeto que o `--baseline` grava; `changedFiles(repo, { staged: true })` ou `changedFiles(repo, { since: REF })` é o conjunto de caminhos que o `only` recebe, ao lado de um `label` para o cabeçalho; e `BASELINE_FILE` é o nome do arquivo.
 

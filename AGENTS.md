@@ -11,7 +11,7 @@ still match the code. Node 18+, ESM, no build step.
 - `src/fix.mjs` — the only automatic rewrite: case mismatches.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
-- `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs`, `test/baseline.test.mjs` — the suite: the analysis and the fix, the baseline and the limits to what changed, the two renderers, the server driven over stdio, and the banner. Every test that needs a repository builds a throwaway one.
+- `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs`, `test/baseline.test.mjs`, `test/history.test.mjs` — the suite: the analysis and the fix, the baseline and the limits to what changed, the history behind a missing path, the two renderers, the server driven over stdio, and the banner. Every test that needs a repository builds a throwaway one.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `action.yml` — the GitHub Action, `uses: TomD4vs/prumo@v1`: a composite step that runs the checked-out `bin/prumo.mjs`. Not in the npm tarball.
 - `.pre-commit-hooks.yaml` — the hook for the pre-commit framework; its `files:` regex is guarded by the same test as the hook in `docs/agents.md`.

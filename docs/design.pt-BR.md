@@ -360,6 +360,39 @@ Nenhuma regra foi reportada morta fora da pasta retida, e nenhum servidor ou hoo
 ausente nos sessenta e quatro repositórios que configuram um, então para essas duas formas os testes
 unitários e a simulação são a única evidência, e a precisão delas segue sem medida.
 
+O histórico por trás de um caminho ausente, para a 0.7.2, foi medido no nono, no décimo e no décimo
+primeiro corpus com o histórico restaurado, porque os clones eram rasos e um clone raso não tem
+rename para contar; quatro repositórios não puderam ser baixados por inteiro. A checagem em si não
+mudou: um caminho ausente ou um link markdown que se moveu agora diz para onde o git moveu o
+arquivo, ou quando o git o apagou, e a pergunta da medição era se o que o git diz é o que a nota
+deveria dizer. Cada linha que o git deu foi lida contra o commit dela:
+
+| Repositórios públicos, o histórico por trás de um caminho ausente, 0.7.2 | |
+| --- | ---: |
+| Repositórios do nono ao décimo primeiro corpus com o histórico restaurado | 176 |
+| Caminhos ausentes e links markdown fora dos catálogos | 335 |
+| Com um rename ou uma exclusão no histórico | 15 |
+| Renames, todos certos | 6 |
+| Exclusões, todas certas | 9 |
+| Nunca estiveram no histórico | 320 |
+| Dentro de um catálogo reorganizando seus plugins, achados com linha de histórico | 28 |
+
+Os seis renames são uma tabela de arquivos nomeando três arquivos que se moveram quando um projeto
+trocou de nome, duas skills cujas pastas perderam um prefixo, e um logo movido para uma pasta de
+assets; as nove exclusões são cinco docs removidos numa reestruturação, um script aposentado em
+favor de outro com nome diferente, um arquivo de teste substituído pelo formato nativo, e mais dois.
+Os 320 que o git nunca teve são os caminhos de outro projeto, marcadores, e arquivos que uma nota
+descreve antes de alguém fazer commit deles; sessenta deles foram procurados em todos os branches, e
+nenhum esteve lá. Então, no material público, o histórico fala por um caminho ausente em vinte, e
+fala bem: dentro do único catálogo que estava reorganizando seus plugins, vinte e quatro das vinte e
+oito linhas eram renames para a nova árvore de pastas, e os três seguidos à mão estavam certos. Duas
+decisões foram tomadas sobre esse material e são ajustadas a ele: o limite de renames do git é
+elevado na consulta, porque um commit que tocou milhares de arquivos no décimo corpus leu duas
+skills movidas como exclusões até que fosse, e um link escrito como `mdc:caminho`, que é como uma
+regra do Cursor aponta para a raiz do repositório, é resolvido a partir da raiz, o que limpou dezoito
+links falsos no décimo primeiro e fez uma skill copiada no oitavo cruzar o portão de outro projeto,
+vinte e dois achados retidos. Nos corpora fixos esta release não remove nem acrescenta nada.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização, porque uma nota corrigida errado é pior que uma desatualizada. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.

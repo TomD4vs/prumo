@@ -1478,3 +1478,14 @@ test('the result identifies the run: schema, version, repository and time', () =
   assert.equal(r.repo, resolve(repo));
   assert.ok(!Number.isNaN(Date.parse(r.checkedAt)), 'checkedAt is an ISO date');
 });
+
+test('an mdc: link in a Cursor rule resolves from the repository root, and keeps its prefix when the case is fixed', () => {
+  const r = run({
+    '.cursor/rules/astro.mdc': '---\nglobs: src/**\n---\nSee [config](mdc:astro.config.mjs), [styles](mdc:src/Styles/global.css) and [gone](mdc:src/gone.ts).\n',
+    'astro.config.mjs': '',
+    'src/styles/global.css': '',
+  });
+  assert.deepEqual(r.caseMismatch.map((c) => `${c.cited} -> ${c.actual}`), ['mdc:src/Styles/global.css -> mdc:src/styles/global.css']);
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), ['mdc:src/gone.ts']);
+  assert.equal(r.missingPaths.length, 0);
+});

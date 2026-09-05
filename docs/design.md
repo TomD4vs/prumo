@@ -351,6 +351,39 @@ material. No rule was reported dead outside the folder held back, and no server 
 missing script in the sixty-four repositories that configure one, so for those two shapes the unit
 tests and the simulation are the only evidence, and their precision is unmeasured.
 
+The history behind a missing path, for 0.7.2, was measured on the ninth, tenth and eleventh corpora
+with their history restored, since the clones were shallow and a shallow clone has no rename to
+tell; four repositories could not be fetched in full. The check itself did not change: a missing
+path or a moved markdown link now says where git moved the file, or when git deleted it, and the
+question for the measurement was whether what git says is what the note should say. Every line git
+gave was read against its commit:
+
+| Public repositories, the history behind a missing path, 0.7.2 | |
+| --- | ---: |
+| Repositories of the ninth to eleventh corpora with their history restored | 176 |
+| Missing paths and markdown links outside the catalogues | 335 |
+| With a rename or a deletion in the history | 15 |
+| Renames, all right | 6 |
+| Deletions, all right | 9 |
+| Never in the history | 320 |
+| Inside one catalogue reorganising its plugins, findings with a history line | 28 |
+
+The six renames are a file table naming three files that moved when a project changed its name,
+two skills whose folders dropped a prefix, and a logo moved into an assets folder; the nine deletions
+are five docs removed in one restructuring, a script retired for another with a different name, a
+test file replaced by its native format, and two more. The 320 that git never held are the paths of
+another project, placeholders, and files a note describes before anyone committed them; sixty of
+them were looked for on every branch, and none was ever there. So on public material the history
+speaks for one missing path in twenty, and it speaks well: inside the one catalogue that was
+reorganising its plugins, twenty-four of the twenty-eight lines were renames into the new folder
+tree, and the three followed by hand were right. Two decisions were taken on this material and are
+fitted to it: git's rename limit is raised for the lookup, since a commit that touched thousands of
+files on the tenth corpus read two moved skills as deletions until it was, and a link written as
+`mdc:path`, which is how a Cursor rule points at the repository root, is resolved from the root,
+which cleared eighteen false links on the eleventh and let a vendored skill on the eighth cross the
+another-project gate, twenty-two findings held back. On the fixed corpora this release removes
+nothing and adds nothing.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case, since a note corrected wrongly is worse than a stale one. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.

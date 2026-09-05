@@ -89,11 +89,15 @@ echo "$OUT" | grep -q -- "->  backend/app/models/ticket.py" && ok "-> the spelli
 echo "$OUT" | grep -q "^BROKEN LINK  (1)   1 with a likely destination" && ok "BROKEN LINK with a likely destination" || bad "BROKEN LINK"
 echo "$OUT" | grep -q "^  CLAUDE.md:7  \[\[deploy-checklist\]\]   ->  deploy_checklist" && ok "file, line, link and suggestion on one line" || bad "link line"
 echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted script cited inside a command, and a renamed component" || bad "MISSING PATH: $(echo "$OUT" | grep MISSING)"
+echo "$OUT" | grep -qE "^      ->  frontend/src/components/TicketTable.tsx   renamed in [0-9a-f]{7}, today" && ok "a missing path says where git moved it: renamed in <commit>, today" || bad "history rename: $(echo "$OUT" | grep -A2 TicketList | tr '
+' '|')"
+echo "$OUT" | grep -qE "^      deleted in [0-9a-f]{7}, today" && ok "and a deleted script says when it went" || bad "history delete: $(echo "$OUT" | grep -A2 seed_db | tr '
+' '|')"
 echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
 chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats baselineStale,baselined,configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 5' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+echo "$J" | grep -q '"schemaVersion": 6' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -327,7 +331,7 @@ echo "$OUT" | grep -q "^4 to review" && chk "$RC" "1" "--no-baseline reports all
 mkdir -p config; echo x > config/old.php; git add -A >/dev/null 2>&1
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "^        2 findings held in .prumo-baseline.json; 1 entry there matches nothing now" && ok "a resolved finding shows as an entry that matches nothing now" || bad "stale: $(echo "$OUT" | grep held)"
 ci
-J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===5?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 5 in the JSON" || bad "json baseline stats"
+J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===6?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 5 in the JSON" || bad "json baseline stats"
 printf 'Read \x60docs/also-gone.md\x60.\n' >> AGENTS.md; git add AGENTS.md >/dev/null 2>&1
 OUT=$($PR --staged 2>&1); RC=$?
 echo "$OUT" | grep -q "^prumo — 1 context file, " && echo "$OUT" | grep -q "^        only the context files staged for commit" && echo "$OUT" | grep -q "docs/also-gone.md" && ! echo "$OUT" | grep -q "docs/new.md" && chk "$RC" "1" "--staged checks the staged AGENTS.md alone" || bad "staged: $(echo "$OUT" | tr '\n' '|')"

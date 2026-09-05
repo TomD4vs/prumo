@@ -76,7 +76,7 @@ MISSING PATH  (1)   paths cited to say they are gone were filtered out
 4 to review                                                   ← 1 + 2 + 1
 ```
 
-Every finding carries a file, a line number and the correction. Nothing is guessed and nothing is written. What each finding means, and what to do about it, is in the [reference](docs/reference.md#what-each-finding-means). If it flags a line you know is correct, [Silencing a finding](docs/reference.md#silencing-a-finding) covers the two ways to say so.
+Every finding carries a file, a line number and the correction, and a missing path says where git moved it when the history holds a rename. Nothing is guessed and nothing is written. What each finding means, and what to do about it, is in the [reference](docs/reference.md#what-each-finding-means). If it flags a line you know is correct, [Silencing a finding](docs/reference.md#silencing-a-finding) covers the two ways to say so.
 
 ---
 
