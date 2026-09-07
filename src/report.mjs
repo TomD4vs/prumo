@@ -122,15 +122,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   if (!total) out.push(teal('nothing to review.'));
   else if (!color) out.push(`${total} to review${tail}`);
   else {
-    const kinds = [
-      caseMismatch.length && plural(caseMismatch.length, 'case mismatch', 'case mismatches'),
-      brokenLinks.length && plural(brokenLinks.length, 'broken link', 'broken links'),
-      orphans.length && plural(orphans.length, 'note not in the index', 'notes not in the index'),
-      missingPaths.length && plural(missingPaths.length, 'missing path', 'missing paths'),
-      unknownCommands.length && plural(unknownCommands.length, 'unknown command', 'unknown commands'),
-      configIssues.length && plural(configIssues.length, 'config issue', 'config issues'),
-    ].filter(Boolean);
-    out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}${fixable ? `   ·   --fix corrects ${fixable}` : ''}`));
+    out.push(bold(`${total} to review`) + (fixable ? dim(`   ·   --fix corrects ${fixable}`) : ''));
     if (!fixed) {
       const others = total - fixable;
       const rows = [];

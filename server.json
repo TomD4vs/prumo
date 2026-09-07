@@ -6,12 +6,12 @@
     "url": "https://github.com/TomD4vs/prumo",
     "source": "github"
   },
-  "version": "0.9.4",
+  "version": "0.9.5",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tomd4vs/prumo",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "transport": {
         "type": "stdio"
       },

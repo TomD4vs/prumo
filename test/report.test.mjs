@@ -132,7 +132,7 @@ test('a fix pass is reported before the findings, changes and skips alike', () =
   assert.match(out, /\njson: out\.json$/);
 });
 
-test('with colour, the titles become badges, the correction is painted apart, and the total is counted by kind', () => {
+test('with colour, the titles become badges, the correction is painted apart, and the total says what --fix corrects', () => {
   const findings = {
     caseMismatch: [{ file: 'CLAUDE.md', line: 18, cited: 'layouts/AppLayout.vue', actual: 'resources/js/Layouts/AppLayout.vue' }],
     brokenLinks: [
@@ -147,7 +147,7 @@ test('with colour, the titles become badges, the correction is painted apart, an
   assert.match(painted, /\x1b\[38;5;173mlayouts\/AppLayout\.vue\x1b\[0m/);
   assert.match(painted, /\x1b\[38;5;79m->\x1b\[0m  \x1b\[38;5;79mresources\/js\/Layouts\/AppLayout\.vue\x1b\[0m/);
   assert.match(painted, /\x1b\[7;38;5;221m BROKEN LINK \x1b\[0m \x1b\[1m2\x1b\[0m   \x1b\[38;5;245mpoints at a page or heading that is not there; 1 with a likely destination/);
-  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path   ·   --fix corrects 1\x1b\[0m\n/);
+  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   --fix corrects 1\x1b\[0m\n/, 'the kinds are on the badges already');
   const plainOf = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
   assert.match(plainOf(painted), /\n  next  prumo --fix   corrects 1 in place: letter case, and the renames git recorded\n        edit the other 4, or mark a line <!-- prumo-ignore --> when the note is right$/, 'a person at a terminal is told what to do next');
   assert.doesNotMatch(renderText(result(findings)), /next/, 'a pipe never sees the next block');
