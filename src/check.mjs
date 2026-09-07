@@ -47,6 +47,8 @@ const OUTSIDE_REPO = /^(~|\/|[A-Za-z]:[\\/]|\.\.\/|https?:|file:|\$)/;
 const HOSTNAME = /^[\w-]+(\.[\w-]+)*\.(com|org|net|io|dev|ai|app|co|edu|gov|de|br|uk|fr|es|it|nl|ch|at|eu|me|info|xyz)\//i;
 /** What a note appends to a path to point inside the file: a line number, a GitHub `#L10` anchor, a `::symbol` or a `:symbol`. */
 const INSIDE_FILE = /([:#]L?\d+(-L?\d+)?|::?[A-Za-z_$][\w.$]*(\(\))?)$/;
+/** A link fragment in the line form of GitHub, `L12`, `L12-L20` or `L12C3-L14C7`, points at a line, which moves with every edit, so only the page is checked. */
+const LINE_ANCHOR = /^L\d+(C\d+)?(-L?\d+(C\d+)?)?$/i;
 const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 /** `path/to/thing.js`, `tests/path/test.py` and `src/foo/bar.test.ts` are how an example spells its argument, not files in this repository. */
 const PLACEHOLDER_PATH = /(^|[/])(path[/]|(foo|bar|baz)([/.]|$))/i;
@@ -1244,7 +1246,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
         const anchor = decodeLink(fragment).toLowerCase();
         if (!to) {
           const own = anchorsOf(target.path, body);
-          if (anchor && !own.has(anchor)) {
+          if (anchor && !LINE_ANCHOR.test(fragment) && !own.has(anchor)) {
             const near = nearAnchor(own, anchor);
             brokenLinks.push({ file: target.label, line: i + 1, kind: 'anchor', cited: `#${fragment}`, suggestion: near ? `#${near}` : null });
           }
@@ -1274,7 +1276,7 @@ export function analyze({ repo, targets, config = null, baseline = null, only = 
         if (inside && index.known.has(rel)) {
           cite(rel, false);
           record(i, to, rel);
-          if (anchor && /\.(md|mdx)$/i.test(rel)) {
+          if (anchor && !LINE_ANCHOR.test(fragment) && /\.(md|mdx)$/i.test(rel)) {
             const theirs = anchorsOf(abs);
             if (!theirs.has(anchor)) {
               const near = nearAnchor(theirs, anchor);

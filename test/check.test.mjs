@@ -418,7 +418,7 @@ test('the text report names the file and line of a broken link', () => {
   catch (e) { out = e.stdout.toString(); assert.equal(e.status, 1); }
   assert.match(out, /^  CLAUDE\.md:3  \[\[gone-note\]\]$/m);
   assert.match(out, /^  CLAUDE\.md:3  docs\/gone\.md$/m);
-  assert.match(out, /, 1 file in the git index$/m);
+  assert.match(out, /, 1 file tracked by git$/m);
 });
 
 test('a path that .gitignore covers is exempt and counted, not reported', () => {
@@ -1608,4 +1608,17 @@ test('a note with CRLF line endings reads the same as one with LF, and a fix kee
   assert.ok(fixed.includes('src/Component.vue\r\n'), 'the case is corrected on its line');
   assert.equal(fixed.split('\r\n').length, note.length, 'every line still ends in CRLF');
   assert.ok(!/[^\r]\n/.test(fixed), 'no line ending was rewritten');
+});
+
+test('a link fragment in the line form of GitHub points at a line, not a heading, so only the page is checked', () => {
+  const r = run({
+    'CLAUDE.md': [
+      'See [a](docs/short.md#L1), [b](docs/short.md#L1-L2), [c](docs/short.md#L3C1-L4C2), [d](docs/short.md#L9) and [e](#L5).',
+      'Still checked: [f](docs/short.md#nowhere), [g](docs/Short.md#L1) and [h](docs/gone.md#L1).',
+      '',
+    ].join('\n'),
+    'docs/short.md': '# Intro\nline two\n',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => [l.kind, l.cited]), [['anchor', 'docs/short.md#nowhere'], ['link', 'docs/gone.md']]);
+  assert.deepEqual(r.caseMismatch.map((c) => [c.cited, c.actual]), [['docs/Short.md', 'docs/short.md']]);
 });

@@ -64,7 +64,7 @@ Either way the command is `prumo`, with zero dependencies. Errors at this step, 
 A clean run:
 
 ```
-prumo — 1 context file, 401 files in the git index
+prumo — 1 context file, 401 files tracked by git
 
 nothing to review.
 ```
@@ -72,23 +72,23 @@ nothing to review.
 A run with findings, annotated:
 
 ```
-prumo — 3 context files, 412 files in the git index           ← what it read
+prumo — 3 context files, 412 files tracked by git             ← what it read
         1 historical entry exempt from path checks            ← what it skipped on purpose
 
-CASE MISMATCH  (1)   resolves on Windows and macOS, breaks on Linux and CI
+CASE MISMATCH  (1)   wrong letter case: works on Windows and macOS, fails on Linux and CI
   CLAUDE.md:18                                                ← file and line
       layouts/AppLayout.vue                                   ← what the note says
       ->  resources/js/Layouts/AppLayout.vue                  ← what the repository has
 
-BROKEN LINK  (2)   1 with a likely destination
+BROKEN LINK  (2)   points at a page or heading that is not there; 1 with a likely destination
   CLAUDE.md:21  [[deploy-checklist]]   ->  deploy_checklist   ← the file it probably meant
   CLAUDE.md:30  [[old-architecture]]                          ← no candidate: renamed or deleted
 
-MISSING PATH  (1)   paths cited to say they are gone were filtered out
+MISSING PATH  (1)   the note cites it, but git tracks no such file or folder
   docs/setup.md:44  config/database.php                       ← file, line, dead path
       Copy the template into `config/database.php`…           ← the sentence, so you can judge
 
-4 to review                                                   ← 1 + 2 + 1
+4 to review, --fix corrects 1                                 ← 1 + 2 + 1
 ```
 
 Every finding carries a file, a line number and the correction, and a missing path says where git moved it when the history holds a rename. Nothing is guessed and nothing is written. What each finding means, and what to do about it, is in the [reference](docs/reference.md#what-each-finding-means). If it flags a line you know is correct, [Silencing a finding](docs/reference.md#silencing-a-finding) covers the two ways to say so.

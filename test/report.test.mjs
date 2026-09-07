@@ -14,13 +14,13 @@ const result = (over = {}) => ({
 });
 
 test('a clean result renders the header and nothing to review', () => {
-  assert.equal(renderText(result()), 'prumo — 1 context file, 12 files in the git index\n\nnothing to review.');
+  assert.equal(renderText(result()), 'prumo — 1 context file, 12 files tracked by git\n\nnothing to review.');
 });
 
 test('the header counts what was skipped on purpose, one line per kind', () => {
   const out = renderText(result({ stats: { tracked: 2, targets: 3, historical: 1, suppressed: 2, gitignored: 3, untracked: 1 } }));
   assert.deepEqual(out.split('\n').slice(0, 5), [
-    'prumo — 3 context files, 2 files in the git index',
+    'prumo — 3 context files, 2 files tracked by git',
     '        1 historical entry exempt from path checks',
     '        2 lines or files suppressed by a prumo-ignore marker',
     '        3 paths under .gitignore exempt from path checks',
@@ -38,16 +38,16 @@ test('each section renders the way the README shows it, and the total adds them 
     missingPaths: [{ file: 'docs/setup.md', line: 44, cited: 'config/database.php', excerpt: 'Copy the template into `config/database.php`.' }],
     orphans: ['loose.md'],
   }));
-  assert.match(out, /^CASE MISMATCH  \(1\)   resolves on Windows and macOS, breaks on Linux and CI$/m);
+  assert.match(out, /^CASE MISMATCH  \(1\)   wrong letter case: works on Windows and macOS, fails on Linux and CI$/m);
   assert.match(out, /^  CLAUDE\.md:18\n      layouts\/AppLayout\.vue\n      ->  resources\/js\/Layouts\/AppLayout\.vue$/m);
-  assert.match(out, /^BROKEN LINK  \(2\)   1 with a likely destination$/m);
+  assert.match(out, /^BROKEN LINK  \(2\)   points at a page or heading that is not there; 1 with a likely destination$/m);
   assert.match(out, /^  CLAUDE\.md:21  \[\[deploy-checklist\]\]   ->  deploy_checklist$/m);
   assert.match(out, /^  CLAUDE\.md:30  docs\/old\.md$/m);
   assert.match(out, /^NOT IN INDEX  \(1\)/m);
   assert.match(out, /^  loose\.md$/m);
   assert.match(out, /^MISSING PATH  \(1\)/m);
   assert.match(out, /^  docs\/setup\.md:44  config\/database\.php\n      Copy the template into `config\/database\.php`\.$/m);
-  assert.match(out, /\n5 to review$/);
+  assert.match(out, /\n5 to review, --fix corrects 1$/);
 });
 
 test('an unknown command and a heading anchor render like the other findings, and count in the total', () => {
@@ -143,11 +143,11 @@ test('with colour, the titles become badges, the correction is painted apart, an
     orphans: ['loose.md'],
   };
   const painted = renderText(result(findings), { color: true });
-  assert.match(painted, /\x1b\[7;38;5;203m CASE MISMATCH \x1b\[0m \x1b\[1m1\x1b\[0m   \x1b\[38;5;245mresolves on Windows/);
+  assert.match(painted, /\x1b\[7;38;5;203m CASE MISMATCH \x1b\[0m \x1b\[1m1\x1b\[0m   \x1b\[38;5;245mwrong letter case: works on Windows/);
   assert.match(painted, /\x1b\[38;5;173mlayouts\/AppLayout\.vue\x1b\[0m/);
   assert.match(painted, /\x1b\[38;5;79m->\x1b\[0m  \x1b\[38;5;79mresources\/js\/Layouts\/AppLayout\.vue\x1b\[0m/);
-  assert.match(painted, /\x1b\[7;38;5;221m BROKEN LINK \x1b\[0m \x1b\[1m2\x1b\[0m   \x1b\[38;5;245m1 with a likely destination/);
-  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path\x1b\[0m$/);
+  assert.match(painted, /\x1b\[7;38;5;221m BROKEN LINK \x1b\[0m \x1b\[1m2\x1b\[0m   \x1b\[38;5;245mpoints at a page or heading that is not there; 1 with a likely destination/);
+  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path   ·   --fix corrects 1\x1b\[0m$/);
   assert.match(renderText(result(), { color: true }), /\x1b\[38;5;79mnothing to review\.\x1b\[0m$/);
 
   const plain = renderText(result(findings));

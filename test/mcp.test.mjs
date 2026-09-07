@@ -78,8 +78,8 @@ test('prumo_check returns the text report and the findings as structured content
   const repo = repoWith({ 'CLAUDE.md': 'See `layouts/App.vue` and [[gone-note]].\n', 'resources/js/Layouts/App.vue': '' });
   const [r] = talk([{ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'prumo_check', arguments: { repo } } }]);
   assert.equal(r.result.isError, false);
-  assert.match(r.result.content[0].text, /^prumo — 1 context file, 2 files in the git index/);
-  assert.match(r.result.content[0].text, /2 to review$/);
+  assert.match(r.result.content[0].text, /^prumo — 1 context file, 2 files tracked by git/);
+  assert.match(r.result.content[0].text, /2 to review, --fix corrects 1$/);
   const s = r.result.structuredContent;
   assert.equal(s.total, 2);
   assert.equal(s.fixed, null);

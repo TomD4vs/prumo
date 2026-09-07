@@ -90,9 +90,9 @@ git rm -q scripts/seed_db.py
 git mv frontend/src/components/TicketList.tsx frontend/src/components/TicketTable.tsx
 ci
 OUT=$($PR 2>&1); RC=$?; chk "$RC" "1" "findings: exit 1"
-echo "$OUT" | grep -q "^CASE MISMATCH  (1)   resolves on Windows and macOS, breaks on Linux and CI" && ok "CASE MISMATCH with its caption" || bad "CASE MISMATCH"
+echo "$OUT" | grep -q "^CASE MISMATCH  (1)   wrong letter case: works on Windows and macOS, fails on Linux and CI" && ok "CASE MISMATCH with its caption" || bad "CASE MISMATCH"
 echo "$OUT" | grep -q -- "->  backend/app/models/ticket.py" && ok "-> the spelling git holds" || bad "->"
-echo "$OUT" | grep -q "^BROKEN LINK  (1)   1 with a likely destination" && ok "BROKEN LINK with a likely destination" || bad "BROKEN LINK"
+echo "$OUT" | grep -q "^BROKEN LINK  (1)   points at a page or heading that is not there; 1 with a likely destination" && ok "BROKEN LINK with a likely destination" || bad "BROKEN LINK"
 echo "$OUT" | grep -q "^  CLAUDE.md:7  \[\[deploy-checklist\]\]   ->  deploy_checklist" && ok "file, line, link and suggestion on one line" || bad "link line"
 echo "$OUT" | grep -q "^MISSING PATH  (2)" && ok "MISSING PATH (2): a deleted script cited inside a command, and a renamed component" || bad "MISSING PATH: $(echo "$OUT" | grep MISSING)"
 echo "$OUT" | grep -qE "^      ->  frontend/src/components/TicketTable.tsx   renamed in [0-9a-f]{7}, today" && ok "a missing path says where git moved it: renamed in <commit>, today" || bad "history rename: $(echo "$OUT" | grep -A2 TicketList | tr '

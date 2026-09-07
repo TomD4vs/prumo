@@ -64,7 +64,7 @@ Nos dois casos o comando é `prumo`, com zero dependências. Erros nesta etapa, 
 Execução limpa:
 
 ```
-prumo — 1 context file, 401 files in the git index
+prumo — 1 context file, 401 files tracked by git
 
 nothing to review.
 ```
@@ -72,23 +72,23 @@ nothing to review.
 Uma execução com achados, anotada:
 
 ```
-prumo — 3 context files, 412 files in the git index           ← o que ele leu
+prumo — 3 context files, 412 files tracked by git             ← o que ele leu
         1 historical entry exempt from path checks            ← o que ele pulou de propósito
 
-CASE MISMATCH  (1)   resolves on Windows and macOS, breaks on Linux and CI
+CASE MISMATCH  (1)   wrong letter case: works on Windows and macOS, fails on Linux and CI
   CLAUDE.md:18                                                ← arquivo e linha
       layouts/AppLayout.vue                                   ← o que a nota diz
       ->  resources/js/Layouts/AppLayout.vue                  ← o que o repositório tem
 
-BROKEN LINK  (2)   1 with a likely destination
+BROKEN LINK  (2)   points at a page or heading that is not there; 1 with a likely destination
   CLAUDE.md:21  [[deploy-checklist]]   ->  deploy_checklist   ← o arquivo que provavelmente era
   CLAUDE.md:30  [[old-architecture]]                          ← sem candidato: renomeado ou apagado
 
-MISSING PATH  (1)   paths cited to say they are gone were filtered out
+MISSING PATH  (1)   the note cites it, but git tracks no such file or folder
   docs/setup.md:44  config/database.php                       ← arquivo, linha, caminho morto
       Copie o modelo para `config/database.php`…              ← a frase, para você julgar
 
-4 to review                                                   ← 1 + 2 + 1
+4 to review, --fix corrects 1                                 ← 1 + 2 + 1
 ```
 
 Todo achado traz arquivo, número da linha e a correção, e um caminho ausente diz para onde o git o moveu quando o histórico guarda um rename. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.

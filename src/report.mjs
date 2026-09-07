@@ -45,7 +45,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     : `${label}  (${n})${caption ? `   ${caption}` : ''}`);
   const at = (o) => bold(`${o.file}:${o.line}`);
 
-  out.push(bold('prumo') + dim(` — ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.tracked, 'file', 'files')} in the git index`));
+  out.push(bold('prumo') + dim(` — ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.tracked, 'file', 'files')} tracked by git`));
   if (stats.historical) out.push(dim(`        ${plural(stats.historical, 'historical entry', 'historical entries')} exempt from path checks`));
   if (stats.suppressed) out.push(dim(`        ${plural(stats.suppressed, 'line or file', 'lines or files')} suppressed by a prumo-ignore marker`));
   if (stats.gitignored) out.push(dim(`        ${plural(stats.gitignored, 'path', 'paths')} under .gitignore exempt from path checks`));
@@ -63,7 +63,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   }
 
   if (caseMismatch.length) {
-    out.push(title('CASE MISMATCH', PAINT.red, caseMismatch.length, 'resolves on Windows and macOS, breaks on Linux and CI'));
+    out.push(title('CASE MISMATCH', PAINT.red, caseMismatch.length, 'wrong letter case: works on Windows and macOS, fails on Linux and CI'));
     for (const o of cap(caseMismatch)) out.push(`  ${at(o)}`, `      ${orange(o.cited)}`, `      ${teal('->')}  ${teal(o.actual)}`);
     out.push(...rest(caseMismatch));
   }
@@ -78,7 +78,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
   if (brokenLinks.length) {
     const withHint = brokenLinks.filter((l) => l.suggestion).length;
-    out.push(title('BROKEN LINK', PAINT.yellow, brokenLinks.length, withHint ? `${withHint} with a likely destination` : ''));
+    out.push(title('BROKEN LINK', PAINT.yellow, brokenLinks.length, `points at a page or heading that is not there${withHint ? `; ${withHint} with a likely destination` : ''}`));
     for (const o of cap(brokenLinks)) {
       const shown = o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited;
       out.push(`  ${at(o)}  ${orange(shown)}${o.suggestion && !o.history ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`, ...history(o));
@@ -87,13 +87,13 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   }
 
   if (orphans.length) {
-    out.push(title('NOT IN INDEX', PAINT.blue, orphans.length, 'file the index never references'));
+    out.push(title('NOT IN INDEX', PAINT.blue, orphans.length, 'in the folder, but MEMORY.md never mentions it'));
     for (const o of cap(orphans)) out.push(`  ${orange(o)}`);
     out.push(...rest(orphans));
   }
 
   if (missingPaths.length) {
-    out.push(title('MISSING PATH', PAINT.yellow, missingPaths.length, 'paths cited to say they are gone were filtered out'));
+    out.push(title('MISSING PATH', PAINT.yellow, missingPaths.length, 'the note cites it, but git tracks no such file or folder'));
     for (const o of cap(missingPaths)) out.push(`  ${at(o)}  ${orange(o.cited)}`, `      ${dim(o.excerpt)}`, ...history(o));
     out.push(...rest(missingPaths));
   }
@@ -116,8 +116,11 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     out.push(...rest(elsewhere));
   }
 
+  const renamed = (o) => o.history && o.history.event === 'renamed';
+  const fixable = fixed ? 0 : caseMismatch.length + brokenLinks.filter(renamed).length + missingPaths.filter(renamed).length;
+  const tail = fixable ? `, --fix corrects ${fixable}` : '';
   if (!total) out.push(teal('nothing to review.'));
-  else if (!color) out.push(`${total} to review`);
+  else if (!color) out.push(`${total} to review${tail}`);
   else {
     const kinds = [
       caseMismatch.length && plural(caseMismatch.length, 'case mismatch', 'case mismatches'),
@@ -127,7 +130,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
       unknownCommands.length && plural(unknownCommands.length, 'unknown command', 'unknown commands'),
       configIssues.length && plural(configIssues.length, 'config issue', 'config issues'),
     ].filter(Boolean);
-    out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}`));
+    out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}${fixable ? `   ·   --fix corrects ${fixable}` : ''}`));
   }
   if (baselineWritten !== null) out.push(dim(`baseline: ${BASELINE_FILE}, ${plural(baselineWritten, 'finding', 'findings')} recorded`));
   if (jsonPath) out.push(dim(`json: ${jsonPath}`));

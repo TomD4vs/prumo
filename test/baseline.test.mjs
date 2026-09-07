@@ -105,7 +105,7 @@ test('--baseline writes the file and exits 0, the next run exits 0 with the coun
   git(repo, 'commit -qm x');
   const wrote = cli(repo, ['--baseline']);
   assert.equal(wrote.status, 0);
-  assert.match(wrote.out, /^3 to review$/m);
+  assert.match(wrote.out, /^3 to review, --fix corrects 1$/m);
   assert.match(wrote.out, /^baseline: \.prumo-baseline\.json, 3 findings recorded$/m);
   assert.ok(existsSync(join(repo, BASELINE_FILE)));
   assert.equal(JSON.parse(readFileSync(join(repo, BASELINE_FILE), 'utf8')).findings.length, 3);
@@ -117,7 +117,7 @@ test('--baseline writes the file and exits 0, the next run exits 0 with the coun
 
   const all = cli(repo, ['--no-baseline']);
   assert.equal(all.status, 1);
-  assert.match(all.out, /^3 to review$/m);
+  assert.match(all.out, /^3 to review, --fix corrects 1$/m);
 
   const annotated = cli(repo, ['--format', 'github']);
   assert.equal(annotated.out.trim(), '::notice::Baseline: 3 findings held in .prumo-baseline.json');
@@ -139,14 +139,14 @@ test('--staged checks the staged context files alone, --since REF the ones chang
 
   const none = cli(repo, ['--staged']);
   assert.equal(none.status, 0);
-  assert.match(none.out, /^prumo — 0 context files, 3 files in the git index\n        only the context files staged for commit\n\nnothing to review\.$/m);
+  assert.match(none.out, /^prumo — 0 context files, 3 files tracked by git\n        only the context files staged for commit\n\nnothing to review\.$/m);
 
   write(repo, 'AGENTS.md', '# agents\n\nSee `lib/gone.ts` and `lib/also.ts`.\n');
   git(repo, 'add AGENTS.md');
   assert.deepEqual([...changedFiles(repo, { staged: true })], ['AGENTS.md']);
   const staged = cli(repo, ['--staged']);
   assert.equal(staged.status, 1);
-  assert.match(staged.out, /^prumo — 1 context file, 3 files in the git index\n        only the context files staged for commit$/m);
+  assert.match(staged.out, /^prumo — 1 context file, 3 files tracked by git\n        only the context files staged for commit$/m);
   assert.match(staged.out, /lib\/also\.ts/);
   assert.doesNotMatch(staged.out, /src\/gone\.ts/, 'CLAUDE.md is not staged');
   assert.doesNotMatch(staged.out, /AGENT CONFIG/, '.mcp.json is not staged');
@@ -181,7 +181,7 @@ test('the header says what limited the run and what the baseline holds, --baseli
   const stats = { tracked: 9, targets: 1, historical: 0, suppressed: 0, gitignored: 0, untracked: 0, configs: 0 };
   const limited = renderText({ ...base, stats: { ...stats, only: 'staged', baselined: 2, baselineStale: 1 } });
   assert.deepEqual(limited.split('\n').slice(0, 3), [
-    'prumo — 1 context file, 9 files in the git index',
+    'prumo — 1 context file, 9 files tracked by git',
     '        only the context files staged for commit',
     '        2 findings held in .prumo-baseline.json; 1 entry there matches nothing now',
   ]);

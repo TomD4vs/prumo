@@ -65,7 +65,7 @@ test('piped output opens with the header line, and only PRUMO_BANNER=1 puts the 
   const run = (env) => execSync('node ' + JSON.stringify(BIN) + ' .', { cwd: repo, env: { ...process.env, FORCE_COLOR: '', ...env }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
 
   const plain = run({ PRUMO_BANNER: '' });
-  assert.match(plain, /^prumo — 1 context file, 2 files in the git index\n/);
+  assert.match(plain, /^prumo — 1 context file, 2 files tracked by git\n/);
   assert.doesNotMatch(plain, /█/);
 
   const shown = run({ PRUMO_BANNER: '1', NO_COLOR: '1' });
