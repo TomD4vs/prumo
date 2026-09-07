@@ -1575,3 +1575,37 @@ test('a shell comment ends a command line, the repository name is a prefix befor
   assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['make gone'], 'the words after # are a comment, and only the target nothing defines is reported');
   assert.deepEqual(r.missingPaths.map((o) => o.cited), ['docs/gone.md'], 'the repository name before a root file resolves, and a folder the sentence makes conditional is quiet');
 });
+
+test('a note with CRLF line endings reads the same as one with LF, and a fix keeps the endings it found', () => {
+  const note = [
+    '# app', '',
+    '```', 'src/component.vue', 'docs/missing-file.md', '```', '',
+    '```bash', 'node scripts/seed.js --force', '```', '',
+    '```markdown', 'See `src/gone-quoted.ts` and [a link](docs/gone.md).', '```', '',
+    '```js', "const x = require('lib/gone.js');", '```', '',
+    '<!-- prumo-ignore-next-line -->',
+    '```', 'docs/silenced.md', '```', '',
+    '<!-- [commented](docs/also-gone.md) -->',
+    'A real one: [live](docs/really-gone.md).', '',
+  ];
+  const files = { 'src/Component.vue': '', 'docs/README.md': '' };
+  const seen = (r) => [
+    r.caseMismatch.map((c) => [c.line, c.cited, c.actual]),
+    r.missingPaths.map((m) => [m.line, m.cited]),
+    r.brokenLinks.map((l) => [l.line, l.cited]),
+    r.stats.suppressed,
+  ];
+  const lf = run({ 'CLAUDE.md': note.join('\n'), ...files });
+  assert.deepEqual(seen(lf), [[[4, 'src/component.vue', 'src/Component.vue']], [[5, 'docs/missing-file.md'], [9, 'scripts/seed.js']], [[26, 'docs/really-gone.md']], 1]);
+
+  const repo = repoWith({ 'CLAUDE.md': note.join('\r\n'), ...files });
+  const targets = resolveTargets(repo, []);
+  const crlf = analyze({ repo, targets });
+  assert.deepEqual(seen(crlf), seen(lf), 'the fences open, the quotation and the comment stay quiet, and the marker still counts');
+
+  applyCaseFixes(crlf.caseMismatch, targets);
+  const fixed = readFileSync(join(repo, 'CLAUDE.md'), 'utf8');
+  assert.ok(fixed.includes('src/Component.vue\r\n'), 'the case is corrected on its line');
+  assert.equal(fixed.split('\r\n').length, note.length, 'every line still ends in CRLF');
+  assert.ok(!/[^\r]\n/.test(fixed), 'no line ending was rewritten');
+});

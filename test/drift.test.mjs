@@ -164,3 +164,14 @@ test('the CLI runs the report, exits 0, takes --format json and --json FILE, and
   assert.equal(github.status, 2);
   assert.match(github.stderr, /Use text or json/);
 });
+
+test('a note with CRLF line endings has the same sections as one with LF, and a heading inside its fences is still code', () => {
+  const files = { 'src/app.js': 'a', 'src/models/user.js': 'u', 'src/models/post.js': 'p', 'docs/schema.md': '# schema\n', 'tests/a.test.js': 't' };
+  const shape = (r) => r.sections.map((s) => [s.section, s.line, s.cited, s.changed, s.commits]);
+  const lf = report(repoWith({ 'CLAUDE.md': NOTE, ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
+  const crlf = report(repoWith({ 'CLAUDE.md': NOTE.replace(/\n/g, '\r\n'), ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
+  assert.deepEqual(shape(crlf), shape(lf));
+  assert.deepEqual(crlf.stats, lf.stats);
+  assert.equal(crlf.stats.sections, 3, 'the heading inside the fence is not a section');
+  assert.deepEqual(sectionsOf(['# One\r', '```\r', '# not a heading\r', '```\r', 'text\r']).map((s) => s.title), ['One'], 'a line that kept its carriage return still opens a fence');
+});

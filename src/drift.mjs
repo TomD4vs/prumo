@@ -102,7 +102,7 @@ export function drift({ repo, targets, config = null, now = Math.floor(Date.now(
   for (const { file, path } of result.files) {
     const body = readTextFile(path);
     if (body === null) continue;
-    const lines = body.split('\n');
+    const lines = body.split(/\r?\n/);
     // The newline that ends the file is not a line git blames; keeping it would read the last section as uncommitted.
     if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
     const parts = sectionsOf(lines);

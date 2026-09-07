@@ -40,6 +40,9 @@ node bin/prumo.mjs . --all      # do not truncate
 - **The git index is the source of truth for paths**, never the filesystem: `existsSync`
   reports success for the wrong letter case on Windows and macOS, which is the exact bug
   the case check exists to find.
+- **Split a file into lines with `/\r?\n/`, never with `'\n'`.** A CRLF checkout keeps its `\r`
+  otherwise, the fence opener stops matching, and every filter that rests on a fenced block is
+  off on Windows while Linux reads the same file clean. A real repository showed it in 0.9.1.
 - **Precision over recall.** A generic "does this symbol exist" check was built and removed
   after measuring 2% precision across seven audits. Do not add a check without measuring it
   on a real corpus first.
