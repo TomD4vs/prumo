@@ -147,12 +147,17 @@ test('with colour, the titles become badges, the correction is painted apart, an
   assert.match(painted, /\x1b\[38;5;173mlayouts\/AppLayout\.vue\x1b\[0m/);
   assert.match(painted, /\x1b\[38;5;79m->\x1b\[0m  \x1b\[38;5;79mresources\/js\/Layouts\/AppLayout\.vue\x1b\[0m/);
   assert.match(painted, /\x1b\[7;38;5;221m BROKEN LINK \x1b\[0m \x1b\[1m2\x1b\[0m   \x1b\[38;5;245mpoints at a page or heading that is not there; 1 with a likely destination/);
-  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path   ·   --fix corrects 1\x1b\[0m$/);
+  assert.match(painted, /\x1b\[1m5 to review\x1b\[0m\x1b\[38;5;245m   ·   1 case mismatch   ·   2 broken links   ·   1 note not in the index   ·   1 missing path   ·   --fix corrects 1\x1b\[0m\n/);
+  const plainOf = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+  assert.match(plainOf(painted), /\n  next  prumo --fix   corrects 1 in place: letter case, and the renames git recorded\n        edit the other 4, or mark a line <!-- prumo-ignore --> when the note is right$/, 'a person at a terminal is told what to do next');
+  assert.doesNotMatch(renderText(result(findings)), /next/, 'a pipe never sees the next block');
+  assert.doesNotMatch(renderText(result(findings), { color: true, fixed: { paths: 1, files: 1, changes: [], skipped: [] } }), /next/, 'after --fix there is nothing to suggest');
+  assert.match(plainOf(renderText(result({ missingPaths: findings.missingPaths }), { color: true })), /\n  next  edit the 1, or mark a line <!-- prumo-ignore --> when the note is right$/);
   assert.match(renderText(result(), { color: true }), /\x1b\[38;5;79mnothing to review\.\x1b\[0m$/);
 
   const plain = renderText(result(findings));
   assert.doesNotMatch(plain, /\x1b/, 'without colour there is no escape code at all');
-  assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, '').split('\n').length, plain.split('\n').length, 'colour adds no line');
+  assert.equal(painted.replace(/\x1b\[[0-9;]*m/g, '').split('\n').length, plain.split('\n').length + 2, 'colour adds only the two lines of the next block');
 });
 
 test('the GitHub format is one annotation per finding, on the file and line', () => {

@@ -131,6 +131,13 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
       configIssues.length && plural(configIssues.length, 'config issue', 'config issues'),
     ].filter(Boolean);
     out.push(bold(`${total} to review`) + dim(`   ·   ${kinds.join('   ·   ')}${fixable ? `   ·   --fix corrects ${fixable}` : ''}`));
+    if (!fixed) {
+      const others = total - fixable;
+      const rows = [];
+      if (fixable) rows.push(bold('prumo --fix') + dim(`   corrects ${fixable} in place: letter case, and the renames git recorded`));
+      if (others) rows.push(dim(`edit the ${fixable ? 'other ' : ''}${others}, or mark a line <!-- prumo-ignore --> when the note is right`));
+      out.push(dim('  next  ') + rows[0], ...rows.slice(1).map((r) => '        ' + r));
+    }
   }
   if (baselineWritten !== null) out.push(dim(`baseline: ${BASELINE_FILE}, ${plural(baselineWritten, 'finding', 'findings')} recorded`));
   if (jsonPath) out.push(dim(`json: ${jsonPath}`));

@@ -35,7 +35,7 @@ prumo budget [repo] [target...] [--since REF]
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
-In a terminal, the report opens with the name drawn large, the version and the GitHub page. Each section title becomes a coloured label, the path the note cites is painted apart from the one the repository holds, and the last line counts the findings by kind. When the output goes to a pipe, a file, CI or an agent, nothing comes before the header line and no colour is used, so what those read is exactly what this page shows.
+In a terminal, the report opens with the name drawn large, the version and the GitHub page. Each section title becomes a coloured label, the path the note cites is painted apart from the one the repository holds, and the last line counts the findings by kind, followed by a `next` block that says what `--fix` will rewrite and what is left to edit or to mark with `prumo-ignore`. When the output goes to a pipe, a file, CI or an agent, nothing comes before the header line, nothing comes after the count, and no colour is used, so what those read is exactly what this page shows.
 
 | Variable | Meaning |
 | --- | --- |

@@ -35,7 +35,7 @@ prumo budget [repo] [alvo...] [--since REF]
 | `-h`, `--help` | Mostra a ajuda |
 | `-v`, `--version` | Mostra a versão |
 
-No terminal, o relatório abre com o nome em letras grandes, a versão e a página do GitHub. Cada título de seção vira um rótulo colorido, o caminho que a nota cita é pintado em cor diferente do que o repositório tem, e a última linha conta os achados por tipo. Quando a saída vai para um pipe, um arquivo, o CI ou um agente, nada vem antes da linha de cabeçalho e nenhuma cor é usada, então o que eles leem é exatamente o que esta página mostra.
+No terminal, o relatório abre com o nome em letras grandes, a versão e a página do GitHub. Cada título de seção vira um rótulo colorido, o caminho que a nota cita é pintado em cor diferente do que o repositório tem, e a última linha conta os achados por tipo, seguida de um bloco `next` que diz o que o `--fix` vai reescrever e o que sobra para editar ou marcar com `prumo-ignore`. Quando a saída vai para um pipe, um arquivo, o CI ou um agente, nada vem antes da linha de cabeçalho, nada vem depois da contagem e nenhuma cor é usada, então o que eles leem é exatamente o que esta página mostra.
 
 | Variável | Significado |
 | --- | --- |
