@@ -126,6 +126,8 @@ Um `[[wikilink]]`, ou um link markdown como `[Setup](docs/setup.md)`, aponta par
 
 O alvo pode ser uma página markdown, uma imagem, um PDF ou um arquivo de código, e as três formas de escrever link em markdown são lidas: `[a](x.md)`, `[a](<um nome com espaços.md>)` e um `[a][ref]` cuja definição `[ref]:` é reportada na própria linha dela. Um link para um título, `[setup](docs/guide.md#quick-start)` ou `[topo](#quick-start)`, é checado contra os títulos daquela página, transformados em âncoras do jeito que o GitHub faz, e contra qualquer atributo `id` ou `name` no HTML dela. Um fragmento na forma de linha do GitHub, `[a](docs/guide.md#L12)` ou `#L12-L20`, aponta para uma linha, que muda a cada edição, então só a página é checada. Colchetes duplos colados numa palavra, com ponto dentro ou com espaços nas bordas, como `df[[col]]`, `[[rule.threat]]` ou `$[[ inputs.stage ]]`, são código ou sintaxe de template, e ficam em paz.
 
+Num `CLAUDE.md` ou num `CLAUDE.local.md`, um import também é link: o Claude Code lê `@docs/guide.md` como o conteúdo daquele arquivo, resolvido a partir da pasta da nota, e não diz nada quando o arquivo não existe. Ele aparece no relatório como `@docs/guide.md`, a capitalização errada é um `CASE MISMATCH` que o `--fix` corrige, e um rename que o git registrou é seguido do mesmo jeito. Um caminho com pasta só conta quando essa pasta existe ao lado da nota, e por isso `@scope/package` é um pacote npm e não um arquivo; um nome solto só conta com extensão de arquivo, como `@AGENTS.md` ou `@package.json`, e assim um apelido como `@maintainer` fica de fora. Dentro de crases e de blocos cercados nada é import, que é como o próprio Claude Code lê. Caminho absoluto, pasta pessoal, glob e arquivo que cada máquina escreve para si, como `@CLAUDE.local.md`, nunca são checados.
+
 Quando o prumo imprime `-> sugestão`, aquele é quase certamente o arquivo pretendido; os dois costumam divergir só em `-` contra `_`. Sem sugestão, o destino foi renomeado ou apagado, então atualize ou remova o link. Num link markdown, o histórico do git é consultado do mesmo jeito que num caminho ausente, abaixo, e um rename que o git registrou substitui o palpite pelo nome. Um link cujo texto é o mesmo caminho em crase é uma citação só, reportada uma vez, como link.
 
 Centenas desses geralmente têm uma causa sistemática só. Numa execução medida, todo link estava em kebab-case enquanto todo arquivo estava em snake_case, e renomear os arquivos resolveu 247 de uma vez.
@@ -254,9 +256,9 @@ Se uma linha mudou entre a varredura e o `--fix`, o prumo deixa a linha como est
 
 ---
 
-## Dois relatórios: drift e budget
+## Três relatórios: drift, budget e coverage
 
-Nenhum dos dois é uma checagem. Uma checagem diz que uma citação está certa ou errada, e a página de design mede com que frequência ela acerta. Um relatório mede e ordena, e nenhuma linha dele pode ser alarme falso. Os dois saem com código 0 seja qual for o resultado, aceitam `--format json` e `--json ARQ`, e também são ferramentas do servidor MCP, `prumo_drift` e `prumo_budget`.
+Nenhum deles é uma checagem. Uma checagem diz que uma citação está certa ou errada, e a página de design mede com que frequência ela acerta. Um relatório mede e ordena, e nenhuma linha dele pode ser alarme falso. Os três saem com código 0 seja qual for o resultado, aceitam `--format json` e `--json ARQ`, e também são ferramentas do servidor MCP, `prumo_drift`, `prumo_budget` e `prumo_coverage`.
 
 ### `prumo drift`
 
@@ -296,3 +298,18 @@ REPEATED  (2)   a paragraph of twelve words or more written in more than one pla
 ```
 
 Os tokens são estimados a quatro caracteres cada, que é o que os fornecedores de modelo citam para prosa em inglês, então o número é um tamanho na unidade que o agente paga. Um tokenizador contaria diferente, e mais ainda para texto que não é inglês. O crescimento compara cada arquivo com o mesmo arquivo num commit anterior: o de trinta dias atrás, o primeiro commit de um repositório mais novo que isso, ou o `REF` dado com `--since`; um arquivo que não existia lá é `new`, e um que o git não rastreia é `not in git`. Um parágrafo repetido é um bloco de doze palavras ou mais, separado por linhas em branco, que aparece em mais de um lugar, em dois arquivos ou duas vezes no mesmo, comparado sem distinguir capitalização nem espaçamento; um bloco cercado conta como um parágrafo. Blocos menores, títulos e front matter ficam de fora, já que um item de lista ou um título qualquer um escreve duas vezes.
+
+### `prumo coverage`
+
+Quais pastas do código nenhum arquivo de contexto menciona, as mais ativas primeiro.
+
+```
+prumo — coverage, 4 context files, 12 folders of code, 9 cited
+
+UNCITED  (3)   folders no context file mentions, most commits in 90 days first
+  packages/billing   48 files   31 commits   last 2 days ago
+  scripts            12 files    4 commits   last 3 months ago
+  infra               6 files    0 commits   last 1 year ago
+```
+
+Uma pasta é uma pasta do primeiro nível do repositório ou, dentro de uma pasta do primeiro nível que guarda dois pacotes ou mais, cada pacote, uma pasta com o próprio `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, `composer.json` e afins. Pastas ocultas como `.github`, pastas que um build escreve como `dist` e as pastas em `ignore` no `.prumorc.json` ficam de fora. Uma pasta conta como citada quando um arquivo de contexto nomeia um caminho dentro dela ou a própria pasta, ou quando ela guarda um arquivo de contexto seu. A atividade é o número de commits que mexeram na pasta nos últimos noventa dias, e isso põe primeiro o código em que o agente mais trabalha sem ter ouvido falar dele. Uma pasta pode ficar fora das notas de propósito, e por isso o relatório é uma lista para ler, e não um achado.

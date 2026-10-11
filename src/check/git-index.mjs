@@ -86,9 +86,12 @@ function endingIn(index, tail, exact) {
  * Tries the literal path, then `@/` aliases, then the path without a first segment that names
  * no folder here, which is how a note spells the project name in front of a real path, then the
  * TypeScript source behind an emitted `.js`, then omitted extensions. The prefix step demands an
- * exact nested match, so a wrongly cased first segment stays a case mismatch.
+ * exact nested match, so a wrongly cased first segment stays a case mismatch. Each spelling is
+ * tried from the root, then from `folder`, the folder of the note, and only then by how it ends,
+ * so `src/index.ts` cited in `agents/db/AGENTS.md` is the file beside that note and not the first
+ * `src/index.ts` of another folder.
  */
-export function resolvePath(index, p) {
+export function resolvePath(index, p, folder = '') {
   const tries = [p];
   if (p.startsWith('@/')) {
     tries.push(p.slice(2));
@@ -102,8 +105,10 @@ export function resolvePath(index, p) {
   if (!/\.[a-z0-9]{2,5}$/i.test(p)) {
     for (const base of [...tries]) for (const e of TRY_EXT) tries.push(base + e);
   }
+  const beside = folder && folder !== '.' ? `${folder}/` : '';
   for (const t of tries) {
     if (index.known.has(t)) return { state: 'ok', real: t };
+    if (beside && index.known.has(beside + t)) return { state: 'ok', real: beside + t };
     const nested = endingIn(index, t, true);
     if (nested) return { state: 'ok', real: nested };
   }
@@ -115,12 +120,13 @@ export function resolvePath(index, p) {
   return { state: 'missing' };
 }
 
-/** `resolvePath` with each answer kept, since a path cited on many lines is resolved once. */
+/** `resolvePath` with each answer kept, since a path cited on many lines is resolved once per folder. */
 export function makeResolver(index) {
   const resolved = new Map();
-  return (p) => {
-    let r = resolved.get(p);
-    if (!r) { r = resolvePath(index, p); resolved.set(p, r); }
+  return (p, folder = '') => {
+    const key = `${folder}\0${p}`;
+    let r = resolved.get(key);
+    if (!r) { r = resolvePath(index, p, folder); resolved.set(key, r); }
     return r;
   };
 }

@@ -126,6 +126,8 @@ A `[[wikilink]]`, or a markdown link such as `[Setup](docs/setup.md)`, points at
 
 The target may be a markdown page, an image, a PDF or a source file, and the three ways markdown writes a link are all read: `[a](x.md)`, `[a](<a name with spaces.md>)` and a `[a][ref]` whose `[ref]:` definition is reported on its own line. A link to a heading, `[setup](docs/guide.md#quick-start)` or `[top](#quick-start)`, is checked against the headings of that page, turned into anchors the way GitHub does it, and against any `id` or `name` attribute in its HTML. A fragment in the line form of GitHub, `[a](docs/guide.md#L12)` or `#L12-L20`, points at a line, which moves with every edit, so only the page is checked. Double brackets glued to a word, holding a dot or padded with spaces, as in `df[[col]]`, `[[rule.threat]]` or `$[[ inputs.stage ]]`, are code or template syntax and are left alone.
 
+In a `CLAUDE.md` or a `CLAUDE.local.md`, an import is a link too: Claude Code reads `@docs/guide.md` as the contents of that file, resolved from the folder of the note, and says nothing when the file is not there. It is reported as `@docs/guide.md`, a wrong letter case is a `CASE MISMATCH` that `--fix` corrects, and a rename git recorded is followed the same way. A path with a folder counts only when that folder exists beside the note, so `@scope/package` names an npm package and not a file; a bare name counts only with the extension of a file, as in `@AGENTS.md` or `@package.json`, so a handle such as `@maintainer` is left alone. Inside backticks and fenced blocks nothing is an import, as Claude Code itself reads them, and an absolute path, a home folder, a glob and a file written per machine, such as `@CLAUDE.local.md`, are never checked.
+
 Where prumo prints a `-> suggestion`, that is almost certainly the intended file; the two usually differ only in `-` versus `_`. With no suggestion, the target was renamed or deleted, so update the link or drop it. For a markdown link, git's history is asked the same way as for a missing path, below, and a rename git recorded replaces the guess from the name. A link whose text is the same path in backticks is one citation, reported once, as the link.
 
 Hundreds of these usually share one systematic cause. In one measured run, every link was written in kebab-case while every file was named in snake_case, and renaming the files cleared 247 at once.
@@ -254,9 +256,9 @@ If a line changed between the scan and the fix, prumo leaves that line as it is 
 
 ---
 
-## Two reports: drift and budget
+## Three reports: drift, budget and coverage
 
-Neither is a check. A check says a citation is right or wrong, and the design page measures how often it is right. A report measures and orders, and no line of it can be a false alarm. Both exit 0 whatever they find, take `--format json` and `--json FILE`, and are tools of the MCP server as well, `prumo_drift` and `prumo_budget`.
+None of them is a check. A check says a citation is right or wrong, and the design page measures how often it is right. A report measures and orders, and no line of it can be a false alarm. All three exit 0 whatever they find, take `--format json` and `--json FILE`, and are tools of the MCP server as well, `prumo_drift`, `prumo_budget` and `prumo_coverage`.
 
 ### `prumo drift`
 
@@ -296,3 +298,18 @@ REPEATED  (2)   a paragraph of twelve words or more written in more than one pla
 ```
 
 Tokens are estimated at four characters each, which is what the model vendors quote for English prose, so the number is a size in the unit the agent pays in. A tokenizer would count differently, and more so for text that is not English. Growth compares each file with the same file at an earlier commit: the one thirty days ago, the first commit of a younger repository, or the `REF` given with `--since`; a file that was not there is `new`, and one git does not track is `not in git`. A repeated paragraph is a block of twelve words or more, separated by blank lines, that appears in more than one place, in two files or twice in the same one, compared without regard to letter case or spacing; a fenced block counts as one paragraph. Shorter blocks, headings and front matter are left out, since a list item or a title is written twice by anyone.
+
+### `prumo coverage`
+
+Which folders of the code no context file mentions, the most active first.
+
+```
+prumo — coverage, 4 context files, 12 folders of code, 9 cited
+
+UNCITED  (3)   folders no context file mentions, most commits in 90 days first
+  packages/billing   48 files   31 commits   last 2 days ago
+  scripts            12 files    4 commits   last 3 months ago
+  infra               6 files    0 commits   last 1 year ago
+```
+
+A folder is a top-level folder of the repository, or, inside a top-level folder that holds two packages or more, each package, a folder with its own `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, `composer.json` and the like. Hidden folders such as `.github`, folders a build writes such as `dist`, and folders under `ignore` in `.prumorc.json` are left out. A folder counts as cited when a context file names a path in it or the folder itself, or when it holds a context file of its own. Activity is the number of commits that touched the folder in the last ninety days, which puts first the code the agent works in most without being told about it. A folder may be left out of the notes on purpose, which is why this is a list to read and not a finding.

@@ -539,6 +539,43 @@ nenhuma delas, não removeram nada fora dos catálogos, e sete citações dentro
 fazem de um arquivo de estado ou de configuração uma condição, *"se o usuário já tem"*, que se leem
 como certas.
 
+Uma décima quinta passagem mede a checagem de import, em sessenta repositórios achados buscando, em
+`CLAUDE.md`, por `@AGENTS.md`, `@docs`, `@README.md` e `@.claude`, nenhum em lista anterior; um clone
+falhou. O Claude Code lê `@caminho` num `CLAUDE.md` como o conteúdo daquele arquivo e não diz nada
+quando o arquivo não existe, então um import quebrado é um link que falha em silêncio. Uma primeira
+versão da regra, rodada antes de qualquer decisão no décimo primeiro ao décimo quarto corpus, não
+resolveu 26 dos seus 62 candidatos, e 18 deles eram pacotes npm citados no texto, como
+`@clack/prompts`. Por isso um caminho com pasta só conta quando essa pasta existe ao lado da nota, e
+um nome solto só com extensão de arquivo. Duas regras menores saíram do mesmo material e são
+ajustadas a ele: a vírgula japonesa encerra o caminho, e um caminho que sai do repositório a partir
+de uma nota aninhada não é checado.
+
+| Repositórios públicos, décima quinta passagem, a checagem de import | |
+| --- | ---: |
+| Repositórios checados | 59 |
+| Arquivos `CLAUDE.md` lidos | 137 |
+| Imports | 168 |
+| Resolvidos | 153 |
+| Achados | 7 |
+| Reais | 4 |
+| Falsos | 3 |
+| Achados no décimo primeiro ao décimo quarto corpus, 223 repositórios | 7 |
+| Desses, reais | 0 |
+
+Os reais são um import de `docs/USAGE.md` cujo arquivo está na raiz, um `common.mk` que foi para
+`scripts/`, e duas páginas que uma nota espera em `.claude/docs/`, uma que nunca foi adicionada e
+outra que desceu uma pasta. Os falsos têm a forma que as passagens anteriores conhecem: um
+`CLAUDE.md` modelo à espera do projeto para onde vai ser copiado, uma fixture de teste e, nos corpus
+antigos, sete imports num plugin que nomeia os arquivos do projeto onde é instalado. Nenhum achado
+das outras checagens apareceu ou sumiu em nenhum dos dois corpus. A mesma passagem olhou os caminhos
+que só resolvem pelo final, para um arquivo fora da pasta da nota: nenhum era uma skill sem um
+arquivo seu que outra skill tem, o falso negativo que a décima quarta passagem deixou em aberto. O
+que apareceu foi uma citação atribuída ao arquivo errado. `src/index.ts`, citado em
+`agents/db/AGENTS.md`, era lido como o primeiro `src/index.ts` de outra pasta enquanto
+`agents/db/src/index.ts` existe: 17 citações em quatro repositórios. Nenhum achado muda, porque o
+caminho resolve de qualquer jeito, mas o drift contava os commits do arquivo errado. Agora um
+caminho é tentado ao lado da nota antes de ser casado pelo final.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.
@@ -553,15 +590,15 @@ O `resolvePath` em [src/check.mjs](../src/check.mjs) tenta, nesta ordem: corresp
 
 O índice precisa ser lido como o git escreve. O `git ls-files` roda com o `core.quotepath` ligado por padrão, e isso devolve um nome não-ASCII entre aspas e com escape octal: `"docs/A\303\247\303\243o.md"` no lugar de `docs/Ação.md`. Lido assim, todo caminho acentuado fica de fora do índice: a checagem de capitalização fica em silêncio nele e, no Windows, o `existsSync` aceita a caixa errada sem dizer nada. Um arquivo de contexto dentro de uma pasta acentuada nem chega a ser detectado. Por isso a chamada é `git -c core.quotepath=false ls-files -z`, e o `-z` mantém inteiro um nome que contenha quebra de linha. Toda chamada nova a `git ls-files` passa pelo `trackedFiles`.
 
-Duas consequências. Um caminho citado é comparado pelo final, não pelo começo, porque as notas escrevem caminhos em forma curta e relativa (`pages/Auth/Login.vue`) muito mais do que por inteiro. Uma busca que parte de `resources/js/pages/` perde todos eles; foi assim que quatro caminhos errados sobreviveram a seis auditorias feitas à mão, um deles por dois meses. E o CI roda no Linux, Windows e macOS só por esse motivo: o comportamento sob teste muda conforme o sistema de arquivos, então uma execução verde numa plataforma não prova nada sobre as outras.
+Duas consequências. Um caminho citado é comparado pelo final, não pelo começo, porque as notas escrevem caminhos em forma curta e relativa (`pages/Auth/Login.vue`) muito mais do que por inteiro. Uma busca que parte de `resources/js/pages/` perde todos eles; foi assim que quatro caminhos errados sobreviveram a seis auditorias feitas à mão, um deles por dois meses. Antes disso, o caminho é tentado exatamente a partir da pasta da nota, e assim `src/index.ts`, citado em `agents/db/AGENTS.md`, é o arquivo ao lado daquela nota, e não o primeiro `src/index.ts` que alguma outra pasta tenha. E o CI roda no Linux, Windows e macOS só por esse motivo: o comportamento sob teste muda conforme o sistema de arquivos, então uma execução verde numa plataforma não prova nada sobre as outras.
 
 Um caminho é reportado em toda linha que o cita, então um `--fix` corrige todas. Até a 0.4.10 um caminho era reportado uma vez por arquivo, e a segunda citação em diante ficava invisível para o relatório e para o `--fix`, que precisava de uma rodada por citação. Uma coisa daquele comportamento foi mantida de propósito. Um caminho que uma frase desculpa, por ter sumido, por ser uma saída ou por pertencer a outro repositório, continua desculpado nas linhas seguintes do mesmo arquivo, porque elas falam do mesmo arquivo. A mesma versão fez o `--fix` reescrever um caminho onde quer que ele esteja. Antes ele só encontrava o alvo entre crases ou depois de `](`, e respondia *"line changed since the scan"* para uma definição de referência, um comando, um caminho do Windows ou um número de linha que não tinham mudado nada.
 
 ---
 
-## Dois relatórios que não são checagens
+## Três relatórios que não são checagens
 
-O `prumo drift` e o `prumo budget` vieram por último, de propósito. Uma checagem responde certo ou errado para uma citação, então um acervo consegue dizer com que frequência ela acerta, e toda regra acima foi medida assim antes de sair. Um relatório não tem resposta certa contra a qual medir: que uma seção tem oito meses e os cinco arquivos que ela nomeia mudaram quarenta vezes desde então é um fato do git, e se a seção está errada é o leitor quem diz. Por isso os dois ficam separados das checagens, saem com código 0 seja qual for o resultado, e não afirmam nada além da contagem. O que fez valer a pena construí-los é que cada um chega perto de uma pergunta que as checagens não conseguem fazer sem um modelo: o drift de *"isso ainda é verdade"*, ordenando onde o código mais se moveu debaixo de uma nota que ficou parada, e o budget de *"esta nota vale o que custa"*, dando um tamanho ao que o agente lê a cada sessão e nomeando o que ele lê duas vezes. Nenhum dos dois tem número de precisão nesta página, e nenhum vai ter. O que eles precisam conquistar é outra coisa, que o topo da ordem seja onde um mantenedor teria olhado primeiro, e isso só aparece com gente usando.
+O `prumo drift`, o `prumo budget` e o `prumo coverage` vieram por último, de propósito. Uma checagem responde certo ou errado para uma citação, então um acervo consegue dizer com que frequência ela acerta, e toda regra acima foi medida assim antes de sair. Um relatório não tem resposta certa contra a qual medir: que uma seção tem oito meses e os cinco arquivos que ela nomeia mudaram quarenta vezes desde então é um fato do git, e se a seção está errada é o leitor quem diz. Por isso os três ficam separados das checagens, saem com código 0 seja qual for o resultado, e não afirmam nada além da contagem. O que fez valer a pena construí-los é que cada um chega perto de uma pergunta que as checagens não conseguem fazer sem um modelo: o drift de *"isso ainda é verdade"*, ordenando onde o código mais se moveu debaixo de uma nota que ficou parada, e o budget de *"esta nota vale o que custa"*, dando um tamanho ao que o agente lê a cada sessão e nomeando o que ele lê duas vezes, e o coverage de *"do que o agente nunca ouve falar"*, o avesso de um caminho ausente, listando as pastas que nenhuma nota menciona, as mais trabalhadas primeiro. Nenhum deles tem número de precisão nesta página, e nenhum vai ter. O que eles precisam conquistar é outra coisa, que o topo da ordem seja onde um mantenedor teria olhado primeiro, e isso só aparece com gente usando.
 
 ## Sobre o nome
 

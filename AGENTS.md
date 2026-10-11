@@ -5,21 +5,21 @@ still match the code. Node 18+, ESM, no build step.
 
 ## Layout
 
-- `bin/prumo.mjs` — CLI: argument parsing, then the report, or one of the two reports, `drift` and `budget`. No analysis lives here.
-- `bin/prumo-mcp.mjs` — MCP server over stdio, four tools, same analysis and same reports.
+- `bin/prumo.mjs` — CLI: argument parsing, then the report, or one of the three reports, `drift`, `budget` and `coverage`. No analysis lives here.
+- `bin/prumo-mcp.mjs` — MCP server over stdio, five tools, same analysis and same reports.
 - `src/check.mjs` — what the analysis exports, `analyze()` and `resolveTargets()` among it; the code lives under `src/check/`, one module per job:
   - `analyze.mjs` runs the checks over each context file, then the gates on another project, `.gitignore`, the baseline and the history;
-  - `paths.mjs`, `links.mjs`, `commands.mjs` and `agent-config.mjs` are the checks, each with the filters only it uses;
+  - `paths.mjs`, `links.mjs`, `imports.mjs`, `commands.mjs` and `agent-config.mjs` are the checks, each with the filters only it uses; `imports.mjs` reads the `@path` of a `CLAUDE.md` as the broken link it becomes when the file is not there;
   - `sentence.mjs` reads what the words around a citation say: negation, a file that gets written, a condition;
   - `lines.mjs` tells prose from a fenced block and holds the `prumo-ignore` markers;
   - `git-index.mjs` reads the index and resolves a path against it, in the order `docs/design.md` fixes;
   - `targets.mjs`, `config.mjs`, `baseline.mjs`, `history.mjs`, `repository.mjs` and `version.mjs` are what the run reads around the notes.
-- `src/drift.mjs` and `src/budget.mjs` — the two reports, `drift()` and `budget()`: git blame and git log behind the sections of a note, and the size, growth and repeated paragraphs of each file. Neither is a check.
+- `src/drift.mjs`, `src/budget.mjs` and `src/coverage.mjs` — the three reports, `drift()`, `budget()` and `coverage()`: git blame and git log behind the sections of a note, the size, growth and repeated paragraphs of each file, and the folders of the code no note mentions. None is a check.
 - `src/index.mjs` — what the package exports: everything from the modules above and below.
 - `src/fix.mjs` — the only automatic rewrites: case mismatches, and the renames git recorded.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
-- `test/` — the suite, one file per subject: `paths`, `filters`, `links`, `commands`, `agent-config`, `lines`, `targets`, `config` and `fix` for the analysis, `hostile` for notes built to make a pattern backtrack, `cli` for what the command line and the docs promise, then `baseline`, `history`, `report`, `mcp`, `banner`, `drift` and `budget`. `test/support.mjs` builds the throwaway repositories every test needs and runs the CLI with the shell's colour settings cleared; `node --test` loads it as a file of its own, which is why the count is one above the tests.
+- `test/` — the suite, one file per subject: `paths`, `filters`, `links`, `commands`, `agent-config`, `lines`, `targets`, `config`, `imports` and `fix` for the analysis, `hostile` for notes built to make a pattern backtrack, `cli` for what the command line and the docs promise, then `baseline`, `history`, `report`, `mcp`, `banner`, `drift`, `budget` and `coverage`. `test/support.mjs` builds the throwaway repositories every test needs and runs the CLI with the shell's colour settings cleared; `node --test` loads it as a file of its own, which is why the count is one above the tests.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `action.yml` — the GitHub Action, `uses: TomD4vs/prumo@v1`: a composite step that runs the checked-out `bin/prumo.mjs`. Not in the npm tarball.
 - `.pre-commit-hooks.yaml` — the hook for the pre-commit framework; its `files:` regex is guarded by the same test as the hook in `docs/agents.md`.

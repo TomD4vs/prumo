@@ -20,7 +20,7 @@ A saída em texto traz arquivo, linha e correção, o que basta para um agente a
 
 ## Exponha como ferramenta
 
-O pacote traz o `prumo-mcp`, um servidor MCP por stdio com quatro ferramentas: `prumo_check`, que só lê, `prumo_fix`, que reescreve a capitalização e os renames que o git registrou, e os dois relatórios, `prumo_drift` e `prumo_budget`, que também só leem. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados.
+O pacote traz o `prumo-mcp`, um servidor MCP por stdio com cinco ferramentas: `prumo_check`, que só lê, `prumo_fix`, que reescreve a capitalização e os renames que o git registrou, e os três relatórios, `prumo_drift`, `prumo_budget` e `prumo_coverage`, que também só leem. O agente decide quando chamar e recebe o mesmo relatório do CLI, mais os achados como dados.
 
 No Claude Code:
 

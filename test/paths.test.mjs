@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkFiles } from './support.mjs';
+import { analyze, resolveTargets } from '../src/check.mjs';
+import { checkFiles, repoWith } from './support.mjs';
 
 test('flags a path whose case disagrees with the git index', () => {
   const r = checkFiles({
@@ -160,4 +161,21 @@ test('a line number, a GitHub anchor or a ::symbol after a path points inside th
     'src/index.ts': '',
   });
   assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/gone.ts']);
+});
+
+test('a path cited in a nested note is the file beside that note before any other with the same ending', () => {
+  const repo = repoWith({
+    'agents/auth/AGENTS.md': '# auth\n\nEntry point: `src/index.ts`.\n',
+    'agents/auth/src/index.ts': '',
+    'agents/db/AGENTS.md': '# db\n\nEntry point: `src/index.ts`.\n',
+    'agents/db/src/index.ts': '',
+    'agents/web/AGENTS.md': '# web\n\nEntry point: `src/index.ts`.\n',
+  });
+  const r = analyze({ repo, targets: resolveTargets(repo, []), collect: true });
+  assert.deepEqual(r.citations.map((c) => `${c.file} ${c.path}`).sort(), [
+    'agents/auth/AGENTS.md agents/auth/src/index.ts',
+    'agents/db/AGENTS.md agents/db/src/index.ts',
+    'agents/web/AGENTS.md agents/auth/src/index.ts',
+  ]);
+  assert.equal(r.missingPaths.length, 0, 'a note with no file beside it still resolves by how the path ends, as before');
 });

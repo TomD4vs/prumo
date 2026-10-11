@@ -32,6 +32,8 @@ const SHAPES = {
   'table cells': line('| '),
   'list markers': line('- '),
   'repository links': line('github.com/a/'),
+  'imports': line('@src/a.ts '),
+  'one endless import': line('a/', '@src/'),
 };
 
 for (const [name, text] of Object.entries(SHAPES)) {

@@ -7,6 +7,9 @@ import { BASELINE_FILE } from './check.mjs';
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+/** What a note wrote, the way it wrote it: `[[name]]` for a wikilink, `@path` for an import, the path alone otherwise. */
+const shown = (o, value = o.cited) => (o.kind === 'wikilink' ? `[[${value}]]` : o.kind === 'import' ? `@${value}` : value);
+
 /** The widest a finding may be written on one line; past it, the correction goes on lines of its own. */
 const ONE_LINE = 100;
 
@@ -60,7 +63,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   if (fixed) {
     const count = `${plural(fixed.paths, 'path', 'paths')} in ${plural(fixed.files, 'file', 'files')}`;
     out.push(color ? `${badge(PAINT.teal, 'FIXED')} ${bold(count)}` : `FIXED  ${count}`);
-    for (const c of fixed.changes) out.push(`  ${at(c)}   ${orange(c.cited)}  ${teal('->')}  ${teal(c.actual)}${c.why === 'rename' ? `   ${dim(`renamed in ${c.commit}`)}` : ''}`);
+    for (const c of fixed.changes) out.push(`  ${at(c)}   ${orange(shown(c))}  ${teal('->')}  ${teal(shown(c, c.actual))}${c.why === 'rename' ? `   ${dim(`renamed in ${c.commit}`)}` : ''}`);
     for (const s of fixed.skipped) out.push(dim(`  skipped ${s.file}:${s.line} (${s.why})`));
     out.push('');
   }
@@ -68,9 +71,9 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
   if (caseMismatch.length) {
     out.push(title('CASE MISMATCH', PAINT.red, caseMismatch.length, 'wrong letter case: works on Windows and macOS, fails on Linux and CI'));
     for (const o of cap(caseMismatch)) {
-      const fits = `  ${o.file}:${o.line}  ${o.cited}   ->  ${o.actual}`.length <= ONE_LINE;
-      if (fits) out.push(`  ${at(o)}  ${orange(o.cited)}   ${teal('->')}  ${teal(o.actual)}`);
-      else out.push(`  ${at(o)}`, `      ${orange(o.cited)}`, `      ${teal('->')}  ${teal(o.actual)}`);
+      const fits = `  ${o.file}:${o.line}  ${shown(o)}   ->  ${shown(o, o.actual)}`.length <= ONE_LINE;
+      if (fits) out.push(`  ${at(o)}  ${orange(shown(o))}   ${teal('->')}  ${teal(shown(o, o.actual))}`);
+      else out.push(`  ${at(o)}`, `      ${orange(shown(o))}`, `      ${teal('->')}  ${teal(shown(o, o.actual))}`);
     }
     out.push(...rest(caseMismatch));
   }
@@ -87,8 +90,7 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
     const withHint = brokenLinks.filter((l) => l.suggestion).length;
     out.push(title('BROKEN LINK', PAINT.yellow, brokenLinks.length, `points at a page or heading that is not there${withHint ? `; ${withHint} with a likely destination` : ''}`));
     for (const o of cap(brokenLinks)) {
-      const shown = o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited;
-      out.push(`  ${at(o)}  ${orange(shown)}${o.suggestion && !o.history ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`, ...history(o));
+      out.push(`  ${at(o)}  ${orange(shown(o))}${o.suggestion && !o.history ? `   ${teal('->')}  ${teal(o.suggestion)}` : ''}`, ...history(o));
     }
     out.push(...rest(brokenLinks));
   }
@@ -187,6 +189,41 @@ export function renderDrift(result, { all = false, color = false, jsonPath = nul
 }
 
 /**
+ * Renders the coverage report: the folders no context file cites, the most commits first, and how
+ * many folders are cited.
+ * @param {object} result   what coverage() returned
+ * @param {object} [opts]   `all`, `color` and `jsonPath`, as for renderText()
+ */
+export function renderCoverage(result, { all = false, color = false, jsonPath = null } = {}) {
+  const { folders, stats } = result;
+  const { bold, dim, teal, badge } = palette(color);
+  const out = [];
+  const title = (label, code, n, caption) => (color
+    ? `${badge(code, label)} ${bold(String(n))}   ${dim(caption)}`
+    : `${label}  (${n})   ${caption}`);
+
+  out.push(bold('prumo') + dim(` — coverage, ${plural(stats.targets, 'context file', 'context files')}, ${plural(stats.folders, 'folder', 'folders')} of code, ${stats.cited} cited`));
+  out.push('');
+
+  if (folders.length) {
+    out.push(title('UNCITED', PAINT.blue, folders.length, `folders no context file mentions, most commits in ${stats.days} days first`));
+    const shown = all ? folders : folders.slice(0, 25);
+    const w1 = widest(shown, (o) => o.folder);
+    const w2 = widest(shown, (o) => count(o.files));
+    const w3 = widest(shown, (o) => count(o.commits));
+    for (const o of shown) {
+      const active = `${right(count(o.commits), w3)} ${o.commits === 1 ? 'commit ' : 'commits'}`;
+      out.push(`  ${bold(cell(o.folder, w1))}   ${right(count(o.files), w2)} ${o.files === 1 ? 'file ' : 'files'}   ${o.commits ? teal(active) : dim(active)}   ${dim(o.age === 'not committed' ? o.age : `last ${o.age}`)}`);
+    }
+    if (!all && folders.length > 25) out.push(dim(`  … ${folders.length - 25} more (use --all)`));
+    out.push('');
+  } else out.push(teal('every folder of code is cited by a context file.'), '');
+
+  if (jsonPath) out.push(dim(`json: ${jsonPath}`));
+  return out.join('\n').trimEnd();
+}
+
+/**
  * Renders the budget report: each context file with its estimated tokens, largest first, the
  * growth since an earlier commit, and the paragraphs written twice.
  * @param {object} result   what budget() returned
@@ -264,8 +301,8 @@ export function renderSarif(result) {
     message: { text },
     locations: [{ physicalLocation: { artifactLocation: { uri: o.file, uriBaseId: '%SRCROOT%' }, ...(o.line ? { region: { startLine: o.line } } : {}) } }],
   });
-  for (const o of result.caseMismatch) at('case-mismatch', o, `${o.cited} should be ${o.actual}`);
-  for (const o of result.brokenLinks) at('broken-link', o, `${o.kind === 'wikilink' ? `[[${o.cited}]]` : o.cited}${o.history ? historyNote(o) : o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
+  for (const o of result.caseMismatch) at('case-mismatch', o, `${shown(o)} should be ${shown(o, o.actual)}`);
+  for (const o of result.brokenLinks) at('broken-link', o, `${shown(o)}${o.history ? historyNote(o) : o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
   for (const o of result.missingPaths) at('missing-path', o, `${o.cited}${historyNote(o)}`);
   for (const o of result.unknownCommands || []) at('unknown-command', o, `${o.cited}${o.suggestion ? ` (did you mean ${o.suggestion}?)` : ''}`);
   for (const o of result.configIssues || []) at('agent-config', o, `${o.cited}: ${o.message}`);
@@ -296,8 +333,8 @@ export function renderGithub(result) {
   if (result.stats && result.stats.baselined) lines.push(`::notice::Baseline: ${plural(result.stats.baselined, 'finding', 'findings')} held in ${BASELINE_FILE}`);
   for (const o of elsewhere) lines.push(`::notice file=${o.file}::Documents another project: ${o.absent} of ${o.cited} ${o.unit || 'cited paths'} ${o.unit ? 'reach no file here' : 'start in folders this repository does not have'}; findings held back`);
   for (const o of configIssues) say('warning', o, `Agent config: ${o.cited} ${o.message}`);
-  for (const o of caseMismatch) say('error', o, `Case mismatch: ${o.cited} should be ${o.actual}`);
-  for (const o of brokenLinks) say('warning', o, `Broken link: ${o.cited}${o.history ? historyNote(o) : o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
+  for (const o of caseMismatch) say('error', o, `Case mismatch: ${shown(o)} should be ${shown(o, o.actual)}`);
+  for (const o of brokenLinks) say('warning', o, `Broken link: ${o.kind === 'wikilink' ? o.cited : shown(o)}${o.history ? historyNote(o) : o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of missingPaths) say('warning', o, `Missing path: ${o.cited}${historyNote(o)}`);
   for (const o of unknownCommands) say('warning', o, `Unknown command: ${o.cited}${o.suggestion ? ` — did you mean ${o.suggestion}?` : ''}`);
   for (const o of orphans) lines.push(`::notice::Not in index: ${o}`);

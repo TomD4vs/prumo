@@ -16,6 +16,7 @@ import { classifyLines, headingsAbove, IGNORE_LINE, IGNORE_NEXT, IGNORE_FILE } f
 import { checkPaths } from './paths.mjs';
 import { checkCommands, dropAlternatives, makeCommandSources } from './commands.mjs';
 import { checkWikilinks, checkLinks, makeLinkTargets, makeAnchors, proseOf } from './links.mjs';
+import { checkImports } from './imports.mjs';
 import { CONFIG_FILES, frontmatterIssues, configFileIssues, ruleGlobs } from './agent-config.mjs';
 
 const HISTORICAL_NAME = /((phase|fase)[_\- ]?\d*[_\- ]?(done|complete|conclu)|[_-](superseded|superad|historic|revertid|reverted))/i;
@@ -30,15 +31,16 @@ function inIndex(run, target) {
 }
 
 /**
- * One context file as the line checks see it: its lines and how each is read, the paths a sentence
- * has excused, and the paths it cites, with the ones whose first folder is absent, which is what
- * the gates on another project count.
+ * One context file as the line checks see it: its lines and how each is read, the folder it sits
+ * in, the paths a sentence has excused, and the paths it cites, with the ones whose first folder is
+ * absent, which is what the gates on another project count.
  */
 function scanOf(run, target, body, lines, marked) {
   const isSkill = /(^|\/)SKILL\.md$/i.test(target.label);
   const cited = new Set(), absent = new Set();
   return {
     target, body, lines, marked, cited, absent,
+    folder: posix.dirname(relative(run.repo, target.path).split(sep).join('/')),
     headings: headingsAbove(lines, marked),
     excused: new Set(),
     cite(p, missing, head = p.split('/')[0]) {
@@ -89,6 +91,7 @@ function checkFile(run, target) {
     const prose = proseOf(m.text);
     checkWikilinks(run, file, i, prose);
     checkLinks(run, file, i, prose);
+    checkImports(run, file, i, m);
   });
   dropAlternatives(findings.unknownCommands, opened.unknownCommands);
 
@@ -206,7 +209,7 @@ function attachHistory(run) {
     if (h) o.history = h;
   }
   for (const o of findings.brokenLinks) {
-    if (o.kind !== 'link' || !relOf.has(o)) continue;
+    if (!(o.kind === 'link' || o.kind === 'import') || !relOf.has(o)) continue;
     const h = historian.of(relOf.get(o), o.file, true);
     if (h) o.history = h;
   }

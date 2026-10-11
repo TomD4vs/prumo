@@ -14,13 +14,14 @@ test('initialize answers with the protocol version, the server name and the pack
   assert.deepEqual(r.result.capabilities, { tools: {} });
 });
 
-test('tools/list offers prumo_check, prumo_drift and prumo_budget as read only and prumo_fix as a writer', () => {
+test('tools/list offers prumo_check and the three reports as read only and prumo_fix as a writer', () => {
   const [r] = talk([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }]);
   const byName = Object.fromEntries(r.result.tools.map((t) => [t.name, t]));
-  assert.deepEqual(Object.keys(byName).sort(), ['prumo_budget', 'prumo_check', 'prumo_drift', 'prumo_fix']);
+  assert.deepEqual(Object.keys(byName).sort(), ['prumo_budget', 'prumo_check', 'prumo_coverage', 'prumo_drift', 'prumo_fix']);
   assert.equal(byName.prumo_check.annotations.readOnlyHint, true);
   assert.equal(byName.prumo_drift.annotations.readOnlyHint, true);
   assert.equal(byName.prumo_budget.annotations.readOnlyHint, true);
+  assert.equal(byName.prumo_coverage.annotations.readOnlyHint, true);
   assert.equal(byName.prumo_fix.annotations.readOnlyHint, false);
   assert.equal(byName.prumo_budget.inputSchema.properties.since.type, 'string');
   for (const t of r.result.tools) assert.equal(t.inputSchema.type, 'object');
@@ -55,7 +56,7 @@ test('prumo_check returns the text report and the findings as structured content
   assert.equal(s.fixed, null);
   assert.equal(s.caseMismatch[0].cited, 'layouts/App.vue');
   assert.equal(s.brokenLinks[0].cited, 'gone-note');
-  assert.equal(s.schemaVersion, 9);
+  assert.equal(s.schemaVersion, 10);
   assert.equal(typeof s.prumoVersion, 'string');
 });
 

@@ -134,7 +134,7 @@ export function checkPaths(run, file, i, m) {
     if (!CODE_EXT.test(p) && !index.known.has(p.split('/')[0])) continue;
     if (p.startsWith('@/') && !index.aliasRoot) continue;
 
-    const r = run.resolve(p);
+    const r = run.resolve(p, file.folder);
     if (r.state === 'ok') { file.cite(p, false); file.record(i, p, r.real); continue; }
     if (r.state !== 'case' && LOCAL_FILE.test(p)) continue;
     if (r.state === 'missing' && installedElsewhere(index, p)) { file.cite(p, false); continue; }

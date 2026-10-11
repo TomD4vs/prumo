@@ -32,12 +32,20 @@ function replaceLink(line, cited, actual) {
   return m && m[2] === cited ? m[1] + actual + m[3] : null;
 }
 
+/** Rewrites an `@path` import, where the path runs from the `@` to the first space or punctuation mark. */
+function replaceImport(line, cited, actual) {
+  const re = new RegExp('(^|[\\s(])@' + escape(cited) + '(?=$|[\\s`()<>\\[\\]{}"\',;.:!?、。，；：（）])', 'g');
+  if (line.search(re) < 0) return null;
+  return line.replace(re, (m, before) => `${before}@${actual}`);
+}
+
 const decode = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
 
 /**
- * The rewrites a run's history allows: a missing path, or a markdown link, whose file git recorded
- * as renamed, with the new name written the way the citation was, from the root, from beside the
- * note, with a `/` or an `mdc:` in front, or with its spaces as `%20`. A deletion is never touched,
+ * The rewrites a run's history allows: a missing path, a markdown link or an `@` import whose file git
+ * recorded as renamed, with the new name written the way the citation was, from the root, from beside
+ * the note, with a `/` or an `mdc:` in front, or with its spaces as `%20`; an import always from beside
+ * the note, since that is where Claude Code resolves it. A deletion is never touched,
  * since there is nothing to write in its place.
  */
 export function renameFixes(result) {
@@ -55,16 +63,17 @@ export function renameFixes(result) {
   }
   for (const o of result.brokenLinks || []) {
     const h = o.history;
-    if (!h || h.event !== 'renamed' || !h.to || o.kind !== 'link') continue;
+    if (!h || h.event !== 'renamed' || !h.to || !(o.kind === 'link' || o.kind === 'import')) continue;
     let actual;
-    if (/^mdc:/i.test(o.cited)) actual = `mdc:${h.to}`;
+    if (o.kind === 'import') actual = beside(o.file, h.to);
+    else if (/^mdc:/i.test(o.cited)) actual = `mdc:${h.to}`;
     else if (o.cited.startsWith('/')) actual = `/${h.to}`;
     else {
       const written = decode(o.cited).replace(/^\.\//, '');
       actual = (o.cited.startsWith('./') ? './' : '') + (h.from === written ? h.to : beside(o.file, h.to));
     }
     if (o.cited.includes('%20')) actual = actual.split(' ').join('%20');
-    changes.push({ file: o.file, line: o.line, kind: 'link', cited: o.cited, actual, why: 'rename', commit: h.commit });
+    changes.push({ file: o.file, line: o.line, kind: o.kind, cited: o.cited, actual, why: 'rename', commit: h.commit });
   }
   return changes;
 }
@@ -96,7 +105,8 @@ export function applyFixes(findings, targets) {
     for (const item of [...items].sort((a, b) => a.line - b.line || b.cited.length - a.cited.length)) {
       const i = item.line - 1;
       if (i < 0 || i >= lines.length) { skipped.push({ ...item, why: 'line out of range' }); continue; }
-      const next = item.kind === 'link' ? replaceLink(lines[i], item.cited, item.actual) : replaceToken(lines[i], item.cited, item.actual);
+      const replace = item.kind === 'link' ? replaceLink : item.kind === 'import' ? replaceImport : replaceToken;
+      const next = replace(lines[i], item.cited, item.actual);
       if (next === null) { skipped.push({ ...item, why: 'line changed since the scan' }); continue; }
       lines[i] = next;
       changes.push(item);

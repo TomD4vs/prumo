@@ -526,6 +526,41 @@ none of them, they removed nothing outside the catalogues, and seven citations i
 sentences that make a state or configuration file a condition, *"if the user already has"*, which
 read as right.
 
+A fifteenth pass measures the import check, on sixty repositories found by searching `CLAUDE.md` for
+`@AGENTS.md`, `@docs`, `@README.md` and `@.claude`, none on any earlier list; one clone failed. Claude
+Code reads `@path` in a `CLAUDE.md` as the contents of that file and says nothing when the file is not
+there, so a broken import is a link that fails in silence. A first version of the rule, run before any
+decision on the eleventh to fourteenth corpora, could not resolve 26 of its 62 candidates, and 18 of
+those were npm packages named in prose, such as `@clack/prompts`. So a path with a folder counts only
+when that folder exists beside the note, and a bare name only with the extension of a file. Two smaller
+rules came from the same material and are fitted to it: a Japanese comma ends the path, and a path that
+climbs out of the repository from a nested note is not checked.
+
+| Public repositories, fifteenth pass, the import check | |
+| --- | ---: |
+| Repositories checked | 59 |
+| `CLAUDE.md` files read | 137 |
+| Imports | 168 |
+| Resolved | 153 |
+| Findings | 7 |
+| Real | 4 |
+| False | 3 |
+| Findings on the eleventh to fourteenth corpora, 223 repositories | 7 |
+| Of those, real | 0 |
+
+The real ones are an import of `docs/USAGE.md` whose file sits at the root, a `common.mk` that moved
+into `scripts/`, and two pages a note expects in `.claude/docs/`, one never added and one moved a
+folder deeper. The false ones are the shape the earlier passes know: a template `CLAUDE.md` waiting
+for the project it gets copied into, a test fixture, and on the older corpora seven imports in one
+plugin that names the files of the project it is installed in. No finding of the other checks
+appeared or disappeared on either corpus. The same pass looked at the paths that resolve only by how
+they end, to a file outside the note's folder: none was a skill missing a file of its own that
+another skill has, the false negative that pass fourteen left open. What it showed instead was a
+citation attributed to the wrong file. `src/index.ts` cited in `agents/db/AGENTS.md` was read as the
+first `src/index.ts` of another folder while `agents/db/src/index.ts` exists, 17 citations in four
+repositories. No finding changes, since the path resolves either way, but drift counted the commits
+of the wrong file. A path is now tried beside its note before it is matched by how it ends.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case and the renames git itself recorded, since a note corrected wrongly is worse than a stale one, and those two are the only corrections read from git rather than guessed. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
@@ -540,15 +575,15 @@ The git index is the only source that stores a path's true letter case. `existsS
 
 The index has to be read the way git spells it. `git ls-files` runs with `core.quotepath` on by default, which returns a non-ASCII name quoted and octal-escaped, `"docs/A\303\247\303\243o.md"` for `docs/Ação.md`. Read that way, every accented path falls out of the index: the case check goes silent on it, and on Windows `existsSync` then accepts the wrong case without a word. A context file under an accented folder is not even detected. The call is therefore `git -c core.quotepath=false ls-files -z`, and the `-z` keeps a name that contains a newline in one piece. Any new call to `git ls-files` goes through `trackedFiles`.
 
-Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
+Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. Before that, a path is tried exactly from the folder of the note, so `src/index.ts` cited in `agents/db/AGENTS.md` is the file beside that note, and not the first `src/index.ts` that some other folder holds. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
 
 A path is reported on every line that cites it, so one `--fix` corrects all of them. Up to 0.4.10 a path was reported once per file, and its second citation onwards was invisible to the report and to `--fix`, which needed one run per citation. One part of that behaviour was kept on purpose. A path that a sentence excuses, as gone, as an output or as another repository's, stays excused on the lines of that file that follow, since they speak of the same file. The same release made `--fix` rewrite a path wherever it stands. It used to find its target only between backticks or after `](`, and answered *"line changed since the scan"* for a reference definition, a command, a Windows path or a line number that had not changed at all.
 
 ---
 
-## Two reports that are not checks
+## Three reports that are not checks
 
-`prumo drift` and `prumo budget` came last, and on purpose. A check answers right or wrong for one citation, so a corpus can say how often it is right, and every rule above was measured that way before it shipped. A report has no right answer to measure against: that a section is eight months old and the five files it names changed forty times since is a fact from git, and whether the section is wrong is for the reader. So the two are kept apart from the checks, exit 0 whatever they find, and claim nothing beyond the count. What made them worth building is that each gets close to a question the checks cannot ask without a model: drift to *"is this still true"*, by ranking where the code moved most under a note that stayed still, and budget to *"is this note worth its cost"*, by putting a size on what the agent reads at every session and naming what it reads twice. Neither has a precision number on this page, and neither will. What they have to earn is a different thing, that the top of the ranking is where a maintainer would have looked first, and that shows only with people using them.
+`prumo drift`, `prumo budget` and `prumo coverage` came last, and on purpose. A check answers right or wrong for one citation, so a corpus can say how often it is right, and every rule above was measured that way before it shipped. A report has no right answer to measure against: that a section is eight months old and the five files it names changed forty times since is a fact from git, and whether the section is wrong is for the reader. So the three are kept apart from the checks, exit 0 whatever they find, and claim nothing beyond the count. What made them worth building is that each gets close to a question the checks cannot ask without a model: drift to *"is this still true"*, by ranking where the code moved most under a note that stayed still, and budget to *"is this note worth its cost"*, by putting a size on what the agent reads at every session and naming what it reads twice, and coverage to *"what is the agent never told"*, the reverse of a missing path, by listing the folders no note mentions with the most worked on first. None has a precision number on this page, and none will. What they have to earn is a different thing, that the top of the ranking is where a maintainer would have looked first, and that shows only with people using them.
 
 ## About the name
 

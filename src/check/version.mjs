@@ -6,4 +6,4 @@ import { createRequire } from 'node:module';
 
 export const VERSION = createRequire(import.meta.url)('../../package.json').version;
 /** Bumped when the shape of what analyze() returns changes in a way a consumer has to know about. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;

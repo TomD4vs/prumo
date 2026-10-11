@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
  * prumo — is your documentation still true?
- * CLI entry point: argument parsing, the report, the fix pass, and the two reports, drift and budget.
+ * CLI entry point: argument parsing, the report, the fix pass, and the three reports, drift, budget and coverage.
  */
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { analyze, resolveTargets, loadConfig, loadBaseline, baselineOf, changedFiles, hasRootSkill, BASELINE_FILE } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
-import { renderText, renderGithub, renderSarif, renderDrift, renderBudget } from '../src/report.mjs';
+import { renderText, renderGithub, renderSarif, renderDrift, renderBudget, renderCoverage } from '../src/report.mjs';
 import { drift } from '../src/drift.mjs';
 import { budget } from '../src/budget.mjs';
+import { coverage } from '../src/coverage.mjs';
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -28,6 +29,7 @@ USAGE
   prumo [repo] [target...] [options]
   prumo drift  [repo] [target...]   which sections describe code that changed since they were written
   prumo budget [repo] [target...]   what each context file costs the agent, and what is written twice
+  prumo coverage [repo] [target...] which folders of the code no context file mentions, most active first
 
 ARGUMENTS
   repo          path to a git repository (default: current directory)
@@ -74,6 +76,7 @@ EXAMPLES
   prumo --since origin/main
   prumo drift
   prumo budget --since v1.0.0
+  prumo coverage
 `;
 
 const argv = process.argv.slice(2);
@@ -81,8 +84,8 @@ const argv = process.argv.slice(2);
 if (argv.includes('-h') || argv.includes('--help')) { process.stdout.write(HELP); process.exit(0); }
 if (argv.includes('-v') || argv.includes('--version')) { console.log(VERSION); process.exit(0); }
 
-/** The two reports are commands: the first word, before the repository. */
-const COMMAND = ['drift', 'budget'].includes(argv[0]) ? argv.shift() : null;
+/** The three reports are commands: the first word, before the repository. */
+const COMMAND = ['drift', 'budget', 'coverage'].includes(argv[0]) ? argv.shift() : null;
 
 const valueAt = (flag) => {
   const i = argv.indexOf(flag);
@@ -144,6 +147,7 @@ try {
   }
   if (COMMAND === 'drift') result = drift({ repo, targets, config });
   else if (COMMAND === 'budget') result = budget({ repo, targets, config, since: sinceArg.value || '' });
+  else if (COMMAND === 'coverage') result = coverage({ repo, targets, config });
   else {
     if (STAGED || sinceArg.value) only = { paths: changedFiles(repo, { staged: STAGED, since: sinceArg.value || '' }), label: STAGED ? 'staged' : `since ${sinceArg.value}` };
     if (!WRITE_BASELINE && !argv.includes('--no-baseline')) baseline = loadBaseline(repo);
@@ -160,7 +164,7 @@ if (COMMAND) {
   else {
     const color = wantsColor();
     const head = wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '';
-    const render = COMMAND === 'drift' ? renderDrift : renderBudget;
+    const render = { drift: renderDrift, budget: renderBudget, coverage: renderCoverage }[COMMAND];
     console.log(head + render(result, { all: ALL, color, jsonPath: jsonArg.value }));
   }
   process.exit(0);

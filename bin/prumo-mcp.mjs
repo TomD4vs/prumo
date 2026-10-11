@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * prumo — MCP server over stdio, so an agent can ask for a check as a tool call.
- * Four tools: prumo_check (read only), prumo_fix (rewrites case mismatches and the renames git recorded),
- * and the two reports, prumo_drift and prumo_budget (read only).
+ * Five tools: prumo_check (read only), prumo_fix (rewrites case mismatches and the renames git recorded),
+ * and the three reports, prumo_drift, prumo_budget and prumo_coverage (read only).
  * JSON-RPC 2.0, one message per line, no dependencies.
  */
 
@@ -10,9 +10,10 @@ import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { analyze, resolveTargets, loadConfig, loadBaseline, hasRootSkill } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
-import { renderText, renderDrift, renderBudget } from '../src/report.mjs';
+import { renderText, renderDrift, renderBudget, renderCoverage } from '../src/report.mjs';
 import { drift } from '../src/drift.mjs';
 import { budget } from '../src/budget.mjs';
+import { coverage } from '../src/coverage.mjs';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
 const PROTOCOL = '2025-06-18';
@@ -31,7 +32,7 @@ const TOOLS = [
   {
     name: 'prumo_check',
     description:
-      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]], markdown links and heading anchors, paths that no longer exist, commands naming a script or target no package.json, Makefile or composer.json defines, agent configuration that points at nothing (a rule whose globs match no file, a skill without a description, an MCP server or a hook naming a missing script), and notes an index never mentions. Findings recorded in a .prumo-baseline.json at the repository root are held back and counted in stats.baselined. Nothing is written.',
+      'Checks the context files a coding agent reads (CLAUDE.md, AGENTS.md, SKILL.md, .cursor/rules and the rest) against the git index of a repository. Reports paths whose letter case disagrees with git, broken [[wikilinks]], markdown links, heading anchors and @ imports of a CLAUDE.md, paths that no longer exist, commands naming a script or target no package.json, Makefile or composer.json defines, agent configuration that points at nothing (a rule whose globs match no file, a skill without a description, an MCP server or a hook naming a missing script), and notes an index never mentions. Findings recorded in a .prumo-baseline.json at the repository root are held back and counted in stats.baselined. Nothing is written.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG },
@@ -41,7 +42,7 @@ const TOOLS = [
   {
     name: 'prumo_fix',
     description:
-      'Rewrites case mismatches in place to the spelling the git index holds, and a missing path or a markdown link to the name git recorded when it renamed the file, then reports what remains. Nothing else is touched: a link suggested from a name, a missing path with no history and a deleted file are never edited.',
+      'Rewrites case mismatches in place to the spelling the git index holds, and a missing path, a markdown link or an @ import to the name git recorded when it renamed the file, then reports what remains. Nothing else is touched: a link suggested from a name, a missing path with no history and a deleted file are never edited.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG },
@@ -68,6 +69,16 @@ const TOOLS = [
     },
     annotations: { title: 'prumo budget', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
+  {
+    name: 'prumo_coverage',
+    description:
+      'Reports the folders of the code that no context file mentions: every top-level folder, or every package of a workspace, that no context file cites a path in and that holds no context file of its own, with the files git tracks in it, its commits in the last ninety days and its last commit, the most active first. It is what the agent is never told about, never a finding: a folder may be left out of the notes on purpose. Nothing is written.',
+    inputSchema: {
+      type: 'object',
+      properties: { repo: REPO_ARG, targets: TARGETS_ARG },
+    },
+    annotations: { title: 'prumo coverage', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
 ];
 
 /** Runs one check, one fix or one report; throws with a message meant for the agent. */
@@ -83,6 +94,7 @@ function run(name, { repo = '.', targets: explicit = [], since = '' } = {}) {
 
   if (name === 'prumo_drift') return { result: drift({ repo, targets, config }), fixed: null };
   if (name === 'prumo_budget') return { result: budget({ repo, targets, config, since: String(since || '') }), fixed: null };
+  if (name === 'prumo_coverage') return { result: coverage({ repo, targets, config }), fixed: null };
 
   const baseline = loadBaseline(repo);
   let result = analyze({ repo, targets, config, baseline });
@@ -108,7 +120,7 @@ function handle(msg) {
         protocolVersion: PROTOCOL,
         capabilities: { tools: {} },
         serverInfo: { name: 'prumo', version: VERSION },
-        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand. Call prumo_drift to learn which sections describe code that changed since they were written, and prumo_budget to learn what each context file costs and what is written twice.',
+        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand. Call prumo_drift to learn which sections describe code that changed since they were written, prumo_budget to learn what each context file costs and what is written twice, and prumo_coverage to learn which folders of the code no context file mentions.',
       });
     case 'ping':
       return reply({});
@@ -120,7 +132,7 @@ function handle(msg) {
       try {
         const { result, fixed } = run(name, args || {});
         if (result.command !== 'check') {
-          const render = result.command === 'drift' ? renderDrift : renderBudget;
+          const render = { drift: renderDrift, budget: renderBudget, coverage: renderCoverage }[result.command];
           return reply({ content: [{ type: 'text', text: render(result, { all: true }) }], structuredContent: result, isError: false });
         }
         const total = result.caseMismatch.length + result.brokenLinks.length + result.missingPaths.length + result.unknownCommands.length + result.configIssues.length + result.orphans.length;

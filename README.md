@@ -108,7 +108,7 @@ prumo is a plain CLI, so any agent with shell access can run it.
 
 **Ask the agent to run it.** `npx @tomd4vs/prumo` works in any git repository, and covers skills installed under `.claude/skills/` on its own. For a repository that is itself a skill, name the file: `npx @tomd4vs/prumo . SKILL.md`. The text output names the file, the line and the correction, which is enough for an agent to act on without parsing. `--format json` returns the same findings as structured data.
 
-**Expose it as a tool.** The package also ships `prumo-mcp`, an MCP server over stdio with four tools: `prumo_check`, which is read only, `prumo_fix`, which rewrites letter case and the renames git recorded, and the two reports, `prumo_drift` and `prumo_budget`, read only as well. In Claude Code:
+**Expose it as a tool.** The package also ships `prumo-mcp`, an MCP server over stdio with five tools: `prumo_check`, which is read only, `prumo_fix`, which rewrites letter case and the renames git recorded, and the three reports, `prumo_drift`, `prumo_budget` and `prumo_coverage`, read only as well. In Claude Code:
 
 ```bash
 claude mcp add prumo -- npx -y -p @tomd4vs/prumo prumo-mcp
@@ -148,16 +148,17 @@ It annotates the exact line of the pull request and fails the job when something
 
 The action's inputs, the SARIF upload and the pre-commit block are in the [reference](docs/reference.md#continuous-integration).
 
-## Two reports
+## Three reports
 
-Beyond the checks, two commands measure instead of judging, and exit 0 whatever they find:
+Beyond the checks, three commands measure instead of judging, and exit 0 whatever they find:
 
 ```bash
 prumo drift     # which sections describe code that changed since they were written
 prumo budget    # what each context file costs the agent, and what is written twice
+prumo coverage  # which folders of the code no context file mentions, most active first
 ```
 
-`drift` reads from `git blame` when each section was last written, counts the commits that touched the files it cites since then, and lists the sections most moved first: a reading order for a review, since a section whose files changed forty times may still be right. `budget` estimates the tokens each file costs at every session, how much that grew since a commit, and which paragraphs are written in more than one place. Both are on the [reference](docs/reference.md#two-reports-drift-and-budget), and both are tools of the MCP server.
+`drift` reads from `git blame` when each section was last written, counts the commits that touched the files it cites since then, and lists the sections most moved first: a reading order for a review, since a section whose files changed forty times may still be right. `budget` estimates the tokens each file costs at every session, how much that grew since a commit, and which paragraphs are written in more than one place. `coverage` lists the folders of the code, package by package in a workspace, that no context file mentions, the most commits in ninety days first: what the agent is never told about. All three are on the [reference](docs/reference.md#three-reports-drift-budget-and-coverage), and all three are tools of the MCP server.
 
 ## Documentation
 
