@@ -301,22 +301,24 @@ A section is the text under one heading, or the text above the first heading; a 
 
 ### `prumo budget`
 
-What each context file costs the agent that reads it at every session, how much that grew, and what is written twice.
+What the context files cost the agent that reads them, at every session and only when used, how much that grew, and what is written twice.
 
 ```
-prumo — budget, 6 context files, 14,200 tokens at four characters each
+prumo — budget, 6 context files, 9,100 tokens at every session and 5,400 more when used, at four characters each
         since a3f21c9, 2026-08-06: +1,900 tokens
 
-BUDGET  (6)   largest first
-  CLAUDE.md                         4,100 tokens   118 lines   +1,200 since 2026-08-06
-  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   new since 2026-08-06
-  AGENTS.md                         2,300 tokens    70 lines   unchanged
+BUDGET  (6)   what every session reads first, then the largest
+  CLAUDE.md                         4,100 tokens   118 lines   every session, +2,300 imported   +1,200 since 2026-08-06
+  AGENTS.md                         2,300 tokens    70 lines   every session                    unchanged
+  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   when used, 40 listed             new since 2026-08-06
   …
 
 REPEATED  (2)   a paragraph of twelve words or more written in more than one place
   CLAUDE.md:12   also at .claude/skills/release/SKILL.md:8   210 words
   CLAUDE.md:50   also at CLAUDE.md:88   40 words
 ```
+
+A file is not read the same way everywhere, and the report follows what each agent's documentation says. A `CLAUDE.md`, an `AGENTS.md`, a `GEMINI.md` and the other notes at the root are read whole at every session, and a `CLAUDE.md`, a `CLAUDE.local.md` or a `GEMINI.md` brings in the files it imports with `@path`, followed four hops deep, as Claude Code does, and counted with it: `+2,300 imported`. A skill or a command is listed by its description, cut at 1,536 characters, and read whole only when it runs, and so is a Cursor rule with only a `description` and a Windsurf rule with `trigger: model_decision`: `when used, 40 listed`. A note in a folder, `api/CLAUDE.md` or `api/AGENTS.md`, is read when the agent works in that folder, and a rule scoped by `globs`, `applyTo` or `paths`, or one called by name, when it works on a file the rule matches: `when used`. A `GEMINI.md` in a folder counts at every session, since the Gemini CLI reads every one below the working directory when it starts, and so do a Cursor rule with `alwaysApply: true` and an instruction that applies to `**`. The totals count each file once, so an `AGENTS.md` that a `CLAUDE.md` imports is not paid twice; they add up what every agent reads, while each agent reads only its own files.
 
 Tokens are estimated at four characters each, which is what the model vendors quote for English prose, so the number is a size in the unit the agent pays in. A tokenizer would count differently, and more so for text that is not English. Growth compares each file with the same file at an earlier commit: the one thirty days ago, the first commit of a younger repository, or the `REF` given with `--since`; a file that was not there is `new`, and one git does not track is `not in git`. A repeated paragraph is a block of twelve words or more, separated by blank lines, that appears in more than one place, in two files or twice in the same one, compared without regard to letter case or spacing; a fenced block counts as one paragraph. Shorter blocks, headings and front matter are left out, since a list item or a title is written twice by anyone.
 

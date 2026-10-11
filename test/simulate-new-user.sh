@@ -103,7 +103,7 @@ echo "$OUT" | grep -q "^4 to review" && ok "4 to review" || bad "total"
 G=$($PR --format github 2>/dev/null); chk "$(echo "$G" | grep -Ec '^::(error|warning) file=[^,]+,line=[0-9]+::')" "4" "--format github: one annotation per finding"
 J=$($PR --format json 2>/dev/null)
 chk "$(echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(Object.keys(j).join(',')+' '+Object.keys(j.stats).sort().join(','))})")" "schemaVersion,prumoVersion,repo,checkedAt,command,caseMismatch,brokenLinks,missingPaths,unknownCommands,configIssues,orphans,elsewhere,stats absent,baselineStale,baselined,cited,configs,gitignored,historical,suppressed,targets,tracked,untracked" "--format json: the keys docs/api.md lists"
-echo "$J" | grep -q '"schemaVersion": 10' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
+echo "$J" | grep -q '"schemaVersion": 11' && echo "$J" | grep -q "\"prumoVersion\": \"$VERSION\"" && ok "--format json identifies the run by schema and version" || bad "json identity"
 $PR --json out.json >/dev/null 2>&1; [ -s out.json ] && ok "--json FILE" || bad "--json FILE"; rm -f out.json
 chk "$($PR 2>&1 | grep -c $'\x1b')" "0" "in a pipe the report carries no colour code"
 [ "$(FORCE_COLOR=1 $PR 2>&1 | grep -c $'\x1b')" -gt 0 ] && ok "FORCE_COLOR=1 paints the report" || bad "FORCE_COLOR"
@@ -340,7 +340,7 @@ echo "$OUT" | grep -q "^4 to review" && chk "$RC" "1" "--no-baseline reports all
 mkdir -p config; echo x > config/old.php; git add -A >/dev/null 2>&1
 OUT=$($PR 2>&1); echo "$OUT" | grep -q "^        2 findings held in .prumo-baseline.json; 1 entry there matches nothing now" && ok "a resolved finding shows as an entry that matches nothing now" || bad "stale: $(echo "$OUT" | grep held)"
 ci
-J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===10?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 10 in the JSON" || bad "json baseline stats"
+J=$($PR --format json 2>&1); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.stats.baselined===2&&j.stats.baselineStale===1&&j.schemaVersion===11?0:1)})" && ok "stats.baselined, stats.baselineStale and schemaVersion 11 in the JSON" || bad "json baseline stats"
 printf 'Read \x60docs/also-gone.md\x60.\n' >> AGENTS.md; git add AGENTS.md >/dev/null 2>&1
 OUT=$($PR --staged 2>&1); RC=$?
 echo "$OUT" | grep -q "^prumo — 1 context file, " && echo "$OUT" | grep -q "^        only the context files staged for commit" && echo "$OUT" | grep -q "docs/also-gone.md" && ! echo "$OUT" | grep -q "docs/new.md" && chk "$RC" "1" "--staged checks the staged AGENTS.md alone" || bad "staged: $(echo "$OUT" | tr '\n' '|')"
@@ -361,13 +361,13 @@ OUT=$($PR drift 2>&1); RC=$?
 echo "$OUT" | grep -q "^prumo — drift, 1 context file, 3 sections, 2 cited files" && echo "$OUT" | grep -qE "^  CLAUDE.md:3 +Backend +[0-9]+ [a-z]+ ago +1 of 2 cited files changed, 2 commits since" && chk "$RC" "0" "drift orders sections by the commits to what they cite since they were written, exit 0" || bad "drift: $(echo "$OUT" | tr '\n' '|')"
 echo "$OUT" | grep -q "^2 sections cite nothing the repository has" && ok "sections citing nothing are counted, not listed" || bad "quiet sections: $(echo "$OUT" | tail -1)"
 OUT=$($PR budget 2>&1); RC=$?
-echo "$OUT" | grep -qE "^prumo — budget, 1 context file, [0-9]+ tokens at four characters each" && echo "$OUT" | grep -qE "^  CLAUDE.md +[0-9]+ tokens +9 lines +unchanged" && chk "$RC" "0" "budget counts tokens and lines, exit 0" || bad "budget: $(echo "$OUT" | tr '\n' '|')"
+echo "$OUT" | grep -qE "^prumo — budget, 1 context file, [0-9]+ tokens at every session, at four characters each" && echo "$OUT" | grep -qE "^  CLAUDE.md +[0-9]+ tokens +9 lines +every session +unchanged" && chk "$RC" "0" "budget counts tokens and lines, exit 0" || bad "budget: $(echo "$OUT" | tr '\n' '|')"
 printf '\nThe same paragraph, long enough to count as a repeat, is written here and again in the other note for the simulation.\n' >> CLAUDE.md
 printf '# agents\n\nThe same paragraph, long enough to count as a repeat, is written here and again in the other note for the simulation.\n' > AGENTS.md; ci
 OUT=$($PR budget --since HEAD~1 2>&1)
 echo "$OUT" | grep -q "^REPEATED  (1)" && echo "$OUT" | grep -qE "^  CLAUDE.md:11 +also at AGENTS.md:3 +22 words" && ok "a paragraph written in two notes is reported once, with both places" || bad "repeated: $(echo "$OUT" | grep -A1 REPEATED | tr '\n' '|')"
-echo "$OUT" | grep -qE "^  AGENTS.md +[0-9]+ tokens +3 lines +new since [0-9]{4}-[0-9]{2}-[0-9]{2}" && echo "$OUT" | grep -qE "^  CLAUDE.md +[0-9]+ tokens +11 lines +\+[0-9]+ since" && ok "--since REF: growth per file, and a file that was not there is new" || bad "since: $(echo "$OUT" | grep -E 'AGENTS|CLAUDE' | tr '\n' '|')"
-J=$($PR drift --format json 2>/dev/null); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.command==='drift'&&j.schemaVersion===10&&j.sections.length===1?0:1)})" && ok "--format json carries command, schema and the sections" || bad "drift json"
+echo "$OUT" | grep -qE "^  AGENTS.md +[0-9]+ tokens +3 lines +every session +new since [0-9]{4}-[0-9]{2}-[0-9]{2}" && echo "$OUT" | grep -qE "^  CLAUDE.md +[0-9]+ tokens +11 lines +every session +\+[0-9]+ since" && ok "--since REF: growth per file, and a file that was not there is new" || bad "since: $(echo "$OUT" | grep -E 'AGENTS|CLAUDE' | tr '\n' '|')"
+J=$($PR drift --format json 2>/dev/null); echo "$J" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.exit(j.command==='drift'&&j.schemaVersion===11&&j.sections.length===1?0:1)})" && ok "--format json carries command, schema and the sections" || bad "drift json"
 OUT=$($PR drift --fix 2>&1); RC=$?; echo "$OUT" | grep -q 'is not an option of "prumo drift"' && chk "$RC" "2" "an option of the check is refused by a report: message and exit 2" || bad "drift --fix: $OUT rc=$RC"
 mkdir -p scripts infra; echo x > scripts/deploy.sh; echo x > infra/main.tf; ci; echo y > scripts/deploy.sh; ci
 OUT=$($PR coverage 2>&1); RC=$?

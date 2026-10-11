@@ -40,7 +40,7 @@ test('prumo_drift and prumo_budget return their reports as text and as structure
   assert.deepEqual(d.result.structuredContent.sections.map((s) => [s.section, s.cited, s.commits, s.age]), [['Layout', 1, 0, 'today']]);
   assert.equal(d.result.structuredContent.stats.quiet, 1, 'the title section cites nothing');
   assert.equal(b.result.isError, false);
-  assert.match(b.result.content[0].text, /^prumo — budget, 1 context file, \d+ tokens at four characters each\n        since HEAD, /);
+  assert.match(b.result.content[0].text, /^prumo — budget, 1 context file, \d+ tokens at every session, at four characters each\n        since HEAD, /);
   assert.equal(b.result.structuredContent.command, 'budget');
   assert.equal(b.result.structuredContent.files[0].state, 'unchanged');
 });
@@ -56,7 +56,7 @@ test('prumo_check returns the text report and the findings as structured content
   assert.equal(s.fixed, null);
   assert.equal(s.caseMismatch[0].cited, 'layouts/App.vue');
   assert.equal(s.brokenLinks[0].cited, 'gone-note');
-  assert.equal(s.schemaVersion, 10);
+  assert.equal(s.schemaVersion, 11);
   assert.equal(typeof s.prumoVersion, 'string');
 });
 

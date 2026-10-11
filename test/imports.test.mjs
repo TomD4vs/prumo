@@ -19,7 +19,7 @@ test('an @ import in a CLAUDE.md that reaches no file is a broken link, and one 
   });
   assert.deepEqual(imports(r), ['CLAUDE.md:7 @docs/USAGE.md']);
   assert.equal(r.brokenLinks[0].suggestion, 'USAGE.md', 'the file the import most likely meant, written from the note');
-  assert.equal(r.schemaVersion, 10);
+  assert.equal(r.schemaVersion, 11);
 });
 
 test('an import resolves from the folder of the note that holds it, as Claude Code reads it', () => {

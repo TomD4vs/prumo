@@ -15,7 +15,7 @@ still match the code. Node 18+, ESM, no build step.
   - `git-index.mjs` reads the index and resolves a path against it, in the order `docs/design.md` fixes;
   - `targets.mjs`, `config.mjs`, `baseline.mjs`, `history.mjs`, `repository.mjs` and `version.mjs` are what the run reads around the notes.
 - `src/explain.mjs` — `explain()`: the run with a trace on one line, and what the checks decided there, settled against what the run kept.
-- `src/drift.mjs`, `src/budget.mjs` and `src/coverage.mjs` — the three reports, `drift()`, `budget()` and `coverage()`: git blame and git log behind the sections of a note, the size, growth and repeated paragraphs of each file, and the folders of the code no note mentions. None is a check.
+- `src/drift.mjs`, `src/budget.mjs` and `src/coverage.mjs` — the three reports, `drift()`, `budget()` and `coverage()`: git blame and git log behind the sections of a note, the size of each file, what it costs at every session and when used with the files it imports, its growth and its repeated paragraphs, and the folders of the code no note mentions. None is a check.
 - `src/index.mjs` — what the package exports: everything from the modules above and below.
 - `src/fix.mjs` — the only automatic rewrites: case mismatches, and the renames git recorded.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.

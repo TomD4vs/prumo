@@ -55,7 +55,7 @@ const TOOLS = [
   {
     name: 'prumo_budget',
     description:
-      'Reports what each context file costs the agent that reads it at every session: bytes, lines, words and an estimate of tokens at four characters each, largest first; how much each grew since an earlier commit, the one thirty days ago unless `since` names another; and the paragraphs of twelve words or more written in two places. It measures and counts; nothing here is a finding. Nothing is written.',
+      'Reports what the context files cost the agent: bytes, lines, words and an estimate of tokens at four characters each, and when each is read, at every session with the files a CLAUDE.md imports, or only when used, as a skill, the note of a folder or a scoped rule is, the cost at every session first; how much each grew since an earlier commit, the one thirty days ago unless `since` names another; and the paragraphs of twelve words or more written in two places. It measures and counts; nothing here is a finding. Nothing is written.',
     inputSchema: {
       type: 'object',
       properties: { repo: REPO_ARG, targets: TARGETS_ARG, since: { type: 'string', description: 'The commit or branch to compare sizes with. Omit for the commit thirty days ago, or the first commit of a younger repository.' } },

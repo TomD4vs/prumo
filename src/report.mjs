@@ -248,9 +248,19 @@ const GROWTH = {
   unchanged: () => 'unchanged',
 };
 
+const WHEN_READ = {
+  session: () => 'every session',
+  listed: (o) => `when used, ${count(o.own)} listed`,
+  use: () => 'when used',
+};
+
+/** When the agents read a file, and what its imports add, in the words of the budget report. */
+const whenRead = (o) => WHEN_READ[o.load](o) + (o.imported ? `, +${count(o.imported)} imported` : '');
+
 /**
- * Renders the budget report: each context file with its estimated tokens, largest first, the
- * growth since an earlier commit, and the paragraphs written twice.
+ * Renders the budget report: what the context files cost at every session and what they add when
+ * used, then each file with its estimated tokens and when it is read, the cost at every session
+ * first, the growth since an earlier commit, and the paragraphs written twice.
  * @param {object} result   what budget() returned
  * @param {object} [opts]   `all`, `color` and `jsonPath`, as for renderText()
  */
@@ -261,17 +271,18 @@ export function renderBudget(result, { all = false, color = false, jsonPath = nu
   const w1 = widest(shownRows, (o) => o.file);
   const w2 = widest(shownRows, (o) => count(o.tokens));
   const w3 = widest(shownRows, (o) => count(o.lines));
+  const w4 = widest(shownRows, whenRead);
   const row = (o) => {
     const g = stats.since ? (GROWTH[o.state] || GROWTH.unchanged)(o, stats.since.date) : '';
-    return [`  ${p.bold(cell(o.file, w1))}   ${right(count(o.tokens), w2)} tokens   ${right(count(o.lines), w3)} lines${g ? `   ${o.state === 'changed' && o.delta > 0 ? p.orange(g) : p.dim(g)}` : ''}`];
+    return [`  ${p.bold(cell(o.file, w1))}   ${right(count(o.tokens), w2)} tokens   ${right(count(o.lines), w3)} lines   ${g ? cell(whenRead(o), w4) : whenRead(o)}${g ? `   ${o.state === 'changed' && o.delta > 0 ? p.orange(g) : p.dim(g)}` : ''}`];
   };
   const where = (at) => `${at.file}:${at.line}`;
   const grown = stats.since ? stats.tokens - stats.before : 0;
   return [
-    p.bold('prumo') + p.dim(` — budget, ${plural(stats.targets, 'context file', 'context files')}, ${count(stats.tokens)} tokens at four characters each`),
+    p.bold('prumo') + p.dim(` — budget, ${plural(stats.targets, 'context file', 'context files')}, ${count(stats.session)} tokens at every session${stats.whenUsed ? ` and ${count(stats.whenUsed)} more when used` : ''}, at four characters each`),
     p.dim(stats.since ? `        since ${stats.since.ref}, ${stats.since.date}: ${grown > 0 ? '+' : ''}${count(grown)} tokens` : '        no earlier commit to compare with'),
     '',
-    ...section(p, all, { label: 'BUDGET', code: PAINT.blue, caption: () => 'largest first', list: files, line: row }),
+    ...section(p, all, { label: 'BUDGET', code: PAINT.blue, caption: () => 'what every session reads first, then the largest', list: files, line: row }),
     ...(repeated.length
       ? section(p, all, { label: 'REPEATED', code: PAINT.yellow, caption: () => 'a paragraph of twelve words or more written in more than one place', list: repeated, line: (r) => [`  ${p.bold(where(r.at[0]))}   ${p.dim('also at')} ${r.at.slice(1).map(where).join(', ')}   ${p.teal(`${count(r.words)} words`)}`] })
       : [p.teal('nothing written twice.'), '']),

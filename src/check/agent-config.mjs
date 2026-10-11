@@ -14,7 +14,7 @@ const PROJECT_DIR_VAR = /\$\{?CLAUDE_PROJECT_DIR\}?\//g;
  * The front matter of a note, read as flat fields: `key: value` lines and the list items under a
  * key, each with its line number. Enough for globs, names and descriptions, nothing nested.
  */
-function frontmatterOf(lines) {
+export function frontmatterOf(lines) {
   const fields = new Map();
   if ((lines[0] || '').trim() !== '---') return fields;
   let key = '';

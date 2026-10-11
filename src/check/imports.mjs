@@ -4,7 +4,7 @@ import { CODE_EXT, WILDCARD, LOCAL_FILE, TRANSIENT } from './paths.mjs';
 import { decide } from './rules.mjs';
 
 const IMPORTING_NOTE = /(^|\/)CLAUDE(\.local)?\.md$/i;
-const IMPORT = /(^|[\s(])@([^\s`()<>[\]{}"',;、。，；：（）]+)/g;
+export const IMPORT = /(^|[\s(])@([^\s`()<>[\]{}"',;、。，；：（）]+)/g;
 const FILE_EXT = /\.(mk|txt|ini|cfg|conf|env|xml|jsonc|lock|mdc|mdx)$/i;
 
 /**

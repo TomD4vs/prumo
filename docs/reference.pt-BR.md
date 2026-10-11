@@ -301,22 +301,24 @@ Uma seção é o texto sob um título, ou o texto acima do primeiro título; um 
 
 ### `prumo budget`
 
-Quanto cada arquivo de contexto custa ao agente que o lê a cada sessão, quanto isso cresceu, e o que está escrito duas vezes.
+O que os arquivos de contexto custam ao agente que os lê, em toda sessão e só quando usados, quanto isso cresceu, e o que está escrito duas vezes.
 
 ```
-prumo — budget, 6 context files, 14,200 tokens at four characters each
+prumo — budget, 6 context files, 9,100 tokens at every session and 5,400 more when used, at four characters each
         since a3f21c9, 2026-08-06: +1,900 tokens
 
-BUDGET  (6)   largest first
-  CLAUDE.md                         4,100 tokens   118 lines   +1,200 since 2026-08-06
-  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   new since 2026-08-06
-  AGENTS.md                         2,300 tokens    70 lines   unchanged
+BUDGET  (6)   what every session reads first, then the largest
+  CLAUDE.md                         4,100 tokens   118 lines   every session, +2,300 imported   +1,200 since 2026-08-06
+  AGENTS.md                         2,300 tokens    70 lines   every session                    unchanged
+  .claude/skills/release/SKILL.md   3,000 tokens    90 lines   when used, 40 listed             new since 2026-08-06
   …
 
 REPEATED  (2)   a paragraph of twelve words or more written in more than one place
   CLAUDE.md:12   also at .claude/skills/release/SKILL.md:8   210 words
   CLAUDE.md:50   also at CLAUDE.md:88   40 words
 ```
+
+Nem todo agente lê um arquivo do mesmo jeito, e o relatório segue o que a documentação de cada um diz. Um `CLAUDE.md`, um `AGENTS.md`, um `GEMINI.md` e as outras notas da raiz são lidos inteiros em toda sessão, e um `CLAUDE.md`, um `CLAUDE.local.md` ou um `GEMINI.md` traz junto os arquivos que importa com `@caminho`, seguidos até quatro níveis, como faz o Claude Code, e contados com ele: `+2,300 imported`. Uma skill ou um comando aparece pela descrição, cortada em 1.536 caracteres, e só é lido inteiro quando roda, e o mesmo vale para uma regra do Cursor só com `description` e uma regra do Windsurf com `trigger: model_decision`: `when used, 40 listed`. A nota de uma pasta, `api/CLAUDE.md` ou `api/AGENTS.md`, é lida quando o agente trabalha naquela pasta, e uma regra com escopo em `globs`, `applyTo` ou `paths`, ou chamada pelo nome, quando ele mexe num arquivo que ela cobre: `when used`. Um `GEMINI.md` numa pasta conta em toda sessão, porque o Gemini CLI lê todos os que estão abaixo da pasta de trabalho quando começa, e o mesmo vale para uma regra do Cursor com `alwaysApply: true` e uma instrução que vale para `**`. Os totais contam cada arquivo uma vez, então um `AGENTS.md` que um `CLAUDE.md` importa não é pago duas vezes; eles somam o que todos os agentes leem, enquanto cada agente lê só os seus arquivos.
 
 Os tokens são estimados a quatro caracteres cada, que é o que os fornecedores de modelo citam para prosa em inglês, então o número é um tamanho na unidade que o agente paga. Um tokenizador contaria diferente, e mais ainda para texto que não é inglês. O crescimento compara cada arquivo com o mesmo arquivo num commit anterior: o de trinta dias atrás, o primeiro commit de um repositório mais novo que isso, ou o `REF` dado com `--since`; um arquivo que não existia lá é `new`, e um que o git não rastreia é `not in git`. Um parágrafo repetido é um bloco de doze palavras ou mais, separado por linhas em branco, que aparece em mais de um lugar, em dois arquivos ou duas vezes no mesmo, comparado sem distinguir capitalização nem espaçamento; um bloco cercado conta como um parágrafo. Blocos menores, títulos e front matter ficam de fora, já que um item de lista ou um título qualquer um escreve duas vezes.
 
