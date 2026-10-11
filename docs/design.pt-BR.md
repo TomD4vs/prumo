@@ -576,6 +576,36 @@ que apareceu foi uma citação atribuída ao arquivo errado. `src/index.ts`, cit
 caminho resolve de qualquer jeito, mas o drift contava os commits do arquivo errado. Agora um
 caminho é tentado ao lado da nota antes de ser casado pelo final.
 
+Uma décima sexta passagem voltou aos corpus da décima primeira à décima quarta atrás daquele falso
+negativo, e o achou lá em escala. Um `SKILL.md` que roda `python scripts/auth.py` ou lê
+`references/api-reference.md` quer dizer o arquivo da sua própria pasta, e quando esse arquivo faltava,
+o casamento pelo final achava o mesmo nome em alguma outra skill e dava por resolvido: `gmail-automation`
+era lido como quem roda o `scripts/auth.py` de `instagram`, `astropy` como quem lê o
+`references/tables.md` de uma skill de docx. Por isso uma skill que cita uma pasta que carrega,
+`references/`, `scripts/`, `assets/` ou `templates/`, agora só é casada pelo final dentro da skill ou de
+uma pasta acima dela, onde um projeto que guarda suas skills deixa os scripts em comum; e uma linha que
+nomeia a skill dona do arquivo, *"the `ask` skill's `references/threading.md`"*, continua resolvendo
+para ele.
+
+| Repositórios públicos, décima sexta passagem, as pastas de uma skill | |
+| --- | ---: |
+| Repositórios checados | 223 |
+| Citações de uma pasta da skill resolvidas fora da skill | 2902 |
+| Numa pasta acima da skill, ainda resolvidas | 404 |
+| Achados acrescentados | 1554 |
+| Repositórios com achado acrescentado | 14 |
+| Divergências de caixa removidas, um arquivo de outra skill em outra caixa | 7 |
+| Achados acrescentados lidos, sorteados | 40 |
+| Reais | 36 |
+| Falsos | 4 |
+
+Quase todos os achados acrescentados estão em catálogos de skills copiadas sem os seus scripts, que é
+o defeito: o agente recebe a ordem de rodar um arquivo que não está lá. Os quatro falsos são uma skill
+que ensina a montar uma skill e nomeia os arquivos de uma imaginária, um arquivo que o usuário é
+mandado criar, um exemplo de JSON e o `scripts/deploy.sh` de um projeto de exemplo. As sete divergências
+de caixa que saíram também eram falsas, porque o arquivo para o qual apontavam é de outra skill, e cada
+uma agora é o caminho ausente que sempre foi. O décimo quinto corpus não mudou.
+
 Três coisas ficam fora de escopo por decisão. O prumo não julga afirmações, já que *"esta flag faz X"* exige um modelo. Não edita além da capitalização e dos renames que o próprio git registrou, porque uma nota corrigida errado é pior que uma desatualizada, e essas duas são as únicas correções lidas do git em vez de adivinhadas. E não faz chamada de rede nenhuma.
 
 Duas regras decorrem da medição. Nenhuma checagem entra antes de ter a precisão medida num projeto real. Encontrar mais é fácil; acertar é o produto inteiro, e uma checagem que aponta algo correto uma vez por semana faz a ferramenta inteira ser desinstalada. E se um dia entrar uma camada semântica, um modelo julgando se uma afirmação continua valendo, ela fica atrás de um comando separado, que o usuário liga, com a precisão publicada antes do lançamento. Misturá-la à execução padrão desfaria o motivo pelo qual a ferramenta é confiável.
@@ -590,7 +620,7 @@ O `resolvePath` em [src/check.mjs](../src/check.mjs) tenta, nesta ordem: corresp
 
 O índice precisa ser lido como o git escreve. O `git ls-files` roda com o `core.quotepath` ligado por padrão, e isso devolve um nome não-ASCII entre aspas e com escape octal: `"docs/A\303\247\303\243o.md"` no lugar de `docs/Ação.md`. Lido assim, todo caminho acentuado fica de fora do índice: a checagem de capitalização fica em silêncio nele e, no Windows, o `existsSync` aceita a caixa errada sem dizer nada. Um arquivo de contexto dentro de uma pasta acentuada nem chega a ser detectado. Por isso a chamada é `git -c core.quotepath=false ls-files -z`, e o `-z` mantém inteiro um nome que contenha quebra de linha. Toda chamada nova a `git ls-files` passa pelo `trackedFiles`.
 
-Duas consequências. Um caminho citado é comparado pelo final, não pelo começo, porque as notas escrevem caminhos em forma curta e relativa (`pages/Auth/Login.vue`) muito mais do que por inteiro. Uma busca que parte de `resources/js/pages/` perde todos eles; foi assim que quatro caminhos errados sobreviveram a seis auditorias feitas à mão, um deles por dois meses. Antes disso, o caminho é tentado exatamente a partir da pasta da nota, e assim `src/index.ts`, citado em `agents/db/AGENTS.md`, é o arquivo ao lado daquela nota, e não o primeiro `src/index.ts` que alguma outra pasta tenha. E o CI roda no Linux, Windows e macOS só por esse motivo: o comportamento sob teste muda conforme o sistema de arquivos, então uma execução verde numa plataforma não prova nada sobre as outras.
+Duas consequências. Um caminho citado é comparado pelo final, não pelo começo, porque as notas escrevem caminhos em forma curta e relativa (`pages/Auth/Login.vue`) muito mais do que por inteiro. Uma busca que parte de `resources/js/pages/` perde todos eles; foi assim que quatro caminhos errados sobreviveram a seis auditorias feitas à mão, um deles por dois meses. Antes disso, o caminho é tentado exatamente a partir da pasta da nota, e assim `src/index.ts`, citado em `agents/db/AGENTS.md`, é o arquivo ao lado daquela nota, e não o primeiro `src/index.ts` que alguma outra pasta tenha; e um `SKILL.md` que cita `scripts/` ou `references/` só é casado dentro da skill ou de uma pasta acima dela, nunca em outra skill. E o CI roda no Linux, Windows e macOS só por esse motivo: o comportamento sob teste muda conforme o sistema de arquivos, então uma execução verde numa plataforma não prova nada sobre as outras.
 
 Um caminho é reportado em toda linha que o cita, então um `--fix` corrige todas. Até a 0.4.10 um caminho era reportado uma vez por arquivo, e a segunda citação em diante ficava invisível para o relatório e para o `--fix`, que precisava de uma rodada por citação. Uma coisa daquele comportamento foi mantida de propósito. Um caminho que uma frase desculpa, por ter sumido, por ser uma saída ou por pertencer a outro repositório, continua desculpado nas linhas seguintes do mesmo arquivo, porque elas falam do mesmo arquivo. A mesma versão fez o `--fix` reescrever um caminho onde quer que ele esteja. Antes ele só encontrava o alvo entre crases ou depois de `](`, e respondia *"line changed since the scan"* para uma definição de referência, um comando, um caminho do Windows ou um número de linha que não tinham mudado nada.
 

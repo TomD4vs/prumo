@@ -561,6 +561,35 @@ first `src/index.ts` of another folder while `agents/db/src/index.ts` exists, 17
 repositories. No finding changes, since the path resolves either way, but drift counted the commits
 of the wrong file. A path is now tried beside its note before it is matched by how it ends.
 
+A sixteenth pass went back to the eleventh to fourteenth corpora for that false negative, and found it
+there at scale. A `SKILL.md` that runs `python scripts/auth.py` or reads `references/api-reference.md`
+means the file in its own folder, and when that file was missing, the match by how a path ends found the
+same name in some other skill and called it resolved: `gmail-automation` was read as running the
+`scripts/auth.py` of `instagram`, `astropy` as reading the `references/tables.md` of a docx skill. So a
+skill citing a folder it carries, `references/`, `scripts/`, `assets/` or `templates/`, is now matched by
+how the path ends only inside the skill or a folder above it, where a project that holds its skills keeps
+the shared scripts; and a line that names the skill holding the file, *"the `ask` skill's
+`references/threading.md`"*, still resolves to it.
+
+| Public repositories, sixteenth pass, a skill's own folders | |
+| --- | ---: |
+| Repositories checked | 223 |
+| Citations of a skill's own folder resolved outside the skill | 2902 |
+| Into a folder above the skill, still resolved | 404 |
+| Findings added | 1554 |
+| Repositories with a finding added | 14 |
+| Case mismatches removed, a file of another skill in another letter case | 7 |
+| Added findings read, drawn at random | 40 |
+| Real | 36 |
+| False | 4 |
+
+Nearly all of the added findings sit in catalogues of skills copied without their scripts, which is the
+defect: the agent is told to run a file that is not there. The four false ones are a skill that teaches how
+to lay out a skill and names the files of an imagined one, a file the user is told to create, a JSON
+example, and the `scripts/deploy.sh` of an example project. The seven case mismatches it removed were
+false too, since the file they pointed at belongs to another skill, and each is now the missing path it
+always was. The fifteenth corpus did not change.
+
 Three things stay out of scope by design. prumo does not judge claims, since *"this flag does X"* needs a model. It does not edit beyond case and the renames git itself recorded, since a note corrected wrongly is worse than a stale one, and those two are the only corrections read from git rather than guessed. And it makes no network calls at all.
 
 Two rules follow from the measurement. No check is added before its precision is measured on a real project. Finding more is easy; being right is the whole product, and a check that flags something correct once a week gets the whole tool uninstalled. And if a semantic layer is ever added, a model judging whether a statement still holds, it goes behind a separate command the user turns on, with its precision published before release. Folding it into the default run would undo the reason the tool is trusted.
@@ -575,7 +604,7 @@ The git index is the only source that stores a path's true letter case. `existsS
 
 The index has to be read the way git spells it. `git ls-files` runs with `core.quotepath` on by default, which returns a non-ASCII name quoted and octal-escaped, `"docs/A\303\247\303\243o.md"` for `docs/Ação.md`. Read that way, every accented path falls out of the index: the case check goes silent on it, and on Windows `existsSync` then accepts the wrong case without a word. A context file under an accented folder is not even detected. The call is therefore `git -c core.quotepath=false ls-files -z`, and the `-z` keeps a name that contains a newline in one piece. Any new call to `git ls-files` goes through `trackedFiles`.
 
-Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. Before that, a path is tried exactly from the folder of the note, so `src/index.ts` cited in `agents/db/AGENTS.md` is the file beside that note, and not the first `src/index.ts` that some other folder holds. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
+Two consequences follow. A cited path is matched by how it ends, not how it starts, because notes write paths in short relative form (`pages/Auth/Login.vue`) far more often than in full. A search that starts from `resources/js/pages/` misses every one of them; that is how four wrong paths survived six hand-run audits, one of them for two months. Before that, a path is tried exactly from the folder of the note, so `src/index.ts` cited in `agents/db/AGENTS.md` is the file beside that note, and not the first `src/index.ts` that some other folder holds; and a `SKILL.md` citing `scripts/` or `references/` is matched only inside the skill or a folder above it, never in another skill. And CI runs on Linux, Windows and macOS for this reason alone: the behaviour under test changes with the filesystem, so a green run on one platform proves nothing about the others.
 
 A path is reported on every line that cites it, so one `--fix` corrects all of them. Up to 0.4.10 a path was reported once per file, and its second citation onwards was invisible to the report and to `--fix`, which needed one run per citation. One part of that behaviour was kept on purpose. A path that a sentence excuses, as gone, as an output or as another repository's, stays excused on the lines of that file that follow, since they speak of the same file. The same release made `--fix` rewrite a path wherever it stands. It used to find its target only between backticks or after `](`, and answered *"line changed since the scan"* for a reference definition, a command, a Windows path or a line number that had not changed at all.
 

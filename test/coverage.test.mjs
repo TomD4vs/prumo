@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { resolveTargets } from '../src/check.mjs';
 import { coverage, ACTIVE_DAYS } from '../src/coverage.mjs';
 import { renderCoverage } from '../src/report.mjs';
-import { committedRepo, write, git, cli, talk } from './support.mjs';
+import { committedRepo, write, git, cli, talk, dated } from './support.mjs';
 
 const FILES = {
   'CLAUDE.md': '# app\n\nThe server starts in `src/server.ts`; the web package is `packages/web`.\n',
@@ -78,4 +78,18 @@ test('prumo_coverage returns the report as text and as structured content', () =
   assert.equal(r.result.isError, false);
   assert.equal(r.result.structuredContent.command, 'coverage');
   assert.match(r.result.content[0].text, /^UNCITED  \(3\)/m);
+});
+
+test('a folder quiet for longer than the window keeps its last commit, and one git has never committed says so', () => {
+  const old = '2020-01-15T10:00:00Z';
+  const repo = committedRepo({ 'CLAUDE.md': '# app\n\nSee `src/a.ts`.\n', 'src/a.ts': '', 'legacy/old.ts': '', 'tools/x.sh': '', 'packages/a/package.json': '{}', 'packages/b/package.json': '{}', 'packages/README.md': '' }, old);
+  write(repo, { 'legacy/old.ts': 'two' }); git(repo, 'commit -qam legacy', dated('2020-06-01T10:00:00Z'));
+  write(repo, { 'tools/x.sh': 'two', 'packages/a/index.ts': '' }); git(repo, 'add -A'); git(repo, 'commit -qm tools');
+  write(repo, { 'drafts/new.ts': '' }); git(repo, 'add drafts/new.ts');
+  const r = report(repo);
+  const row = (name) => r.folders.find((f) => f.folder === name);
+  assert.deepEqual([row('legacy').commits, row('legacy').last, row('legacy').age], [0, '2020-06-01T10:00:00.000Z', `${Math.round((Date.now() - Date.parse('2020-06-01T10:00:00Z')) / 86400000 / 365)} years ago`]);
+  assert.deepEqual([row('tools').commits, row('tools').age], [1, 'today']);
+  assert.deepEqual([row('drafts').commits, row('drafts').last, row('drafts').age], [0, null, 'not committed']);
+  assert.deepEqual([row('packages/b').last, row('packages/a').age, row('packages').last], ['2020-01-15T10:00:00.000Z', 'today', '2020-01-15T10:00:00.000Z'], 'the files of a package are not the folder that holds the packages');
 });

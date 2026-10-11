@@ -68,14 +68,26 @@ export function buildIndex(repo) {
   return { tracked, known, byName, byNameLower, lower, aliasRoot: ALIAS_ROOTS.some((r) => known.has(r)) };
 }
 
-/** The first indexed path that ends in `/tail`, or null. With `exact` off, `tail` is lower case and so is the comparison. */
-function endingIn(index, tail, exact) {
+/**
+ * The first indexed path that ends in `/tail`, or null. With `exact` off, `tail` is lower case and so
+ * is the comparison. With `within`, only a path whose folder before `tail` it accepts.
+ */
+function endingIn(index, tail, exact, within = null) {
   const list = (exact ? index.byName : index.byNameLower).get(tail.slice(tail.lastIndexOf('/') + 1));
   if (!list) return null;
   const want = '/' + tail;
-  for (const p of list) if ((exact ? p : p.toLowerCase()).endsWith(want)) return p;
+  for (const p of list) {
+    const seen = exact ? p : p.toLowerCase();
+    if (seen.endsWith(want) && (!within || within(seen.slice(0, -want.length), exact))) return p;
+  }
   return null;
 }
+
+/** Accepts a folder that holds `folder` or is `folder` itself, compared without letter case when `exact` is off. */
+const ancestorOf = (folder) => (base, exact) => {
+  const own = exact ? folder : folder.toLowerCase();
+  return own === base || own.startsWith(base + '/');
+};
 
 /**
  * Tries the literal path, then `@/` aliases, then the path without a first segment that names
@@ -84,13 +96,16 @@ function endingIn(index, tail, exact) {
  * exact nested match, so a wrongly cased first segment stays a case mismatch. Each spelling is
  * tried from the root, then from `folder`, the folder of the note, and only then by how it ends,
  * so `src/index.ts` cited in `agents/db/AGENTS.md` is the file beside that note and not the first
- * `src/index.ts` of another folder.
+ * `src/index.ts` of another folder. With `bundled`, a skill citing a folder it carries, the ending only
+ * counts inside the skill or a folder above it, since the same `scripts/auth.py` in another skill is
+ * not the file this one runs.
  */
-export function resolvePath(index, p, folder = '') {
+export function resolvePath(index, p, folder = '', bundled = false) {
   const tries = SPELLINGS.reduce((spelled, step) => [...spelled, ...step(p, index, spelled)], [p]);
   const beside = folder && folder !== '.' ? `${folder}/` : '';
-  const exact = firstOf(tries, (t) => firstOf(EXACT_LOOKUPS, (look) => look(index, t, beside)));
-  const real = exact ? null : firstOf(tries, (t) => index.lower.get(t.toLowerCase()) || endingIn(index, t.toLowerCase(), false));
+  const within = bundled ? ancestorOf(folder) : null;
+  const exact = firstOf(tries, (t) => firstOf(EXACT_LOOKUPS, (look) => look(index, t, beside, within)));
+  const real = exact ? null : firstOf(tries, (t) => index.lower.get(t.toLowerCase()) || endingIn(index, t.toLowerCase(), false, within));
   return exact ? { state: 'ok', real: exact } : real ? { state: 'case', real } : { state: 'missing' };
 }
 
@@ -126,16 +141,16 @@ const SPELLINGS = [
 const EXACT_LOOKUPS = [
   (index, t) => (index.known.has(t) ? t : null),
   (index, t, beside) => (beside && index.known.has(beside + t) ? beside + t : null),
-  (index, t) => endingIn(index, t, true),
+  (index, t, beside, within) => endingIn(index, t, true, within),
 ];
 
 /** `resolvePath` with each answer kept, since a path cited on many lines is resolved once per folder. */
 export function makeResolver(index) {
   const resolved = new Map();
-  return (p, folder = '') => {
-    const key = `${folder}\0${p}`;
+  return (p, folder = '', bundled = false) => {
+    const key = `${folder}\0${p}\0${bundled}`;
     let r = resolved.get(key);
-    if (!r) { r = resolvePath(index, p, folder); resolved.set(key, r); }
+    if (!r) { r = resolvePath(index, p, folder, bundled); resolved.set(key, r); }
     return r;
   };
 }

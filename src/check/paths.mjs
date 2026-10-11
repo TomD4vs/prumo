@@ -12,6 +12,7 @@ export const WILDCARD = /[<>{}*[\]]|\.\.\.|…/;
 export const PLACEHOLDER_PATH = /(^|[/])(path[/]|(foo|bar|baz)([/.]|$))/i;
 export const LOCAL_FILE = /(^|\/)[^/]*\.local(\.[A-Za-z0-9]+)?$/i;
 const SKILL_INSTALL = /^\.(?:claude|agents|cursor|codex|windsurf|gemini)\/skills\/(.+)$/;
+export const SKILL_BUNDLE = /^(references|scripts|assets|templates)$/i;
 export const EXAMPLE_NAME = /(^|[/])(my|your)-?(app|plugin|topic|command|provider|project|skill|module|component|service|feature|package|file|folder|dir|script|tool|agent|repo|lib|api|test|example|org|name|site)s?([/.]|$)/i;
 export const SCOPED_PACKAGE = /^@[^/]+\//;
 export const TEMPLATE_TOKEN = /\bYYYY(?:[-_]?MM(?:[-_]?DD)?)?\b|\bv?X\.Y\.Z\b|(^|[_\-/])N{2,}([_\-.]|$)/;
@@ -123,14 +124,33 @@ export function installedElsewhere(index, p) {
 }
 
 /**
+ * The file another skill holds under the path a skill cites, when the line names that skill as a
+ * whole word, as in "the `ask` skill's `references/threading.md`", or null.
+ */
+function heldByNamedSkill(index, p, line) {
+  const tail = '/' + p;
+  for (const real of index.byName.get(p.slice(p.lastIndexOf('/') + 1)) || []) {
+    if (!real.endsWith(tail)) continue;
+    const base = real.slice(0, -tail.length);
+    const owner = base.slice(base.lastIndexOf('/') + 1).toLowerCase();
+    const at = line.toLowerCase().indexOf(owner);
+    if (owner && at >= 0 && !/[\w-]/.test(line[at - 1] || '') && !/[\w-]/.test(line[at + owner.length] || '')) return real;
+  }
+  return null;
+}
+
+/**
  * One path cited on a line, with what the rules ask of it computed only when a rule asks: how it
- * resolves against the index, the paragraph around it, the verdict of its sentence, its folder.
+ * resolves against the index, the paragraph around it, the verdict of its sentence, its folder. A
+ * skill citing a folder it carries, `scripts/` or `references/`, is resolved inside the skill.
  */
 function pathCitation(run, file, i, m, c) {
   let resolved = null;
+  const bundled = file.isSkill && SKILL_BUNDLE.test(c.p.split('/')[0]) && c.p.includes('/');
   return {
-    ...c, run, file, i, m, kind: 'path', cited: c.p, code: m.kind === 'code',
-    get r() { return resolved ??= run.resolve(c.p, file.folder); },
+    ...c, run, file, i, m, bundled, kind: 'path', cited: c.p, code: m.kind === 'code',
+    get r() { return resolved ??= run.resolve(c.p, file.folder, bundled); },
+    get namedSkill() { return heldByNamedSkill(run.index, c.p, m.text); },
     get paragraph() { return file.context(i, m.anchor, 2, 2); },
     get verdict() { return c.out ? 'produces' : c.command ? '' : verdictOn(file.lines, file.marked, file.headings, i, m, c.at, c.len); },
     get parent() { return c.p.includes('/') ? c.p.slice(0, c.p.lastIndexOf('/')) : ''; },
@@ -149,6 +169,7 @@ const PATH_RULES = [
   { when: (x) => !CODE_EXT.test(x.p) && !x.run.index.known.has(x.p.split('/')[0]), outcome: 'excused', reason: 'no file extension, and its first folder is not in the repository, so it reads as a name' },
   { when: (x) => x.p.startsWith('@/') && !x.run.index.aliasRoot, outcome: 'excused', reason: 'an @/ alias, in a repository with none of the folders an alias resolves against' },
   { when: (x) => x.r.state === 'ok', outcome: 'resolved', reason: 'git tracks it', to: (x) => x.r.real, act: (x) => { x.file.cite(x.p, false); x.file.record(x.i, x.p, x.r.real); } },
+  { when: (x) => x.bundled && x.r.state === 'missing' && x.namedSkill, outcome: 'resolved', reason: 'the line names the skill that holds it', to: (x) => x.namedSkill, act: (x) => { x.file.cite(x.p, false); x.file.record(x.i, x.p, x.namedSkill); } },
   { when: (x) => x.r.state !== 'case' && LOCAL_FILE.test(x.p), outcome: 'excused', reason: 'a file each machine writes for itself, never committed' },
   { when: (x) => x.r.state === 'missing' && installedElsewhere(x.run.index, x.p), outcome: 'resolved', reason: 'a skill cited by its install folder; the file is beside a SKILL.md elsewhere', act: (x) => x.file.cite(x.p, false) },
   { when: (x) => NEGATION.test(x.paragraph), outcome: 'excused', reason: 'the paragraph says the file is gone, moved, or only an example', act: excuseInFile },

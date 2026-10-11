@@ -7,7 +7,7 @@ import { readTextFile, gitIgnored, originRepo } from './repository.mjs';
 import { buildIndex, makeResolver } from './git-index.mjs';
 import { makeHistorian } from './history.mjs';
 import { classifyLines, headingsAbove, IGNORE_LINE, IGNORE_NEXT, IGNORE_FILE } from './lines.mjs';
-import { checkPaths } from './paths.mjs';
+import { checkPaths, SKILL_BUNDLE } from './paths.mjs';
 import { checkCommands, dropAlternatives, makeCommandSources } from './commands.mjs';
 import { checkWikilinks, checkLinks, makeLinkTargets, makeAnchors, proseOf } from './links.mjs';
 import { checkImports } from './imports.mjs';
@@ -15,7 +15,6 @@ import { CONFIG_FILES, frontmatterIssues, configFileIssues, ruleGlobs } from './
 
 const HISTORICAL_NAME = /((phase|fase)[_\- ]?\d*[_\- ]?(done|complete|conclu)|[_-](superseded|superad|historic|revertid|reverted))/i;
 const HISTORICAL_DESC = /^description:.*(historical|superseded|reverted|hist[óo]ric|SUPERAD|REVERTID)/im;
-const SKILL_BUNDLE = /^(references|scripts|assets|templates)$/i;
 
 /** True when git tracks the context file, in any letter case. */
 function inIndex(run, target) {
@@ -35,7 +34,7 @@ function scanOf(run, target, body, lines, marked) {
   const cited = new Set(), absent = new Set();
   const rel = relPathOf(run, target);
   return {
-    target, body, lines, marked, cited, absent, rel,
+    target, body, lines, marked, cited, absent, rel, isSkill,
     folder: posix.dirname(rel),
     headings: headingsAbove(lines, marked),
     excused: new Set(),

@@ -6,7 +6,7 @@ const NOBODY = '0000000000000000000000000000000000000000';
 const CHUNK = 100;
 
 /** A pathspec that git reads literally, since a cited path may hold a character git would read as a pattern. */
-const literal = (p) => (/[*?[\]]/.test(p) || p.startsWith(':') ? `:(literal)${p}` : p);
+export const literal = (p) => (/[*?[\]]/.test(p) || p.startsWith(':') ? `:(literal)${p}` : p);
 
 /** A heading's title. A heading written as a link keeps its text, since the address is not part of the title. */
 const titleOf = (heading) => heading.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();

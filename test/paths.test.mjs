@@ -186,3 +186,27 @@ test('a bare name on a line never hides the same file cited with ./ on that line
   const missing = checkFiles({ 'CLAUDE.md': '# app\n\nRead `gone.md`, that is `./gone.md` beside this note.\n', 'docs/a.md': '' });
   assert.deepEqual(missing.missingPaths.map((m) => m.cited), ['gone.md'], 'and a missing one is still reported');
 });
+
+test('a skill citing a folder it carries is read inside the skill, never in another skill that has the same file', () => {
+  const r = checkFiles({
+    'CLAUDE.md': '# app\n\nThe Instagram login is `scripts/auth.py`.\n',
+    '.claude/skills/gmail/SKILL.md': [
+      '---', 'name: gmail', 'description: reads mail', '---',
+      'Log in with `python scripts/auth.py login`.',
+      'Log out with `python ./scripts/auth.py logout`.',
+      'Templates are in `references/guide.md`.',
+      'Threads follow the `instagram` skill\'s `scripts/auth.py`.',
+      'Instagrammers read `scripts/auth.py` too.',
+    ].join('\n') + '\n',
+    '.claude/skills/gmail/references/guide.md': '',
+    '.claude/skills/instagram/scripts/auth.py': '',
+    'tools/xhs/skills/auth/SKILL.md': '---\nname: auth\ndescription: logs in\n---\nRun `python scripts/cli.py login`.\n',
+    'tools/xhs/scripts/cli.py': '',
+  });
+  assert.deepEqual(r.missingPaths.map((f) => `${f.file}:${f.line} ${f.cited}`), [
+    '.claude/skills/gmail/SKILL.md:5 scripts/auth.py',
+    '.claude/skills/gmail/SKILL.md:6 scripts/auth.py',
+    '.claude/skills/gmail/SKILL.md:9 scripts/auth.py',
+  ]);
+  assert.deepEqual(r.caseMismatch, []);
+});

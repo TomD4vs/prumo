@@ -2,8 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { resolve, relative, sep, posix } from 'node:path';
 import { analyze, loadConfig, makeMatcher, ageOf, SCHEMA_VERSION, VERSION } from './check.mjs';
 import { TRANSIENT } from './check/paths.mjs';
+import { literal } from './drift.mjs';
 
 export const ACTIVE_DAYS = 90;
+const CHUNK = 100;
 const MANIFEST = /^(package\.json|Cargo\.toml|go\.mod|pyproject\.toml|composer\.json|pom\.xml|build\.gradle(\.kts)?|Gemfile|mix\.exs)$/;
 
 /**
@@ -38,20 +40,37 @@ function unitOf(units, path) {
   return units.has(parts[0]) ? parts[0] : null;
 }
 
-/** How many commits touched each unit in the last `days`, read from one walk of the log. */
-function activityOf(git, units, days) {
-  const commits = new Map();
-  let out = '';
-  try { out = git(['-c', 'core.quotepath=false', 'log', `--since=${days} days ago`, '--format=%x01', '--name-only']); } catch { out = ''; }
-  for (const block of out.split('\x01')) {
-    const touched = new Set();
-    for (const line of block.split('\n')) {
-      const unit = line && unitOf(units, line.trim());
-      if (unit) touched.add(unit);
+/**
+ * Reads a walk of the log into each unit's number of commits and the time of its newest one, the
+ * first the walk meets. A block is a commit: its time, then the files it touched.
+ */
+function tally(out, units, commits, last) {
+  for (const block of out.split('\x01').slice(1)) {
+    const [at, ...names] = block.split('\n');
+    const touched = new Set(names.map((name) => name && unitOf(units, name.trim())).filter(Boolean));
+    for (const u of touched) {
+      commits.set(u, (commits.get(u) || 0) + 1);
+      if (!last.has(u)) last.set(u, Number(at) || 0);
     }
-    for (const u of touched) commits.set(u, (commits.get(u) || 0) + 1);
   }
-  return commits;
+}
+
+/** A walk of the log with the time of each commit and the files it touched, or nothing when git cannot give one. */
+function logOf(git, args) {
+  try { return git(['-c', 'core.quotepath=false', 'log', '--format=%x01%ct', '--name-only', ...args]); } catch { return ''; }
+}
+
+/**
+ * How many commits touched each unit in the last `days`, and when each unit was last committed. One
+ * walk of the recent log answers both for the active units; the quiet ones are asked about together,
+ * a hundred to a call, since one git process per folder cost a second for every seven folders on Windows.
+ */
+function activityOf(git, units, days, uncited) {
+  const commits = new Map(), last = new Map();
+  tally(logOf(git, [`--since=${days} days ago`]), units, commits, last);
+  const quiet = uncited.filter((u) => !last.has(u));
+  for (let i = 0; i < quiet.length; i += CHUNK) tally(logOf(git, ['--', ...quiet.slice(i, i + CHUNK).map(literal)]), units, new Map(), last);
+  return { commits, last };
 }
 
 /**
@@ -77,14 +96,12 @@ export function coverage({ repo, targets, config = null, now = Math.floor(Date.n
   for (const c of result.citations) { const u = unitOf(units, c.path); if (u) cited.add(u); }
   for (const f of result.files) { const u = unitOf(units, relative(repo, f.path).split(sep).join(posix.sep)); if (u) cited.add(u); }
 
-  const commits = activityOf(git, units, ACTIVE_DAYS);
-  const folders = [];
-  for (const [folder, files] of units) {
-    if (cited.has(folder)) continue;
-    let at = 0;
-    try { at = Number(git(['log', '-1', '--format=%ct', '--', folder]).trim()) || 0; } catch { at = 0; }
-    folders.push({ folder, files, commits: commits.get(folder) || 0, last: at ? new Date(at * 1000).toISOString() : null, age: at ? ageOf(at, now) : 'not committed' });
-  }
+  const uncited = [...units.keys()].filter((u) => !cited.has(u));
+  const { commits, last } = activityOf(git, units, ACTIVE_DAYS, uncited);
+  const folders = uncited.map((folder) => {
+    const at = last.get(folder) || 0;
+    return { folder, files: units.get(folder), commits: commits.get(folder) || 0, last: at ? new Date(at * 1000).toISOString() : null, age: at ? ageOf(at, now) : 'not committed' };
+  });
   folders.sort((a, b) => b.commits - a.commits || b.files - a.files || a.folder.localeCompare(b.folder));
 
   return {
