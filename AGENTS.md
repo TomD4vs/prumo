@@ -55,6 +55,11 @@ node bin/prumo.mjs . --all      # do not truncate
   on a real corpus first.
 - **Filters are the product.** Most of `check.mjs` exists to stay quiet: negation read across
   a paragraph, historical entries, transient artifacts, aliases and short paths.
+- **Decisions are tables, not chains of `if`.** A decision with several outcomes is an ordered list of
+  rules, `{ when, outcome, reason, act }`, that `src/check/rules.mjs` decides by, or a table or a `Map`
+  that dispatches, as `RUNNERS`, `REPORTS` and `SARIF_RULES` do; a long function becomes small named ones.
+  A guard on one line stays. Every rule of a table has a test that fails without it: remove the rule and
+  watch the suite go red.
 - **Never write to the user's files.** The tool reads and reports; the edit is theirs.
 - **Comments only above functions**: the docblock of a function, and nothing else. No file header, no
   comment on a constant, nothing inside a function body and nothing after code on a line. The reason
