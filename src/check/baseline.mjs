@@ -1,8 +1,3 @@
-/**
- * prumo — the baseline: findings recorded once, at the repository root, and held back on later
- * runs so only what is new fails.
- */
-
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTextFile } from './repository.mjs';
@@ -10,7 +5,6 @@ import { VERSION } from './version.mjs';
 
 export const BASELINE_FILE = '.prumo-baseline.json';
 
-/** What each list of findings is called in the baseline, in SARIF and in the GitHub output. */
 const KIND_OF = { caseMismatch: 'case-mismatch', brokenLinks: 'broken-link', missingPaths: 'missing-path', unknownCommands: 'unknown-command', configIssues: 'agent-config' };
 
 /** The identity of a finding across runs: its kind, its file and what it cites. Line numbers move, so they are left out. */

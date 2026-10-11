@@ -90,7 +90,7 @@ MISSING PATH  (1)   the note cites it, but git tracks no such file or folder
 4 to review, --fix corrects 1                                 ← 1 + 2 + 1
 ```
 
-Todo achado traz arquivo, número da linha e a correção, e um caminho ausente diz para onde o git o moveu quando o histórico guarda um rename. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso.
+Todo achado traz arquivo, número da linha e a correção, e um caminho ausente diz para onde o git o moveu quando o histórico guarda um rename. Nada é adivinhado e nada é gravado. O que cada achado significa, e o que fazer com ele, está na [referência](docs/reference.pt-BR.md#o-que-cada-achado-significa). Se ele apontar uma linha que você sabe estar certa, [Silenciando um achado](docs/reference.pt-BR.md#silenciando-um-achado) mostra as duas formas de dizer isso, e quando ele fica quieto sobre uma linha que você esperava ver, `prumo --explain CLAUDE.md:12` diz o que ele leu ali e qual filtro decidiu ([por que uma linha foi ou não foi reportada](docs/reference.pt-BR.md#por-que-uma-linha-foi-ou-não-foi-reportada)).
 
 ## O que ele não faz
 

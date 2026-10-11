@@ -49,7 +49,7 @@ Both run on Linux, Windows and macOS in CI.
   the same structure. Portuguese is written, not translated.
 - **No dependencies.** prumo ships with none and reads nothing from the network. A change that
   needs a package needs a good argument first.
-- **No comments inside a function body.** `AGENTS.md` has the rest of the house style.
+- **Comments only above functions**, as the docblock of a function: no file header, no comment on a constant, nothing inside a function body. The suite checks it. `AGENTS.md` has the rest of the house style.
 
 ## Reporting a finding that is wrong
 

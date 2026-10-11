@@ -1,17 +1,13 @@
 #!/usr/bin/env node
-/**
- * prumo — is your documentation still true?
- * CLI entry point: argument parsing, the report, the fix pass, and the three reports, drift, budget and coverage.
- */
-
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { analyze, resolveTargets, loadConfig, loadBaseline, baselineOf, changedFiles, hasRootSkill, BASELINE_FILE } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
-import { renderText, renderGithub, renderSarif, renderDrift, renderBudget, renderCoverage } from '../src/report.mjs';
+import { renderText, renderGithub, renderSarif, renderDrift, renderBudget, renderCoverage, renderExplain } from '../src/report.mjs';
 import { drift } from '../src/drift.mjs';
 import { budget } from '../src/budget.mjs';
 import { coverage } from '../src/coverage.mjs';
+import { explain } from '../src/explain.mjs';
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -49,6 +45,7 @@ OPTIONS
   --staged      check only the context files staged for commit
   --since REF   check only the context files changed since REF, a commit or a branch;
                 with budget, compare sizes with REF (default: the commit thirty days ago)
+  --explain F:L why line L of the context file F was or was not reported, citation by citation
   -h, --help
   -v, --version
 
@@ -74,6 +71,7 @@ EXAMPLES
   prumo --fix
   prumo --format github
   prumo --since origin/main
+  prumo --explain CLAUDE.md:12
   prumo drift
   prumo budget --since v1.0.0
   prumo coverage
@@ -81,12 +79,22 @@ EXAMPLES
 
 const argv = process.argv.slice(2);
 
-if (argv.includes('-h') || argv.includes('--help')) { process.stdout.write(HELP); process.exit(0); }
-if (argv.includes('-v') || argv.includes('--version')) { console.log(VERSION); process.exit(0); }
+const ASKED = [
+  [['-h', '--help'], () => process.stdout.write(HELP)],
+  [['-v', '--version'], () => console.log(VERSION)],
+];
+const asked = ASKED.find(([flags]) => flags.some((f) => argv.includes(f)));
+if (asked) { asked[1](); process.exit(0); }
 
-/** The three reports are commands: the first word, before the repository. */
-const COMMAND = ['drift', 'budget', 'coverage'].includes(argv[0]) ? argv.shift() : null;
+const REPORTS = new Map([
+  ['drift', { run: ({ repo, targets, config }) => drift({ repo, targets, config }), render: renderDrift, options: [] }],
+  ['budget', { run: ({ repo, targets, config, since }) => budget({ repo, targets, config, since }), render: renderBudget, options: ['--since'] }],
+  ['coverage', { run: ({ repo, targets, config }) => coverage({ repo, targets, config }), render: renderCoverage, options: [] }],
+]);
+const COMMAND = REPORTS.has(argv[0]) ? argv.shift() : null;
+const REPORT = REPORTS.get(COMMAND);
 
+/** The value after a flag, and where it sits, so it is not read as a target. */
 const valueAt = (flag) => {
   const i = argv.indexOf(flag);
   return i >= 0 ? { index: i + 1, value: argv[i + 1] } : { index: -1, value: null };
@@ -96,113 +104,96 @@ const jsonArg = valueAt('--json');
 const sarifArg = valueAt('--sarif');
 const formatArg = valueAt('--format');
 const sinceArg = valueAt('--since');
-
-if (argv.includes('--json') && !jsonArg.value) { console.error('prumo: --json needs a file path'); process.exit(2); }
-if (argv.includes('--sarif') && !sarifArg.value) { console.error('prumo: --sarif needs a file path'); process.exit(2); }
-if (argv.includes('--since') && !sinceArg.value) { console.error('prumo: --since needs a commit or a branch'); process.exit(2); }
-if (argv.includes('--since') && argv.includes('--staged')) { console.error('prumo: use --staged or --since, one at a time'); process.exit(2); }
-
+const explainArg = valueAt('--explain');
 const FORMAT = formatArg.value || 'text';
-if (COMMAND ? !['text', 'json'].includes(FORMAT) : !['text', 'github', 'json', 'sarif'].includes(FORMAT)) {
-  console.error(`prumo: unknown format "${FORMAT}". Use ${COMMAND ? 'text or json' : 'text, github, json or sarif'}.`);
-  process.exit(2);
-}
+const FORMATS = COMMAND || argv.includes('--explain') ? ['text', 'json'] : ['text', 'github', 'json', 'sarif'];
+const CHECK_ONLY = new Set(['--sarif', '--quiet', '--fix', '--baseline', '--no-baseline', '--staged', '--since', '--explain']);
+const NOT_WITH_EXPLAIN = ['--fix', '--baseline', '--staged', '--since', '--sarif', '--quiet'];
+const KNOWN = new Set(['--all', '--json', '--sarif', '--quiet', '--fix', '--format', '--no-config', '--baseline', '--no-baseline', '--staged', '--since', '--explain', '--help', '--version', '-h', '-v']);
+const valueIndexes = new Set([jsonArg.index, sarifArg.index, formatArg.index, sinceArg.index, explainArg.index].filter((i) => i > 0));
+const flags = argv.filter((a, i) => a.startsWith('-') && !valueIndexes.has(i));
+const has = (flag) => argv.includes(flag);
 
-const CHECK_ONLY = new Set(['--sarif', '--quiet', '--fix', '--baseline', '--no-baseline', '--staged']);
-const KNOWN = new Set(['--all', '--json', '--sarif', '--quiet', '--fix', '--format', '--no-config', '--baseline', '--no-baseline', '--staged', '--since', '--help', '--version', '-h', '-v']);
-const valueIndexes = new Set([jsonArg.index, sarifArg.index, formatArg.index, sinceArg.index].filter((i) => i > 0));
-const unknown = argv.find((a, i) => a.startsWith('-') && !valueIndexes.has(i) && !KNOWN.has(a));
-if (unknown) {
-  console.error(`prumo: unknown option "${unknown}". Run "prumo --help" to see the options.`);
-  process.exit(2);
-}
-if (COMMAND) {
-  const misplaced = argv.find((a, i) => a.startsWith('-') && !valueIndexes.has(i) && (CHECK_ONLY.has(a) || (a === '--since' && COMMAND !== 'budget')));
-  if (misplaced) {
-    console.error(`prumo: ${misplaced} is not an option of "prumo ${COMMAND}". Run "prumo --help" to see the options.`);
-    process.exit(2);
-  }
-}
+const USAGE_ERRORS = [
+  { when: () => has('--json') && !jsonArg.value, message: '--json needs a file path' },
+  { when: () => has('--sarif') && !sarifArg.value, message: '--sarif needs a file path' },
+  { when: () => has('--since') && !sinceArg.value, message: '--since needs a commit or a branch' },
+  { when: () => has('--since') && has('--staged'), message: 'use --staged or --since, one at a time' },
+  { when: () => has('--explain') && !explainArg.value, message: '--explain needs FILE:LINE, as in CLAUDE.md:12' },
+  { when: () => !COMMAND && has('--explain') && NOT_WITH_EXPLAIN.some(has), message: () => `${NOT_WITH_EXPLAIN.find(has)} does not go with --explain, which only reads one line` },
+  { when: () => !FORMATS.includes(FORMAT), message: () => `unknown format "${FORMAT}". Use ${FORMATS.length === 2 ? 'text or json' : 'text, github, json or sarif'}.` },
+  { when: () => flags.some((a) => !KNOWN.has(a)), message: () => `unknown option "${flags.find((a) => !KNOWN.has(a))}". Run "prumo --help" to see the options.` },
+  { when: () => REPORT && flags.some((a) => CHECK_ONLY.has(a) && !REPORT.options.includes(a)), message: () => `${flags.find((a) => CHECK_ONLY.has(a) && !REPORT.options.includes(a))} is not an option of "prumo ${COMMAND}". Run "prumo --help" to see the options.` },
+];
+const usage = USAGE_ERRORS.find((u) => u.when());
+if (usage) { console.error(`prumo: ${typeof usage.message === 'function' ? usage.message() : usage.message}`); process.exit(2); }
 
-const ALL = argv.includes('--all');
-const QUIET = argv.includes('--quiet');
-const FIX = argv.includes('--fix');
-const STAGED = argv.includes('--staged');
-const WRITE_BASELINE = argv.includes('--baseline');
+const ALL = has('--all');
 const positional = argv.filter((a, i) => !a.startsWith('-') && !valueIndexes.has(i));
 const repo = positional[0] || '.';
 
-let result, targets, config, baseline = null, only = null;
-try {
-  config = argv.includes('--no-config') ? {} : loadConfig(repo);
+/** Stops the run with exit 2, which a usage error and a repository that cannot be read share. */
+const stop = (message) => { console.error(`prumo: ${message}`); process.exit(2); };
+
+/** The context files of the run: the ones named, the ones `.prumorc.json` lists, or the ones found; none is an error that says why. */
+function targetsOf(config) {
   const explicit = positional.slice(1).length ? positional.slice(1) : (config.targets || []);
-  try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); }
-  catch { console.error(`prumo: not a git repository: ${repo}`); process.exit(2); }
-  targets = resolveTargets(repo, explicit);
-  if (!targets.length) {
-    console.error(hasRootSkill(repo)
-      ? 'prumo: no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Check it with "prumo . SKILL.md".'
-      : 'prumo: no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');
-    process.exit(2);
-  }
-  if (COMMAND === 'drift') result = drift({ repo, targets, config });
-  else if (COMMAND === 'budget') result = budget({ repo, targets, config, since: sinceArg.value || '' });
-  else if (COMMAND === 'coverage') result = coverage({ repo, targets, config });
-  else {
-    if (STAGED || sinceArg.value) only = { paths: changedFiles(repo, { staged: STAGED, since: sinceArg.value || '' }), label: STAGED ? 'staged' : `since ${sinceArg.value}` };
-    if (!WRITE_BASELINE && !argv.includes('--no-baseline')) baseline = loadBaseline(repo);
-    result = analyze({ repo, targets, config, baseline, only });
-  }
-} catch (err) {
-  console.error(`prumo: ${err.message}`);
-  process.exit(2);
+  try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); } catch { stop(`not a git repository: ${repo}`); }
+  const targets = resolveTargets(repo, explicit);
+  if (targets.length) return targets;
+  return stop(hasRootSkill(repo)
+    ? 'no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Check it with "prumo . SKILL.md".'
+    : 'no context files found. Pass one explicitly, or create a CLAUDE.md / AGENTS.md.');
 }
 
-if (COMMAND) {
-  if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(result, null, 2));
-  if (FORMAT === 'json') console.log(JSON.stringify(result, null, 2));
-  else {
-    const color = wantsColor();
-    const head = wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '';
-    const render = { drift: renderDrift, budget: renderBudget, coverage: renderCoverage }[COMMAND];
-    console.log(head + render(result, { all: ALL, color, jsonPath: jsonArg.value }));
-  }
+/** The check: limited to what a commit or a branch changed when asked, with the baseline at the root unless it is being written or set aside. */
+function check({ targets, config }) {
+  const only = has('--staged') || sinceArg.value ? { paths: changedFiles(repo, { staged: has('--staged'), since: sinceArg.value || '' }), label: has('--staged') ? 'staged' : `since ${sinceArg.value}` } : null;
+  const baseline = has('--baseline') || has('--no-baseline') ? null : loadBaseline(repo);
+  return { result: analyze({ repo, targets, config, baseline, only }), rerun: () => analyze({ repo, targets, config, baseline, only }) };
+}
+
+/** The name and version above a report, for a person at a terminal. */
+const head = (color) => (wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '');
+
+const EXPLAIN = { run: ({ repo, targets, config }) => explain({ repo, targets, config, at: explainArg.value, baseline: has('--no-baseline') ? null : loadBaseline(repo) }), render: renderExplain };
+const SHOWN = REPORT || (explainArg.value ? EXPLAIN : null);
+
+let run;
+try {
+  const config = has('--no-config') ? {} : loadConfig(repo);
+  const targets = targetsOf(config);
+  run = { config, targets, ...(SHOWN ? { result: SHOWN.run({ repo, targets, config, since: sinceArg.value || '' }) } : check({ targets, config })) };
+} catch (err) {
+  stop(err.message);
+}
+
+if (SHOWN) {
+  if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(run.result, null, 2));
+  const color = wantsColor();
+  console.log(FORMAT === 'json' ? JSON.stringify(run.result, null, 2) : head(color) + SHOWN.render(run.result, { all: ALL, color, jsonPath: jsonArg.value }));
   process.exit(0);
 }
 
-let fixed = null;
-if (FIX) {
-  const changes = [...result.caseMismatch, ...renameFixes(result)];
-  if (changes.length) {
-    fixed = applyFixes(changes, targets);
-    result = analyze({ repo, targets, config, baseline, only });
-  }
-}
+const changes = has('--fix') ? [...run.result.caseMismatch, ...renameFixes(run.result)] : [];
+const fixed = changes.length ? applyFixes(changes, run.targets) : null;
+const result = fixed ? run.rerun() : run.result;
+const total = ['caseMismatch', 'brokenLinks', 'missingPaths', 'unknownCommands', 'configIssues', 'orphans'].reduce((n, k) => n + result[k].length, 0);
 
-const { caseMismatch, brokenLinks, missingPaths, unknownCommands, configIssues, orphans, stats } = result;
-const total = caseMismatch.length + brokenLinks.length + missingPaths.length + unknownCommands.length + configIssues.length + orphans.length;
-
-let recorded = null;
-if (WRITE_BASELINE) {
-  const b = baselineOf(result);
-  writeFileSync(join(repo, BASELINE_FILE), JSON.stringify(b, null, 2) + '\n');
-  recorded = b.findings.reduce((n, e) => n + e.count, 0);
-}
+const baselineEntries = has('--baseline') ? baselineOf(result) : null;
+if (baselineEntries) writeFileSync(join(repo, BASELINE_FILE), JSON.stringify(baselineEntries, null, 2) + '\n');
+const recorded = baselineEntries ? baselineEntries.findings.reduce((n, e) => n + e.count, 0) : null;
 
 if (jsonArg.value) writeFileSync(jsonArg.value, JSON.stringify(result, null, 2));
 if (sarifArg.value) writeFileSync(sarifArg.value, renderSarif(result));
 
-if (!QUIET && FORMAT === 'json') {
-  console.log(JSON.stringify(result, null, 2));
-} else if (!QUIET && FORMAT === 'sarif') {
-  console.log(renderSarif(result));
-} else if (!QUIET && FORMAT === 'github') {
-  const lines = renderGithub(result);
-  if (lines) console.log(lines);
-} else if (!QUIET) {
-  const color = wantsColor();
-  const head = wantsBanner() ? banner(VERSION, { color, github: GITHUB }) + '\n\n' : '';
-  console.log(head + renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value, color, baselineWritten: recorded }));
-}
+const OUTPUTS = {
+  json: () => JSON.stringify(result, null, 2),
+  sarif: () => renderSarif(result),
+  github: () => renderGithub(result) || null,
+  text: () => { const color = wantsColor(); return head(color) + renderText(result, { all: ALL, fixed, jsonPath: jsonArg.value, color, baselineWritten: recorded }); },
+};
+const printed = has('--quiet') ? null : OUTPUTS[FORMAT]();
+if (printed !== null) console.log(printed);
 
-process.exit(WRITE_BASELINE ? 0 : total ? 1 : 0);
+process.exit(has('--baseline') || !total ? 0 : 1);

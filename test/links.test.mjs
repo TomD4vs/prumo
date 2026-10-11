@@ -254,3 +254,28 @@ test('a link fragment in the line form of GitHub points at a line, not a heading
   assert.deepEqual(r.brokenLinks.map((l) => [l.kind, l.cited]), [['anchor', 'docs/short.md#nowhere'], ['link', 'docs/gone.md']]);
   assert.deepEqual(r.caseMismatch.map((c) => [c.cited, c.actual]), [['docs/Short.md', 'docs/short.md']]);
 });
+
+test('a link to the web, without a file extension, under ignore, to a per-machine file or to a skill by its install folder is not a broken link', () => {
+  const r = checkFiles({
+    'CLAUDE.md': [
+      '# app',
+      '',
+      'See [the spec](https://example.com/spec.md) and [setup](docs/setup) and [private](docs/private.md).',
+      'Read [local](CLAUDE.local.md) and [the script](.claude/skills/deploy/scripts/run.sh).',
+    ].join('\n') + '\n',
+    '.prumorc.json': JSON.stringify({ ignore: ['docs/private.md'] }),
+    'docs/a.md': '',
+    'plugins/ops/skills/deploy/SKILL.md': '---\nname: deploy\ndescription: deploys\n---\n',
+    'plugins/ops/skills/deploy/scripts/run.sh': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), []);
+});
+
+test('a wikilink under ignore is not a broken link, and double brackets around an @/ alias are not a wikilink', () => {
+  const r = checkFiles({
+    'CLAUDE.md': '# app\n\nSee [[drafts/plan]] and [[@/components/Button]].\n',
+    '.prumorc.json': JSON.stringify({ ignore: ['drafts/plan'] }),
+    'docs/a.md': '',
+  });
+  assert.deepEqual(r.brokenLinks.map((l) => l.cited), []);
+});

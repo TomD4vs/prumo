@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
 import { analyze, resolveTargets, DEFAULT_TARGETS, DEFAULT_DIRS, NESTED, SCHEMA_VERSION } from '../src/check.mjs';
-import { ROOT, BIN, tempDir, repoWith, git } from './support.mjs';
+import { ROOT, BIN, tempDir, repoWith, git, cli } from './support.mjs';
 
 test('throws a clear error outside a git repository', () => {
   const dir = tempDir('prumo-nogit-');
@@ -151,4 +151,28 @@ test('the package has no dependency of any kind, which is why CI audits none', (
   for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies', 'bundleDependencies', 'bundledDependencies']) {
     assert.deepEqual(Object.keys(pkg[field] || {}), [], `${field} must stay empty`);
   }
+});
+
+test('each usage error stops the CLI with exit 2 and says what is wrong, and --help exits 0', () => {
+  const repo = repoWith({ 'CLAUDE.md': '# app\n', 'src/a.ts': '' });
+  const errors = [
+    [['--json'], '--json needs a file path'],
+    [['--sarif'], '--sarif needs a file path'],
+    [['--since'], '--since needs a commit or a branch'],
+    [['--since', 'HEAD', '--staged'], 'use --staged or --since, one at a time'],
+    [['--explain'], '--explain needs FILE:LINE, as in CLAUDE.md:12'],
+    [['--explain', 'CLAUDE.md:1', '--quiet'], '--quiet does not go with --explain, which only reads one line'],
+    [['--format', 'xml'], 'unknown format "xml". Use text, github, json or sarif.'],
+    [['--explain', 'CLAUDE.md:1', '--format', 'sarif'], 'unknown format "sarif". Use text or json.'],
+    [['--nope'], 'unknown option "--nope". Run "prumo --help" to see the options.'],
+  ];
+  for (const [args, message] of errors) {
+    const r = cli([repo, ...args]);
+    assert.equal(r.status, 2, args.join(' '));
+    assert.equal(r.err.trim(), `prumo: ${message}`);
+  }
+  assert.match(cli(['budget', repo, '--fix']).err, /^prumo: --fix is not an option of "prumo budget"\./);
+  const help = cli(['--help']);
+  assert.equal(help.status, 0);
+  assert.match(help.out, /^  --explain F:L why line L of the context file F was or was not reported/m);
 });

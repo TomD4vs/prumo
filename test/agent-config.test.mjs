@@ -96,3 +96,13 @@ test('a rule glob too long to become a regular expression matches nothing, and t
   assert.deepEqual(r.configIssues.map((c) => `${c.file} ${c.kind}`), ['.cursor/rules/huge.mdc glob']);
   assert.deepEqual(r.missingPaths.map((m) => m.cited), ['src/gone.ts'], 'the other files are still checked');
 });
+
+test('a config naming a script in the wrong letter case says what the repository has', () => {
+  const r = checkFiles({
+    'CLAUDE.md': '# app\n',
+    '.mcp.json': JSON.stringify({ mcpServers: { local: { command: 'node', args: ['Scripts/Server.mjs'] } } }, null, 2),
+    'scripts/server.mjs': '',
+  });
+  assert.deepEqual(r.configIssues.map((c) => [c.kind, c.cited]), [['config-path', 'Scripts/Server.mjs']]);
+  assert.match(r.configIssues[0].message, /; the repository has scripts\/server\.mjs$/);
+});

@@ -1,18 +1,8 @@
-/**
- * prumo — the drift report: which sections of a context file describe code that changed after the
- * section was last written. Nothing here is a finding. A section that names five files changed forty
- * times since it was written may still be right, and one whose files never changed may be wrong. The
- * report orders the sections by how much the code beneath them moved, so a reader knows where to
- * look first, and it says so with dates git recorded rather than with a judgement.
- */
-
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { analyze, classifyLines, readTextFile, ageOf, SCHEMA_VERSION, VERSION } from './check.mjs';
 
-/** What git blame writes for a line that is not committed yet. */
 const NOBODY = '0000000000000000000000000000000000000000';
-/** How many cited paths one git log is asked about; a command line has a length limit on Windows. */
 const CHUNK = 100;
 
 /** A pathspec that git reads literally, since a cited path may hold a character git would read as a pattern. */
@@ -64,7 +54,10 @@ export function sectionsOf(lines, marked = classifyLines(lines)) {
   return out;
 }
 
-/** The commit and committer time of every line of a tracked file, in line order, or null when git cannot blame it. */
+/**
+ * The commit and committer time of every line of a tracked file, in line order, or null when git
+ * cannot blame it. A line not committed yet comes back with a commit of forty zeros.
+ */
 function blameOf(git, file) {
   let out;
   try { out = git(['blame', '--line-porcelain', '--', file]); } catch { return null; }
@@ -78,7 +71,10 @@ function blameOf(git, file) {
   return lines;
 }
 
-/** Every commit since a date that touched one of the paths, with the touched paths, each commit once. */
+/**
+ * Every commit since a date that touched one of the paths, with the touched paths, each commit once.
+ * The paths are asked a hundred at a time, since a command line has a length limit on Windows.
+ */
 function commitsSince(git, since, paths) {
   const commits = new Map();
   const from = new Date((since - 86400) * 1000).toISOString();
@@ -99,7 +95,9 @@ function commitsSince(git, since, paths) {
 /**
  * The drift report of the context files: for every section that cites a file or a folder the
  * repository has, when the section last changed according to git blame, and how many commits
- * touched what it cites after that. Sections come back ordered, the most moved first.
+ * touched what it cites after that. Sections come back ordered, the most moved first. Nothing here
+ * is a finding: a section whose files changed forty times may still be right, and one whose files
+ * never changed may be wrong, so the order says where to look and the dates are the ones git recorded.
  * @param {object} opts
  * @param {string} opts.repo      the repository
  * @param {object[]} opts.targets what resolveTargets() returned
@@ -109,58 +107,14 @@ function commitsSince(git, since, paths) {
 export function drift({ repo, targets, config = null, now = Math.floor(Date.now() / 1000) }) {
   const result = analyze({ repo, targets, config, collect: true });
   const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
-  const cites = new Map();
-  for (const c of result.citations) {
-    let list = cites.get(c.file);
-    if (!list) { list = []; cites.set(c.file, list); }
-    list.push(c);
-  }
-
-  const sections = [];
-  const allPaths = new Set();
-  let counted = 0, quiet = 0, uncommitted = 0;
-  for (const { file, path } of result.files) {
-    const body = readTextFile(path);
-    if (body === null) continue;
-    const parts = sectionsOf(blamedLines(body));
-    counted += parts.length;
-    const here = cites.get(file) || [];
-    if (!here.length) { quiet += parts.length; continue; }
-    const blame = blameOf(git, file);
-    if (!blame || blame.some((t) => t.sha === NOBODY)) uncommitted++;
-    const rows = [];
-    let oldest = now;
-    for (const s of parts) {
-      const paths = new Set(here.filter((c) => c.line - 1 >= s.start && c.line - 1 <= s.end).map((c) => c.path));
-      if (!paths.size) { quiet++; continue; }
-      const when = dateOf(blame, s, now);
-      if (when.at < oldest) oldest = when.at;
-      rows.push({ s, paths, when });
-      for (const p of paths) allPaths.add(p);
-    }
-    const commits = commitsSince(git, oldest, [...new Set(rows.flatMap((r) => [...r.paths]))]);
-    for (const { s, paths, when } of rows) {
-      const touched = new Set();
-      let n = 0;
-      for (const c of commits) {
-        if (c.at <= when.at) continue;
-        let hit = false;
-        for (const f of c.files) for (const p of paths) if (f === p || f.startsWith(`${p}/`)) { touched.add(p); hit = true; }
-        if (hit) n++;
-      }
-      sections.push({
-        file,
-        line: s.line,
-        section: s.title,
-        since: new Date(when.at * 1000).toISOString(),
-        age: when.committed ? ageOf(when.at, now) : 'not committed',
-        cited: paths.size,
-        changed: touched.size,
-        commits: n,
-      });
-    }
-  }
-  sections.sort((a, b) => b.commits - a.commits || b.changed - a.changed || a.since.localeCompare(b.since) || a.file.localeCompare(b.file) || a.line - b.line);
+  const cites = groupBy(result.citations, (c) => c.file);
+  const files = result.files
+    .map(({ file, path }) => ({ file, body: readTextFile(path) }))
+    .filter(({ body }) => body !== null)
+    .map(({ file, body }) => driftOfFile(git, file, sectionsOf(blamedLines(body)), cites.get(file) || [], now));
+  const sections = files.flatMap((f) => f.sections)
+    .sort((a, b) => b.commits - a.commits || b.changed - a.changed || a.since.localeCompare(b.since) || a.file.localeCompare(b.file) || a.line - b.line);
+  const sum = (key) => files.reduce((n, f) => n + f[key], 0);
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -169,6 +123,58 @@ export function drift({ repo, targets, config = null, now = Math.floor(Date.now(
     checkedAt: new Date().toISOString(),
     command: 'drift',
     sections,
-    stats: { targets: result.files.length, sections: counted, cited: allPaths.size, quiet, uncommitted },
+    stats: { targets: result.files.length, sections: sum('counted'), cited: new Set(files.flatMap((f) => f.paths)).size, quiet: sum('quiet'), uncommitted: sum('uncommitted') },
+  };
+}
+
+/** A list in groups by a key, in the order the items come; `Map.groupBy` does this from Node 21 on. */
+function groupBy(list, keyOf) {
+  const groups = new Map();
+  for (const item of list) {
+    const key = keyOf(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return groups;
+}
+
+/**
+ * The drift of one file: each section that cites something, with its date and what moved under it
+ * since; the sections that cite nothing are counted as quiet, and a file with lines git cannot blame
+ * as uncommitted. Its citations reach git in one log, from the oldest section on.
+ */
+function driftOfFile(git, file, parts, here, now) {
+  if (!here.length) return { sections: [], paths: [], counted: parts.length, quiet: parts.length, uncommitted: 0 };
+  const blame = blameOf(git, file);
+  const rows = parts
+    .map((s) => ({ s, paths: new Set(here.filter((c) => c.line - 1 >= s.start && c.line - 1 <= s.end).map((c) => c.path)) }))
+    .filter((row) => row.paths.size)
+    .map((row) => ({ ...row, when: dateOf(blame, row.s, now) }));
+  const oldest = rows.reduce((at, row) => Math.min(at, row.when.at), now);
+  const paths = [...new Set(rows.flatMap((r) => [...r.paths]))];
+  const commits = commitsSince(git, oldest, paths);
+  return {
+    sections: rows.map((row) => sectionOf(file, row, commits, now)),
+    paths,
+    counted: parts.length,
+    quiet: parts.length - rows.length,
+    uncommitted: !blame || blame.some((t) => t.sha === NOBODY) ? 1 : 0,
+  };
+}
+
+/** One section of the report: how many of the files it cites changed after it was written, and in how many commits. */
+function sectionOf(file, { s, paths, when }, commits, now) {
+  const hits = commits
+    .filter((c) => c.at > when.at)
+    .map((c) => [...paths].filter((p) => [...c.files].some((f) => f === p || f.startsWith(`${p}/`))));
+  return {
+    file,
+    line: s.line,
+    section: s.title,
+    since: new Date(when.at * 1000).toISOString(),
+    age: when.committed ? ageOf(when.at, now) : 'not committed',
+    cited: paths.size,
+    changed: new Set(hits.flat()).size,
+    commits: hits.filter((h) => h.length).length,
   };
 }

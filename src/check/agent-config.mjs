@@ -1,14 +1,8 @@
-/**
- * prumo — the agent configuration check: a rule none of whose globs reaches a file, a skill with
- * no description, and an MCP server or a hook naming a script that is not here.
- */
-
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { globToRegExp } from './config.mjs';
 import { pathsInCode, TRANSIENT } from './paths.mjs';
 
-/** Agent configuration read as data rather than as prose: MCP servers and hooks name scripts that have to be here. */
 export const CONFIG_FILES = ['.mcp.json', '.cursor/mcp.json', '.vscode/mcp.json', '.claude/settings.json'];
 const INSTALLED_SKILL = /(^|\/)skills\/[^/]+\/SKILL\.md$/i;
 const HOST_SKILL = /(^|\/)\.(claude|agents)\/skills\//i;
@@ -104,54 +98,60 @@ export function ruleGlobs(label, lines) {
  * match or is only a display name.
  */
 export function frontmatterIssues(label, lines, index) {
-  const issues = [];
-  const fm = frontmatterOf(lines);
-  const at = (line, kind, cited, message) => issues.push({ file: label, line, kind, cited, message });
-  if (INSTALLED_SKILL.test(label)) {
-    const description = fm.get('description');
-    const standard = fm.has('name') || HOST_SKILL.test(label);
-    if (fm.size && standard && !(description && description.value)) at(1, 'skill-description', 'description', 'missing from the front matter, so nothing says when to use the skill');
-    if (!fm.size && HOST_SKILL.test(label)) at(1, 'skill-description', 'front matter', 'missing, so the skill has no name and no description to be picked by');
-  }
-  const rule = ruleGlobs(label, lines);
-  if (rule && rule.globs.length && !rule.globs.some((glob) => globMatchesAny(glob, index))) {
-    const { globs } = rule;
-    const shown = globs.length > 3 ? `${globs.slice(0, 3).join(', ')} and ${globs.length - 3} more` : globs.join(', ');
-    at(rule.line, 'glob', shown, `${globs.length === 1 ? 'matches' : 'match'} no file in the repository, so the rule never applies`);
-  }
-  return issues;
+  const x = { label, index, fm: frontmatterOf(lines), rule: ruleGlobs(label, lines) };
+  return FRONTMATTER_PROBLEMS.filter((problem) => problem.when(x)).map((problem) => ({ file: label, ...problem.issue(x) }));
 }
+
+/** The globs of a rule as a report names them: all of them up to three, then how many more. */
+const globsShown = (globs) => (globs.length > 3 ? `${globs.slice(0, 3).join(', ')} and ${globs.length - 3} more` : globs.join(', '));
+
+const FRONTMATTER_PROBLEMS = [
+  {
+    when: (x) => INSTALLED_SKILL.test(x.label) && x.fm.size && (x.fm.has('name') || HOST_SKILL.test(x.label)) && !x.fm.get('description')?.value,
+    issue: () => ({ line: 1, kind: 'skill-description', cited: 'description', message: 'missing from the front matter, so nothing says when to use the skill' }),
+  },
+  {
+    when: (x) => INSTALLED_SKILL.test(x.label) && !x.fm.size && HOST_SKILL.test(x.label),
+    issue: () => ({ line: 1, kind: 'skill-description', cited: 'front matter', message: 'missing, so the skill has no name and no description to be picked by' }),
+  },
+  {
+    when: (x) => x.rule && x.rule.globs.length && !x.rule.globs.some((glob) => globMatchesAny(glob, x.index)),
+    issue: (x) => ({ line: x.rule.line, kind: 'glob', cited: globsShown(x.rule.globs), message: `${x.rule.globs.length === 1 ? 'matches' : 'match'} no file in the repository, so the rule never applies` }),
+  },
+];
+
+/** Every command a JSON configuration runs, with who runs it: each MCP server with its arguments, and each hook of each event. */
+function commandsOf(json) {
+  const servers = (json && typeof json === 'object' && (json.mcpServers || json.servers)) || {};
+  const fromServers = Object.entries(servers)
+    .filter(([, server]) => server && typeof server === 'object')
+    .map(([name, server]) => ({ command: [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s) => typeof s === 'string').join(' '), where: `by the MCP server "${name}"` }));
+  const fromHooks = Object.entries((json && json.hooks) || {}).flatMap(([event, groups]) => (Array.isArray(groups) ? groups : [])
+    .flatMap((group) => (Array.isArray(group && group.hooks) ? group.hooks : []))
+    .filter((hook) => hook && typeof hook.command === 'string')
+    .map((hook) => ({ command: hook.command, where: `by the ${event} hook` })));
+  return [...fromServers, ...fromHooks].filter((c) => c.command);
+}
+
+const CONFIG_PATH_PROBLEMS = [
+  { when: (r) => r.state === 'case', message: (where, r) => `named ${where}; the repository has ${r.real}` },
+  { when: (r, p, repo) => r.state === 'missing' && !existsSync(join(repo, p)), message: (where) => `named ${where}, not here` },
+];
 
 /**
  * The scripts an MCP server or a hook names in a JSON configuration, checked like a command in a
  * fenced block: each argument that reads as a path of this repository has to be here.
  */
 export function configFileIssues(rel, text, repo, ignored, resolveOnce) {
-  const issues = [];
   let json;
-  try { json = JSON.parse(text); } catch { return issues; }
+  try { json = JSON.parse(text); } catch { return []; }
   const lines = text.split(/\r?\n/);
   const lineOf = (needle) => { const i = lines.findIndex((l) => l.includes(needle)); return i < 0 ? 1 : i + 1; };
-  const check = (command, where) => {
-    for (const { p } of pathsInCode(command.replace(PROJECT_DIR_VAR, ''))) {
-      if (ignored(p) || TRANSIENT.test(p)) continue;
+  return commandsOf(json).flatMap(({ command, where }) => pathsInCode(command.replace(PROJECT_DIR_VAR, ''))
+    .filter(({ p, why }) => !why && !ignored(p) && !TRANSIENT.test(p))
+    .flatMap(({ p }) => {
       const r = resolveOnce(p);
-      if (r.state === 'case') issues.push({ file: rel, line: lineOf(p.slice(p.lastIndexOf('/') + 1)), kind: 'config-path', cited: p, message: `named ${where}; the repository has ${r.real}` });
-      else if (r.state === 'missing' && !existsSync(join(repo, p))) issues.push({ file: rel, line: lineOf(p.slice(p.lastIndexOf('/') + 1)), kind: 'config-path', cited: p, message: `named ${where}, not here` });
-    }
-  };
-  const servers = (json && typeof json === 'object' && (json.mcpServers || json.servers)) || {};
-  for (const [name, server] of Object.entries(servers)) {
-    if (!server || typeof server !== 'object') continue;
-    const command = [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((x) => typeof x === 'string').join(' ');
-    if (command) check(command, `by the MCP server "${name}"`);
-  }
-  for (const [event, groups] of Object.entries((json && json.hooks) || {})) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      for (const hook of Array.isArray(group && group.hooks) ? group.hooks : []) {
-        if (hook && typeof hook.command === 'string') check(hook.command, `by the ${event} hook`);
-      }
-    }
-  }
-  return issues;
+      const problem = CONFIG_PATH_PROBLEMS.find((c) => c.when(r, p, repo));
+      return problem ? [{ file: rel, line: lineOf(p.slice(p.lastIndexOf('/') + 1)), kind: 'config-path', cited: p, message: problem.message(where, r) }] : [];
+    }));
 }

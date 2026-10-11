@@ -179,3 +179,10 @@ test('a path cited in a nested note is the file beside that note before any othe
   ]);
   assert.equal(r.missingPaths.length, 0, 'a note with no file beside it still resolves by how the path ends, as before');
 });
+
+test('a bare name on a line never hides the same file cited with ./ on that line', () => {
+  const r = checkFiles({ 'CLAUDE.md': '# app\n\nRead `README.md`, that is `./README.md`, and `./docs/GONE.md`.\n', 'README.md': '# readme\n', 'docs/a.md': '' });
+  assert.equal(r.stats.cited, 2, 'README.md and docs/GONE.md are both cited');
+  const missing = checkFiles({ 'CLAUDE.md': '# app\n\nRead `gone.md`, that is `./gone.md` beside this note.\n', 'docs/a.md': '' });
+  assert.deepEqual(missing.missingPaths.map((m) => m.cited), ['gone.md'], 'and a missing one is still reported');
+});

@@ -1,17 +1,11 @@
-/**
- * prumo — the link check: a wikilink, a markdown link or a heading anchor that points at nothing,
- * and a markdown link spelled with another letter case than the file it reaches.
- */
-
 import { existsSync } from 'node:fs';
 import { join, relative, resolve, sep, isAbsolute, dirname, posix } from 'node:path';
 import { readTextFile } from './repository.mjs';
 import { classifyLines, LIST_ITEM, TABLE_ROW } from './lines.mjs';
-import { CODE_EXT, WILDCARD, HOSTNAME, PLACEHOLDER_PATH, EXAMPLE_NAME, TEMPLATE_TOKEN, SCOPED_PACKAGE, LOCAL_FILE, installedElsewhere } from './paths.mjs';
+import { CODE_EXT, LOCAL_FILE, NOT_A_LINK, installedElsewhere } from './paths.mjs';
+import { decide } from './rules.mjs';
 
-/** A link fragment in the line form of GitHub, `L12`, `L12-L20` or `L12C3-L14C7`, points at a line, which moves with every edit, so only the page is checked. */
 const LINE_ANCHOR = /^L\d+(C\d+)?(-L?\d+(C\d+)?)?$/i;
-/** What a markdown link may point at besides code and markdown: the images and documents a note embeds. */
 const LINK_EXT = /\.(mdx|png|jpe?g|gif|svg|webp|avif|pdf|ico|txt|csv)$/i;
 const WIKILINK = /\[\[([A-Za-z0-9][\w .\/-]{1,80})\]\]/g;
 const MARKDOWN_LINK = /\]\((?:<([^<>#]+)(?:#([^>]*))?>|([^)\s#]+)(?:#([^)\s]*))?|#([^)\s]+))\)/gi;
@@ -107,33 +101,6 @@ export function proseOf(text) {
   return text.replace(/`[^`\n]*`/g, ' ').replace(/^\[([^\]]+)\]:\s*(\S+)\s*$/, '[$1]($2)');
 }
 
-/** The wikilinks on one line, `[[name]]`, each of which has to name a markdown file git tracks. */
-export function checkWikilinks(run, file, i, prose) {
-  const { linkable, linkPath, loose } = run.links;
-  for (const l of prose.matchAll(WIKILINK)) {
-    const to = l[1].trim();
-    if (linkable.has(to) || run.ignored(to)) { if (to.includes('/')) file.cite(to, false); if (linkPath.has(to)) file.record(i, to, linkPath.get(to)); continue; }
-    if (to.startsWith('@/') && !run.index.aliasRoot) continue;
-    if (to !== l[1] || to.includes('.') || /[\w$]/.test(prose[l.index - 1] || '')) continue;
-    if (to.includes('/')) file.cite(to, true);
-    run.findings.brokenLinks.push({
-      file: file.target.label,
-      line: i + 1,
-      kind: 'wikilink',
-      cited: to,
-      suggestion: loose.get(to.toLowerCase().replace(/[_-]/g, '')) || null,
-    });
-  }
-}
-
-/** A link to a heading of the note itself, `#section`, which has to be one of its anchors. */
-function checkOwnAnchor(run, file, i, fragment, anchor) {
-  const own = run.anchors.of(file.target.path, file.body);
-  if (!anchor || LINE_ANCHOR.test(fragment) || own.has(anchor)) return;
-  const near = run.anchors.near(own, anchor);
-  run.findings.brokenLinks.push({ file: file.target.label, line: i + 1, kind: 'anchor', cited: `#${fragment}`, suggestion: near ? `#${near}` : null });
-}
-
 /**
  * The first folder a link reaches, as the gate on another project counts it: from the root for a
  * link written from there, otherwise from the note's own folder once `../` is walked back, and the
@@ -149,66 +116,141 @@ function linkHead(repo, file, href, rel, fromRoot) {
   return base ? `${base}/${parts[0]}` : parts[0];
 }
 
+/** One wikilink on a line, `[[name]]`, with the text right before it, which tells code from a link. */
+function wikilinkCitation(run, file, i, prose, l) {
+  const to = l[1].trim();
+  return { run, file, i, kind: 'wikilink', cited: `[[${to}]]`, to, written: l[1], before: prose[l.index - 1] || '' };
+}
+
+/** A wikilink that names a markdown file is cited by it, with a folder, and recorded for drift with the file it reaches. */
+const citeWikilink = (x) => {
+  if (x.to.includes('/')) x.file.cite(x.to, false);
+  if (x.run.links.linkPath.has(x.to)) x.file.record(x.i, x.to, x.run.links.linkPath.get(x.to));
+};
+
+const WIKILINK_RULES = [
+  { when: (x) => x.run.links.linkable.has(x.to), outcome: 'resolved', reason: 'a markdown file git tracks, or a note of this run', to: (x) => x.run.links.linkPath.get(x.to), act: citeWikilink },
+  { when: (x) => x.run.ignored(x.to), outcome: 'excused', reason: 'listed under ignore in .prumorc.json', act: citeWikilink },
+  { when: (x) => x.to !== x.written || x.to.includes('.') || /[\w$]/.test(x.before), outcome: 'excused', reason: 'template or code syntax: spaces inside, a dot, or glued to a word' },
+  {
+    when: () => true, outcome: 'reported', reason: 'BROKEN LINK',
+    act: (x) => {
+      if (x.to.includes('/')) x.file.cite(x.to, true);
+      x.run.findings.brokenLinks.push({ file: x.file.target.label, line: x.i + 1, kind: 'wikilink', cited: x.to, suggestion: x.run.links.loose.get(x.to.toLowerCase().replace(/[_-]/g, '')) || null });
+    },
+  },
+];
+
+/** The wikilinks on one line, `[[name]]`, each of which has to name a markdown file git tracks. */
+export function checkWikilinks(run, file, i, prose) {
+  for (const l of prose.matchAll(WIKILINK)) decide(WIKILINK_RULES, wikilinkCitation(run, file, i, prose, l));
+}
+
+const ANCHOR_RULES = [
+  { when: (x) => LINE_ANCHOR.test(x.fragment), outcome: 'resolved', reason: 'a line of the page, which moves with every edit, so it is not checked' },
+  { when: (x) => x.anchors().has(x.anchor), outcome: 'resolved', reason: 'a heading of the page' },
+  {
+    when: () => true, outcome: 'reported', reason: 'BROKEN LINK',
+    act: (x) => {
+      const near = x.run.anchors.near(x.anchors(), x.anchor);
+      x.run.findings.brokenLinks.push({ file: x.file.target.label, line: x.i + 1, kind: 'anchor', cited: `${x.page}#${x.fragment}`, suggestion: near ? `${x.page}#${near}` : null });
+    },
+  },
+];
+
+/**
+ * A link to a heading, `#section` on the note itself or `page.md#section` on a page git tracks, which
+ * has to be one of its anchors. `anchors` reads them, and only a link with a fragment calls it.
+ */
+function checkAnchor(run, file, i, page, fragment, anchors) {
+  const anchor = decodeLink(fragment).toLowerCase();
+  if (!anchor) return;
+  decide(ANCHOR_RULES, { run, file, i, kind: 'anchor', cited: `${page}#${fragment}`, page, fragment, anchor, anchors });
+}
+
+/**
+ * Where a markdown link leads: decoded, from the root when it starts with `/` or `mdc:`, from beside
+ * the note otherwise, and from the root as well when only the root holds what it names. `inside` says
+ * it stays in the repository.
+ */
+function linkTarget(run, file, to) {
+  const { repo, index } = run;
+  const mdc = /^mdc:/i.test(to);
+  const href = mdc ? '/' + decodeLink(to.slice(4)).replace(/^\.?\//, '') : decodeLink(to);
+  let abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(file.target.path), href);
+  let rel = relative(repo, abs).split(sep).join('/');
+  const fromRoot = href.replace(/^\.\//, '');
+  const atRoot = !/^(\/|\.\.\/)/.test(href) && !index.known.has(rel) && !index.lower.has(rel.toLowerCase())
+    && (index.known.has(fromRoot) || index.lower.has(fromRoot.toLowerCase()));
+  if (atRoot) { abs = join(repo, fromRoot); rel = fromRoot; }
+  return { mdc, href, abs, rel, atRoot, inside: Boolean(rel) && !rel.startsWith('../') && !isAbsolute(rel) };
+}
+
+/** One markdown link on a line, with where it leads worked out only when a rule asks. */
+function linkCitation(run, file, i, to, fragment) {
+  let target = null;
+  return { run, file, i, kind: 'link', cited: to, to, fragment, get t() { return target ??= linkTarget(run, file, to); } };
+}
+
+/** The spelling git holds for a link with the wrong letter case, written the way the link is: with `mdc:`, from the root, or from beside the note. */
+function caseOf(x, real) {
+  const { mdc, atRoot, href } = x.t;
+  const fixed = mdc ? `mdc:${real}` : atRoot ? real : posix.relative(x.file.folder, real);
+  return href === x.to ? fixed : fixed.split(' ').join('%20');
+}
+
+const LINK_RULES = [
+  { when: (x) => /^(https?:|\/\/)/i.test(x.to), outcome: 'excused', reason: 'a web address, which prumo never fetches' },
+  { when: (x) => !CODE_EXT.test(x.to) && !LINK_EXT.test(x.to), outcome: 'excused', reason: 'not a file of a kind the check reads: code, markdown, an image or a document' },
+  { when: (x) => NOT_A_LINK.some(([re]) => re.test(x.to)), outcome: 'excused', reason: (x) => NOT_A_LINK.find(([re]) => re.test(x.to))[1] },
+  { when: (x) => /^file:/i.test(x.to), outcome: 'excused', reason: 'a file: address, outside the repository' },
+  { when: (x) => x.run.ignored(x.to), outcome: 'excused', reason: 'listed under ignore in .prumorc.json' },
+  {
+    when: (x) => x.t.inside && x.run.index.known.has(x.t.rel), outcome: 'resolved', reason: 'git tracks it', to: (x) => x.t.rel,
+    act: (x) => {
+      x.file.cite(x.t.rel, false);
+      x.file.record(x.i, x.to, x.t.rel);
+      if (/\.(md|mdx)$/i.test(x.t.rel)) checkAnchor(x.run, x.file, x.i, x.to, x.fragment, () => x.run.anchors.of(x.t.abs));
+    },
+  },
+  {
+    when: (x) => x.t.inside && x.run.index.lower.has(x.t.rel.toLowerCase()), outcome: 'reported', reason: 'CASE MISMATCH', to: (x) => caseOf(x, x.run.index.lower.get(x.t.rel.toLowerCase())),
+    act: (x) => {
+      const real = x.run.index.lower.get(x.t.rel.toLowerCase());
+      x.file.cite(x.t.rel, false);
+      x.file.record(x.i, x.to, real);
+      x.run.findings.caseMismatch.push({ file: x.file.target.label, line: x.i + 1, kind: 'link', cited: x.to, actual: caseOf(x, real) });
+    },
+  },
+  { when: (x) => existsSync(x.t.abs), outcome: 'resolved', reason: 'not tracked by git, but present on this disk', act: (x) => { if (x.t.inside) x.file.cite(x.t.rel, false); } },
+  { when: (x) => LOCAL_FILE.test(x.to), outcome: 'excused', reason: 'a file each machine writes for itself, never committed' },
+  { when: (x) => x.t.inside && installedElsewhere(x.run.index, x.t.rel), outcome: 'resolved', reason: 'a skill cited by its install folder; the file is beside a SKILL.md elsewhere', act: (x) => x.file.cite(x.t.rel, false) },
+  {
+    when: () => true, outcome: 'reported', reason: 'BROKEN LINK',
+    act: (x) => {
+      const { href, rel, inside, mdc, atRoot } = x.t;
+      const bare = href.slice(href.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
+      const finding = { file: x.file.target.label, line: x.i + 1, kind: 'link', cited: x.to, suggestion: x.run.links.loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null };
+      if (inside) { x.file.cite(rel, true, linkHead(x.run.repo, x.file, href, rel, mdc || href.startsWith('/') || atRoot)); x.run.relOf.set(finding, rel); }
+      x.run.findings.brokenLinks.push(finding);
+    },
+  },
+];
+
 /**
  * The markdown links on one line. A link resolves from beside the note, from the root when it
  * starts with `/` or `mdc:`, and from the root as well when only the root holds what it names, as
- * an agent reads it. A link to a file with another letter case is a case mismatch, written relative
- * to the note as the link is; a link to a page that is there may still name a heading it lacks.
+ * an agent reads it. The target may be code, markdown, or an image or a document a note embeds. A
+ * link to a file with another letter case is a case mismatch, written relative to the note as the
+ * link is; a link to a page that is there may still name a heading it lacks. A fragment in the line
+ * form of GitHub, `L12`, `L12-L20` or `L12C3-L14C7`, points at a line, which moves with every edit,
+ * so only the page is checked. `LINK_RULES` is the order the questions are asked in.
  */
 export function checkLinks(run, file, i, prose) {
-  const { repo, index, findings } = run;
   for (const l of prose.matchAll(MARKDOWN_LINK)) {
     const to = l[1] || l[3] || '';
     const fragment = l[2] || l[4] || l[5] || '';
-    const anchor = decodeLink(fragment).toLowerCase();
-    if (!to) { checkOwnAnchor(run, file, i, fragment, anchor); continue; }
-    if (!CODE_EXT.test(to) && !LINK_EXT.test(to)) continue;
-    if (WILDCARD.test(to) || HOSTNAME.test(to) || PLACEHOLDER_PATH.test(to) || EXAMPLE_NAME.test(to) || TEMPLATE_TOKEN.test(to) || SCOPED_PACKAGE.test(to)) continue;
-    if (/^(https?:|file:|\/\/)/i.test(to) || run.ignored(to)) continue;
-    const mdc = /^mdc:/i.test(to);
-    const href = mdc ? '/' + decodeLink(to.slice(4)).replace(/^\.?\//, '') : decodeLink(to);
-    let abs = href.startsWith('/') ? join(repo, href.slice(1)) : join(dirname(file.target.path), href);
-    let rel = relative(repo, abs).split(sep).join('/');
-    const fromRoot = href.replace(/^\.\//, '');
-    const atRoot = !/^(\/|\.\.\/)/.test(href) && !index.known.has(rel) && !index.lower.has(rel.toLowerCase())
-      && (index.known.has(fromRoot) || index.lower.has(fromRoot.toLowerCase()));
-    if (atRoot) { abs = join(repo, fromRoot); rel = fromRoot; }
-    const inside = rel && !rel.startsWith('../') && !isAbsolute(rel);
-    if (inside && index.known.has(rel)) {
-      file.cite(rel, false);
-      file.record(i, to, rel);
-      if (anchor && !LINE_ANCHOR.test(fragment) && /\.(md|mdx)$/i.test(rel)) {
-        const theirs = run.anchors.of(abs);
-        if (!theirs.has(anchor)) {
-          const near = run.anchors.near(theirs, anchor);
-          findings.brokenLinks.push({ file: file.target.label, line: i + 1, kind: 'anchor', cited: `${to}#${fragment}`, suggestion: near ? `${to}#${near}` : null });
-        }
-      }
-      continue;
-    }
-    if (inside) {
-      const real = index.lower.get(rel.toLowerCase());
-      if (real) {
-        const fileDir = posix.dirname(relative(repo, file.target.path).split(sep).join('/'));
-        const fixed = mdc ? `mdc:${real}` : atRoot ? real : posix.relative(fileDir, real);
-        file.cite(rel, false);
-        file.record(i, to, real);
-        findings.caseMismatch.push({ file: file.target.label, line: i + 1, kind: 'link', cited: to, actual: href === to ? fixed : fixed.split(' ').join('%20') });
-        continue;
-      }
-    }
-    if (existsSync(abs)) { if (inside) file.cite(rel, false); continue; }
-    if (LOCAL_FILE.test(to)) continue;
-    if (inside && installedElsewhere(index, rel)) { file.cite(rel, false); continue; }
-    const bare = href.slice(href.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '');
-    const finding = {
-      file: file.target.label,
-      line: i + 1,
-      kind: 'link',
-      cited: to,
-      suggestion: run.links.loose.get(bare.toLowerCase().replace(/[_-]/g, '')) || null,
-    };
-    if (inside) { file.cite(rel, true, linkHead(repo, file, href, rel, mdc || href.startsWith('/') || atRoot)); run.relOf.set(finding, rel); }
-    findings.brokenLinks.push(finding);
+    if (to) decide(LINK_RULES, linkCitation(run, file, i, to, fragment));
+    else checkAnchor(run, file, i, '', fragment, () => run.anchors.of(file.target.path, file.body));
   }
 }

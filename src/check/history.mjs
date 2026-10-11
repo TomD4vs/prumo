@@ -1,23 +1,23 @@
-/**
- * prumo — what git recorded about a path that is not here: where it was renamed to, or when it was deleted.
- */
-
 import { execFileSync } from 'node:child_process';
 import { posix } from 'node:path';
 
-/** How long ago a commit was, in the words a person uses. */
+/** A count of a unit of time, ago: `1 month ago`, `3 years ago`. */
+const counted = (n, unit) => `${n} ${n === 1 ? unit : `${unit}s`} ago`;
+
+const AGES = [
+  { when: (days) => days < 1, say: () => 'today' },
+  { when: (days) => days === 1, say: () => 'yesterday' },
+  { when: (days) => days < 30, say: (days) => `${days} days ago` },
+  { when: (days) => Math.round(days / 30) < 12, say: (days) => counted(Math.round(days / 30), 'month') },
+  { when: () => true, say: (days) => counted(Math.round(days / 365), 'year') },
+];
+
+/** How long ago a commit was, in the words a person uses: the first of `AGES` that fits the number of days. */
 export function ageOf(seconds, now = Date.now() / 1000) {
   const days = Math.floor((now - seconds) / 86400);
-  if (days < 1) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 30) return `${days} days ago`;
-  const months = Math.round(days / 30);
-  if (months < 12) return `${months} ${months === 1 ? 'month' : 'months'} ago`;
-  const years = Math.round(days / 365);
-  return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+  return AGES.find((age) => age.when(days)).say(days);
 }
 
-/** At most this many paths are asked of the history in one run; a repository citing more is a catalogue. */
 const HISTORY_BUDGET = 200;
 
 /**
@@ -43,7 +43,8 @@ function changesIn(git, sha) {
  * the file is now, or the commit that deleted it. A rename is git's own detection, by similarity,
  * so what is reported is a fact of the history rather than a guess from a name. Nothing comes back
  * when the history never held the path, which is what a placeholder or another project's path
- * looks like, or when the last commit that touched it is not the one that took it away.
+ * looks like, or when the last commit that touched it is not the one that took it away. At most two
+ * hundred paths are asked of the history in one run, since a repository citing more is a catalogue.
  */
 export function makeHistorian(repo, index) {
   const commits = new Map();

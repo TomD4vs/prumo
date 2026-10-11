@@ -1,8 +1,3 @@
-/**
- * prumo — the git index, the only source that knows a path's true letter case, and the order in
- * which a cited path is resolved against it. docs/design.md explains why that order is fixed.
- */
-
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
@@ -92,33 +87,47 @@ function endingIn(index, tail, exact) {
  * `src/index.ts` of another folder.
  */
 export function resolvePath(index, p, folder = '') {
-  const tries = [p];
-  if (p.startsWith('@/')) {
-    tries.push(p.slice(2));
-    for (const r of ALIAS_ROOTS) tries.push(r + '/' + p.slice(2));
+  const tries = SPELLINGS.reduce((spelled, step) => [...spelled, ...step(p, index, spelled)], [p]);
+  const beside = folder && folder !== '.' ? `${folder}/` : '';
+  const exact = firstOf(tries, (t) => firstOf(EXACT_LOOKUPS, (look) => look(index, t, beside)));
+  const real = exact ? null : firstOf(tries, (t) => index.lower.get(t.toLowerCase()) || endingIn(index, t.toLowerCase(), false));
+  return exact ? { state: 'ok', real: exact } : real ? { state: 'case', real } : { state: 'missing' };
+}
+
+/** The first answer `look` gives for the items of a list, in their order, or null. */
+function firstOf(list, look) {
+  for (const item of list) {
+    const found = look(item);
+    if (found) return found;
   }
+  return null;
+}
+
+/** The project name a note spells in front of a real path, `myapp/src/x.ts`: a first segment that names no folder here, before a path that is here. */
+function withoutProjectName(p, index) {
   const head = p.includes('/') ? p.slice(0, p.indexOf('/')) : '';
   const rest = head ? p.slice(head.length + 1) : '';
-  if (head && (rest.includes('/') || head.toLowerCase() === index.name) && !index.known.has(head) && index.known.has(rest)) tries.push(rest);
-  const js = p.match(/\.(js|jsx|mjs|cjs)$/i);
-  if (js) for (const base of [...tries]) for (const e of TS_FOR[js[1].toLowerCase()]) tries.push(base.slice(0, -js[0].length) + e);
-  if (!/\.[a-z0-9]{2,5}$/i.test(p)) {
-    for (const base of [...tries]) for (const e of TRY_EXT) tries.push(base + e);
-  }
-  const beside = folder && folder !== '.' ? `${folder}/` : '';
-  for (const t of tries) {
-    if (index.known.has(t)) return { state: 'ok', real: t };
-    if (beside && index.known.has(beside + t)) return { state: 'ok', real: beside + t };
-    const nested = endingIn(index, t, true);
-    if (nested) return { state: 'ok', real: nested };
-  }
-  for (const t of tries) {
-    const low = t.toLowerCase();
-    const real = index.lower.get(low) || endingIn(index, low, false);
-    if (real) return { state: 'case', real };
-  }
-  return { state: 'missing' };
+  return head && (rest.includes('/') || head.toLowerCase() === index.name) && !index.known.has(head) && index.known.has(rest) ? [rest] : [];
 }
+
+/** The TypeScript sources behind an emitted `.js`, for every spelling tried so far. */
+function typescriptSources(p, index, tries) {
+  const js = p.match(/\.(js|jsx|mjs|cjs)$/i);
+  return js ? tries.flatMap((base) => TS_FOR[js[1].toLowerCase()].map((e) => base.slice(0, -js[0].length) + e)) : [];
+}
+
+const SPELLINGS = [
+  (p) => (p.startsWith('@/') ? [p.slice(2), ...ALIAS_ROOTS.map((r) => `${r}/${p.slice(2)}`)] : []),
+  withoutProjectName,
+  typescriptSources,
+  (p, index, tries) => (/\.[a-z0-9]{2,5}$/i.test(p) ? [] : tries.flatMap((base) => TRY_EXT.map((e) => base + e))),
+];
+
+const EXACT_LOOKUPS = [
+  (index, t) => (index.known.has(t) ? t : null),
+  (index, t, beside) => (beside && index.known.has(beside + t) ? beside + t : null),
+  (index, t) => endingIn(index, t, true),
+];
 
 /** `resolvePath` with each answer kept, since a path cited on many lines is resolved once per folder. */
 export function makeResolver(index) {

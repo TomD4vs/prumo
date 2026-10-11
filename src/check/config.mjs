@@ -1,7 +1,3 @@
-/**
- * prumo — `.prumorc.json` and the glob matching its lists use.
- */
-
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 

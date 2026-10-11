@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * prumo — MCP server over stdio, so an agent can ask for a check as a tool call.
- * Five tools: prumo_check (read only), prumo_fix (rewrites case mismatches and the renames git recorded),
- * and the three reports, prumo_drift, prumo_budget and prumo_coverage (read only).
- * JSON-RPC 2.0, one message per line, no dependencies.
- */
-
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { analyze, resolveTargets, loadConfig, loadBaseline, hasRootSkill } from '../src/check.mjs';
@@ -81,74 +74,66 @@ const TOOLS = [
   },
 ];
 
-/** Runs one check, one fix or one report; throws with a message meant for the agent. */
-function run(name, { repo = '.', targets: explicit = [], since = '' } = {}) {
-  try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); }
-  catch { throw new Error(`not a git repository: ${repo}`); }
+/** The context files a tool call runs on: the ones named, the ones `.prumorc.json` lists, or the ones found; none is an error for the agent. */
+function contextOf({ repo = '.', targets: explicit = [] }) {
+  try { execSync('git rev-parse --is-inside-work-tree', { cwd: repo, stdio: 'ignore' }); } catch { throw new Error(`not a git repository: ${repo}`); }
   const config = loadConfig(repo);
-  const wanted = explicit.length ? explicit : (config.targets || []);
-  const targets = resolveTargets(repo, wanted);
-  if (!targets.length) throw new Error(hasRootSkill(repo)
+  const targets = resolveTargets(repo, explicit.length ? explicit : (config.targets || []));
+  if (targets.length) return { repo, config, targets };
+  throw new Error(hasRootSkill(repo)
     ? 'no context files found. This repository has a SKILL.md at the root, which is not detected automatically because at the root that name is usually a template. Pass targets ["SKILL.md"] to check it.'
     : 'no context files found. Pass targets, or create a CLAUDE.md / AGENTS.md.');
-
-  if (name === 'prumo_drift') return { result: drift({ repo, targets, config }), fixed: null };
-  if (name === 'prumo_budget') return { result: budget({ repo, targets, config, since: String(since || '') }), fixed: null };
-  if (name === 'prumo_coverage') return { result: coverage({ repo, targets, config }), fixed: null };
-
-  const baseline = loadBaseline(repo);
-  let result = analyze({ repo, targets, config, baseline });
-  let fixed = null;
-  if (name === 'prumo_fix') {
-    const changes = [...result.caseMismatch, ...renameFixes(result)];
-    if (changes.length) {
-      fixed = applyFixes(changes, targets);
-      result = analyze({ repo, targets, config, baseline });
-    }
-  }
-  return { result, fixed };
 }
 
-function handle(msg) {
-  const { id, method, params = {} } = msg;
-  const reply = (result) => ({ jsonrpc: '2.0', id, result });
-  const fail = (code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
+/** The check with the baseline at the root, and with `fix`, the case mismatches and the renames git recorded rewritten first. */
+function checked({ repo, config, targets }, fix) {
+  const baseline = loadBaseline(repo);
+  const result = analyze({ repo, targets, config, baseline });
+  const changes = fix ? [...result.caseMismatch, ...renameFixes(result)] : [];
+  const fixed = changes.length ? applyFixes(changes, targets) : null;
+  return { result: fixed ? analyze({ repo, targets, config, baseline }) : result, fixed };
+}
 
-  switch (method) {
-    case 'initialize':
-      return reply({
-        protocolVersion: PROTOCOL,
-        capabilities: { tools: {} },
-        serverInfo: { name: 'prumo', version: VERSION },
-        instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand. Call prumo_drift to learn which sections describe code that changed since they were written, prumo_budget to learn what each context file costs and what is written twice, and prumo_coverage to learn which folders of the code no context file mentions.',
-      });
-    case 'ping':
-      return reply({});
-    case 'tools/list':
-      return reply({ tools: TOOLS });
-    case 'tools/call': {
-      const { name, arguments: args } = params;
-      if (!TOOLS.some((t) => t.name === name)) return fail(-32602, `unknown tool: ${name}`);
-      try {
-        const { result, fixed } = run(name, args || {});
-        if (result.command !== 'check') {
-          const render = { drift: renderDrift, budget: renderBudget, coverage: renderCoverage }[result.command];
-          return reply({ content: [{ type: 'text', text: render(result, { all: true }) }], structuredContent: result, isError: false });
-        }
-        const total = result.caseMismatch.length + result.brokenLinks.length + result.missingPaths.length + result.unknownCommands.length + result.configIssues.length + result.orphans.length;
-        return reply({
-          content: [{ type: 'text', text: renderText(result, { all: true, fixed }) }],
-          structuredContent: { ...result, fixed, total },
-          isError: false,
-        });
-      } catch (err) {
-        return reply({ content: [{ type: 'text', text: `prumo: ${err.message}` }], isError: true });
-      }
-    }
-    default:
-      if (id === undefined) return null;
-      return fail(-32601, `method not found: ${method}`);
-  }
+const RUNS = new Map([
+  ['prumo_check', (ctx) => checked(ctx, false)],
+  ['prumo_fix', (ctx) => checked(ctx, true)],
+  ['prumo_drift', ({ repo, targets, config }) => ({ result: drift({ repo, targets, config }), fixed: null })],
+  ['prumo_budget', ({ repo, targets, config, since }) => ({ result: budget({ repo, targets, config, since: String(since || '') }), fixed: null })],
+  ['prumo_coverage', ({ repo, targets, config }) => ({ result: coverage({ repo, targets, config }), fixed: null })],
+]);
+
+const REPORT_TEXT = { drift: renderDrift, budget: renderBudget, coverage: renderCoverage };
+
+/** What a tool call answers: a report as its text and its result, the check as its text with the total and what a fix did. */
+function toolContent({ result, fixed }) {
+  const render = REPORT_TEXT[result.command];
+  if (render) return { content: [{ type: 'text', text: render(result, { all: true }) }], structuredContent: result, isError: false };
+  const total = ['caseMismatch', 'brokenLinks', 'missingPaths', 'unknownCommands', 'configIssues', 'orphans'].reduce((n, k) => n + result[k].length, 0);
+  return { content: [{ type: 'text', text: renderText(result, { all: true, fixed }) }], structuredContent: { ...result, fixed, total }, isError: false };
+}
+
+/** Runs one tool call; an error is an answer the agent reads, with the message prumo would print. */
+function callTool(name, args) {
+  try { return toolContent(RUNS.get(name)({ ...contextOf(args), since: args.since })); } catch (err) { return { content: [{ type: 'text', text: `prumo: ${err.message}` }], isError: true }; }
+}
+
+const METHODS = {
+  initialize: () => ({
+    protocolVersion: PROTOCOL,
+    capabilities: { tools: {} },
+    serverInfo: { name: 'prumo', version: VERSION },
+    instructions: 'Call prumo_check on a repository to learn which paths and links in its context files are stale. Call prumo_fix to correct letter case and the renames git recorded; everything else is for you to edit by hand. Call prumo_drift to learn which sections describe code that changed since they were written, prumo_budget to learn what each context file costs and what is written twice, and prumo_coverage to learn which folders of the code no context file mentions.',
+  }),
+  ping: () => ({}),
+  'tools/list': () => ({ tools: TOOLS }),
+  'tools/call': ({ name, arguments: args }) => (RUNS.has(name) ? callTool(name, args || {}) : { error: { code: -32602, message: `unknown tool: ${name}` } }),
+};
+
+/** Answers one JSON-RPC message: a method's result, an error, or nothing for a notification it does not know. */
+function handle({ id, method, params = {} }) {
+  const answer = Object.hasOwn(METHODS, method) ? METHODS[method](params) : id === undefined ? null : { error: { code: -32601, message: `method not found: ${method}` } };
+  if (!answer) return null;
+  return answer.error ? { jsonrpc: '2.0', id, error: answer.error } : { jsonrpc: '2.0', id, result: answer };
 }
 
 let buffer = '';

@@ -1,17 +1,9 @@
-/**
- * prumo — the coverage report: the folders of the code that no context file mentions, the most
- * active first. It is the reverse of a missing path, what the agent is never told about rather than
- * what it is told wrong. Nothing here is a finding: a folder may be left out of the notes on purpose.
- */
-
 import { execFileSync } from 'node:child_process';
 import { resolve, relative, sep, posix } from 'node:path';
 import { analyze, loadConfig, makeMatcher, ageOf, SCHEMA_VERSION, VERSION } from './check.mjs';
 import { TRANSIENT } from './check/paths.mjs';
 
-/** How far back the activity of a folder is counted. */
 export const ACTIVE_DAYS = 90;
-/** What marks a folder as a package of its own, so a workspace is read package by package. */
 const MANIFEST = /^(package\.json|Cargo\.toml|go\.mod|pyproject\.toml|composer\.json|pom\.xml|build\.gradle(\.kts)?|Gemfile|mix\.exs)$/;
 
 /**
@@ -66,6 +58,8 @@ function activityOf(git, units, days) {
  * The coverage report of the context files: each folder of the code that none of them cites, with
  * its files, its commits in the last ninety days and its last commit, most active first. A folder
  * counts as cited when a context file names a path in it, or when it holds a context file of its own.
+ * It is the reverse of a missing path, what the agent is never told about, and never a finding: a
+ * folder may be left out of the notes on purpose.
  * @param {object} opts
  * @param {string} opts.repo      the repository
  * @param {object[]} opts.targets what resolveTargets() returned

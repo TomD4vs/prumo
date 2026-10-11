@@ -1,8 +1,3 @@
-/**
- * prumo — which files are context files: the ones named on the command line, or the ones every
- * agent we know reads, found on their own.
- */
-
 import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep, isAbsolute } from 'node:path';
 import { trackedFiles } from './git-index.mjs';
@@ -27,7 +22,6 @@ export const DEFAULT_TARGETS = [
 
 export const DEFAULT_DIRS = ['.cursor/rules', '.windsurf/rules', '.roo/rules', '.github/instructions', '.claude/commands'];
 
-/** Where a host installs skills. A skill found here is read even when git does not track it. */
 const SKILL_DIRS = ['.claude/skills', '.agents/skills'];
 
 export const NESTED = new Set(['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', 'AGENT.md', 'GEMINI.md', 'COPILOT.md', 'SKILL.md']);

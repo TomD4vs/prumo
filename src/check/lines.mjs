@@ -1,8 +1,3 @@
-/**
- * prumo — how the lines of a note are read: prose, code inside a fenced block, or skipped, and
- * the markers that silence a line, the next one or the whole file.
- */
-
 export const IGNORE_LINE = /<!--\s*prumo-ignore\s*-->/;
 export const IGNORE_NEXT = /<!--\s*prumo-ignore-next-line\s*-->/;
 export const IGNORE_FILE = /<!--\s*prumo-ignore-file\s*-->/;
@@ -10,7 +5,6 @@ export const IGNORE_FILE = /<!--\s*prumo-ignore-file\s*-->/;
 export const LIST_ITEM = /^(\s*)(?:[-*+]|\d+[.)])\s+/;
 export const TABLE_ROW = /^\s*\|/;
 
-/** A fenced block that quotes markdown is an example of syntax, so nothing inside it is a claim. */
 const QUOTES_MARKDOWN = /^(md|markdown|mdx)\b/i;
 const SOURCE_LANGUAGE = /^(js|javascript|jsx|ts|typescript|tsx|mjs|cjs|py|python|php|go|golang|rb|ruby|java|kt|kotlin|rs|rust|c|cpp|c\+\+|h|hpp|cs|csharp|swift|scala|dart|lua|perl|r|sql|vue|svelte|html|xml|css|scss|less)(\s|$)/i;
 
@@ -19,7 +13,7 @@ const SOURCE_LANGUAGE = /^(js|javascript|jsx|ts|typescript|tsx|mjs|cjs|py|python
  * quotes markdown, a block under a `prumo-ignore-next-line` marker, and anything inside an HTML
  * comment. A code line keeps the index of its opening fence, so the sentence that introduces the
  * block counts as its context. A line that kept its `\r` still opens a fence, so a caller that
- * split on `\n` alone reads a CRLF file the way it reads an LF one.
+ * split on `\n` alone reads a CRLF file the way it reads an LF one. A skipped line says why.
  */
 export function classifyLines(lines) {
   const out = [];
@@ -29,13 +23,13 @@ export function classifyLines(lines) {
     let text = lines[i];
     if (fence) {
       const close = text.match(/^\s*(`{3,}|~{3,})\s*$/);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.len) { fence = null; out.push({ kind: 'skip' }); }
-      else out.push(fence.read ? { kind: 'code', text, anchor: fence.at, lang: fence.lang } : { kind: 'skip' });
+      if (close && close[1][0] === fence.char && close[1].length >= fence.len) { fence = null; out.push({ kind: 'skip', why: 'the line that closes a fenced block' }); }
+      else out.push(fence.read ? { kind: 'code', text, anchor: fence.at, lang: fence.lang } : { kind: 'skip', why: fence.why });
       continue;
     }
     if (comment) {
       const end = text.indexOf('-->');
-      if (end < 0) { out.push({ kind: 'skip' }); continue; }
+      if (end < 0) { out.push({ kind: 'skip', why: 'inside an HTML comment' }); continue; }
       text = text.slice(end + 3);
       comment = false;
     }
@@ -48,9 +42,12 @@ export function classifyLines(lines) {
     const opener = text.match(/^\s*(`{3,}|~{3,})(.*)\r?$/);
     if (opener && !(opener[1][0] === '`' && opener[2].includes('`'))) {
       const info = opener[2].trim();
-      const read = !QUOTES_MARKDOWN.test(info) && !SOURCE_LANGUAGE.test(info) && !(i > 0 && IGNORE_NEXT.test(lines[i - 1]));
-      fence = { char: opener[1][0], len: opener[1].length, at: i, read, lang: info.split(/\s+/)[0].toLowerCase() };
-      out.push({ kind: 'skip' });
+      const lang = info.split(/\s+/)[0].toLowerCase();
+      const why = QUOTES_MARKDOWN.test(info) ? 'inside a fenced block that quotes markdown'
+        : SOURCE_LANGUAGE.test(info) ? `inside a fenced block of ${lang} source`
+          : i > 0 && IGNORE_NEXT.test(lines[i - 1]) ? 'inside a fenced block under a prumo-ignore-next-line marker' : '';
+      fence = { char: opener[1][0], len: opener[1].length, at: i, read: !why, why, lang };
+      out.push({ kind: 'skip', why: 'the line that opens a fenced block' });
       continue;
     }
     out.push({ kind: 'prose', text, anchor: i });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { analyze, resolveTargets } from '../src/check.mjs';
+import { analyze, resolveTargets, ageOf } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
 import { renderText, renderGithub, renderSarif } from '../src/report.mjs';
 import { committedRepo, git, dated, cli, talk } from './support.mjs';
@@ -210,4 +210,11 @@ test('the CLI and the MCP server apply the renames with --fix and prumo_fix, and
   assert.ok(fixed.changes.some((c) => c.why === 'rename' && c.actual === 'lib/kept.ts'));
   assert.match(readFileSync(join(again, 'CLAUDE.md'), 'utf8'), /lib\/kept\.ts/);
   assert.match(replies.find((x) => x.id === 3).result.tools.find((x) => x.name === 'prumo_fix').description, /renamed/);
+});
+
+test('an age reads as today, yesterday, days, months or years', () => {
+  const day = 86400;
+  assert.deepEqual([0, 1, 2, 29, 30, 44, 340, 365, 800].map((d) => ageOf(0, d * day + 60)), [
+    'today', 'yesterday', '2 days ago', '29 days ago', '1 month ago', '1 month ago', '11 months ago', '1 year ago', '2 years ago',
+  ]);
 });

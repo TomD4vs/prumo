@@ -1,16 +1,8 @@
-/**
- * prumo — the budget report: what each context file costs the agent that reads it at every
- * session, how much that grew since an earlier commit, and which paragraphs are written twice.
- * It measures and counts; nothing here is a finding, and no line can be a false alarm.
- */
-
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { loadConfig, makeMatcher, readTextFile, classifyLines, SCHEMA_VERSION, VERSION } from './check.mjs';
 
-/** The estimate the model vendors quote for English prose; the report says it is an estimate. */
 export const CHARS_PER_TOKEN = 4;
-/** A paragraph shorter than this is a line anyone would write twice, such as a list item or a heading. */
 const REPEAT_WORDS = 12;
 
 const unix = (text) => text.replace(/\r\n/g, '\n');
@@ -32,7 +24,11 @@ export function paragraphsOf(lines) {
   return out;
 }
 
-/** The paragraphs that appear in more than one place, each with every place it is written, the most words repeated first. */
+/**
+ * The paragraphs that appear in more than one place, each with every place it is written, the most
+ * words repeated first. A paragraph under twelve words, a list item or a heading, is what anyone
+ * writes twice, so it is left out.
+ */
 function repeatsAmong(notes) {
   const byKey = new Map();
   for (const { file, lines } of notes) {
@@ -57,9 +53,38 @@ function repeatTotals(repeated) {
   return { paragraphs: repeated.length, copies: repeated.reduce((n, r) => n + r.at.length - 1, 0), words: repeated.reduce((n, r) => n + r.words * (r.at.length - 1), 0) };
 }
 
+/** What a git command printed, or `fallback` when it failed, since a missing commit or file is an answer here and not an error. */
+const quietly = (run, fallback = '') => { try { return run(); } catch { return fallback; } };
+
+const EARLIER_COMMITS = [
+  (git, since) => since,
+  (git, since) => (since ? '' : quietly(() => git(['rev-list', '-1', '--before=30 days ago', 'HEAD']).trim())),
+  (git, since) => (since ? '' : quietly(() => git(['rev-list', '--max-parents=0', 'HEAD']).trim().split('\n').filter(Boolean).pop() || '')),
+];
+
+/**
+ * The commit sizes are compared with, and its date: the one `since` names, or else the commit thirty
+ * days ago, or else the first commit of a younger repository. A commit named that git does not know
+ * is an error; one found on its own that has no date means there is nothing to compare with.
+ */
+function comparedWith(git, since) {
+  const ref = EARLIER_COMMITS.reduce((found, pick) => found || pick(git, since), '');
+  const at = ref ? quietly(() => git(['show', '-s', '--format=%ct', ref, '--']).trim().split('\n')[0]) : '';
+  if (ref && !at && since) throw new Error(`git does not know "${since}"`);
+  return at ? { ref, date: new Date(Number(at) * 1000).toISOString().slice(0, 10) } : { ref: '', date: null };
+}
+
+/** A file's row set against the same file at the commit compared with: `new` when it was not there, else its growth. */
+function againstThen(row, old) {
+  if (old === null) return { ...row, state: 'new' };
+  const before = tokensOf(unix(old.replace(/^\uFEFF/, '')));
+  return { ...row, before, delta: row.tokens - before, state: row.tokens - before ? 'changed' : 'unchanged' };
+}
+
 /**
  * The budget report of the context files: size, estimated tokens, growth since a commit, and the
- * paragraphs written twice.
+ * paragraphs written twice. Tokens are estimated at four characters each, the figure the model
+ * vendors quote for English prose. It measures and counts; nothing here is a finding.
  * @param {object} opts
  * @param {string} opts.repo      the repository
  * @param {object[]} opts.targets what resolveTargets() returned
@@ -73,23 +98,10 @@ export function budget({ repo, targets, config = null, since = '' }) {
   let tracked;
   try { tracked = new Set(git(['ls-files', '-z']).split('\0').filter(Boolean)); } catch { tracked = new Set(); }
 
-  let ref = since, date = null;
-  if (!ref) {
-    try { ref = git(['rev-list', '-1', '--before=30 days ago', 'HEAD']).trim(); } catch { ref = ''; }
-    if (!ref) { try { ref = git(['rev-list', '--max-parents=0', 'HEAD']).trim().split('\n').filter(Boolean).pop() || ''; } catch { ref = ''; } }
-  }
-  if (ref) {
-    let at = '';
-    try { at = git(['show', '-s', '--format=%ct', ref, '--']).trim().split('\n')[0]; } catch { at = ''; }
-    if (!at) {
-      if (since) throw new Error(`git does not know "${since}"`);
-      ref = '';
-    } else date = new Date(Number(at) * 1000).toISOString().slice(0, 10);
-  }
+  const { ref, date } = comparedWith(git, since);
 
   const files = [], notes = [];
-  for (const t of targets) {
-    if (excluded(t.label)) continue;
+  for (const t of targets.filter((target) => !excluded(target.label))) {
     const raw = readTextFile(t.path);
     if (raw === null) continue;
     const text = unix(raw);
@@ -103,17 +115,7 @@ export function budget({ repo, targets, config = null, since = '' }) {
       delta: null,
       state: tracked.has(t.label) ? 'unchanged' : 'untracked',
     };
-    if (ref && row.state !== 'untracked') {
-      let old = null;
-      try { old = git(['show', `${ref}:${t.label}`]); } catch { old = null; }
-      if (old === null) row.state = 'new';
-      else {
-        row.before = tokensOf(unix(old.replace(/^\uFEFF/, '')));
-        row.delta = row.tokens - row.before;
-        row.state = row.delta ? 'changed' : 'unchanged';
-      }
-    }
-    files.push(row);
+    files.push(ref && row.state !== 'untracked' ? againstThen(row, quietly(() => git(['show', `${ref}:${t.label}`]), null)) : row);
     notes.push({ file: t.label, lines: text.split('\n') });
   }
   files.sort((a, b) => b.tokens - a.tokens || a.file.localeCompare(b.file));

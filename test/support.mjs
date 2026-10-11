@@ -1,8 +1,3 @@
-/**
- * prumo — what the test files share: the paths of the two programs, throwaway repositories that
- * are removed when the run ends, and the CLI run the way a pipe sees it.
- */
-
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -15,7 +10,6 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const BIN = join(ROOT, 'bin', 'prumo.mjs');
 export const SERVER = join(ROOT, 'bin', 'prumo-mcp.mjs');
 
-/** Every run of git in a test has an identity, and never stops on a line ending it would convert. */
 const GIT = 'git -c user.email=t@t -c user.name=t -c core.safecrlf=false';
 
 const made = [];
@@ -37,7 +31,7 @@ export function write(dir, files) {
   }
 }
 
-/** Runs a git command in `dir` and returns what it printed, trimmed. */
+/** Runs a git command in `dir` with an identity, never stopping on a line ending it would convert, and returns what it printed, trimmed. */
 export function git(dir, cmd, env = {}) {
   return execSync(`${GIT} ${cmd}`, { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...env } }).toString().trim();
 }

@@ -32,6 +32,7 @@ prumo budget [repo] [target...] [--since REF]
 | `--no-baseline` | Ignore `.prumo-baseline.json` for this run |
 | `--staged` | Check only the context files staged for commit |
 | `--since REF` | Check only the context files changed since `REF`, a commit or a branch; with `budget`, compare sizes with `REF` (default: the commit thirty days ago) |
+| `--explain FILE:LINE` | Say why that line was or was not reported, citation by citation; prints and exits 0 |
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
@@ -199,6 +200,26 @@ repos:
 ```
 
 **Only what changed.** `--staged` checks the context files staged for commit and nothing else, and `--since REF` the ones changed since a commit or a branch, `--since origin/main` on a pull request. The checks still run against the whole index, so a staged note that cites a file the commit does not touch is checked in full; what neither limit sees is a note left untouched while the file it cites was renamed, which is why the full run belongs on the main branch or on a schedule. The header says which limit applied, and a run that reaches no context file exits 0. The action takes the same limit through its `since` input, and the checkout then needs the history that reaches the branch, `fetch-depth: 0` on `actions/checkout`.
+
+## Why a line was or was not reported
+
+When prumo stays quiet about a line you expected it to flag, or flags one you did not expect, `--explain` says what it read there and what each check decided:
+
+```bash
+prumo --explain CLAUDE.md:3
+```
+
+```
+prumo — explain CLAUDE.md:3
+  The API lives in `src/api/routes.ts`; copy `path/to/config.json` from the example, and see [setup](docs/setup.md#install).
+
+  src/api/routes.ts       excused    the paragraph says the file is gone, moved, or only an example
+  path/to/config.json     excused    a placeholder, as path/to/, foo or bar
+  docs/setup.md           resolved   git tracks it
+  docs/setup.md#install   reported   BROKEN LINK
+```
+
+Every path, link, wikilink, anchor, import and command on the line comes back with one of four outcomes. `reported` is a finding, with its kind. `resolved` reached a file, shown after `->` when the note spells it differently. `excused` is a filter that kept it quiet, in the words of that filter: above, the word *example* two sentences away silences a path that does not exist, which is what the filter is for and also what it can get wrong. `held` was reported and then taken back by the run: a file that documents another project, the baseline, `.gitignore`, a path reported once as the link on the same line, or a command shown under more than one package manager in the same file, which reads as a list of alternatives. A line that is not read at all says why, inside a fenced block that quotes markdown or under a `prumo-ignore` marker, and a line with nothing on it that reads as a citation says that. `FILE` is a context file of the run, as a path from the root; `--format json` returns the same events as data. It cannot be combined with `--fix`, `--baseline`, `--staged`, `--since`, `--sarif` or `--quiet`, since it reads one line and writes nothing.
 
 ## Silencing a finding
 

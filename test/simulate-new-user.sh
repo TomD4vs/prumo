@@ -382,6 +382,10 @@ echo "$OUT" | grep -q "^  CLAUDE.md:5  @docs/Guide.md   ->  @docs/guide.md$" && 
 echo "$OUT" | grep -q "phosphor" && bad "an npm package was read as an import" || ok "an npm package name is not an import"
 echo "$OUT" | grep -q "^2 to review, --fix corrects 1" && chk "$RC" "1" "2 to review, exit 1" || bad "import total: $(echo "$OUT" | tail -1)"
 $PR --fix >/dev/null 2>&1; grep -q "^Read @docs/guide.md first, then @docs/setup.md.$" CLAUDE.md && ok "--fix corrects the import in place, keeping its @" || bad "import fix: $(sed -n 5p CLAUDE.md)"
+OUT=$($PR --explain CLAUDE.md:5 2>&1); RC=$?
+echo "$OUT" | grep -qE "^  @docs/setup.md +reported +BROKEN LINK$" && echo "$OUT" | grep -qE "^  @docs/guide.md +resolved +git tracks it +-> +docs/guide.md$" && chk "$RC" "0" "--explain says what each check decided on one line, exit 0" || bad "explain: $(echo "$OUT" | tr '\n' '|')"
+OUT=$($PR --explain CLAUDE.md:7 2>&1)
+echo "$OUT" | grep -qE "^  @phosphor-icons/react +excused +its first folder is not beside the note" && ok "--explain names the filter that kept a line quiet" || bad "explain excused: $(echo "$OUT" | tr '\n' '|')"
 
 if [ "$GLOBAL" = 1 ]; then
   echo; echo "########## Q. npm install -g (opt-in)"

@@ -1,10 +1,3 @@
-/**
- * prumo — the automatic fixes: case mismatches, whose correct value is read from the git index,
- * and the renames git itself recorded, whose new name is read from the history. Neither is a
- * guess. A link suggested from a name, a missing path with no history and a deleted file are
- * never touched.
- */
-
 import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
@@ -49,39 +42,35 @@ const decode = (s) => { try { return decodeURIComponent(s); } catch { return s; 
  * since there is nothing to write in its place.
  */
 export function renameFixes(result) {
-  const changes = [];
-  const beside = (file, to) => {
-    const dir = posix.dirname(file);
-    return dir === '.' ? to : posix.relative(dir, to);
-  };
-  for (const o of result.missingPaths || []) {
-    const h = o.history;
-    if (!h || h.event !== 'renamed' || !h.to) continue;
-    const bare = o.cited.replace(/^\.\//, '');
-    const actual = h.from === bare ? h.to : beside(o.file, h.to);
-    changes.push({ file: o.file, line: o.line, cited: o.cited, actual, why: 'rename', commit: h.commit });
-  }
-  for (const o of result.brokenLinks || []) {
-    const h = o.history;
-    if (!h || h.event !== 'renamed' || !h.to || !(o.kind === 'link' || o.kind === 'import')) continue;
-    let actual;
-    if (o.kind === 'import') actual = beside(o.file, h.to);
-    else if (/^mdc:/i.test(o.cited)) actual = `mdc:${h.to}`;
-    else if (o.cited.startsWith('/')) actual = `/${h.to}`;
-    else {
-      const written = decode(o.cited).replace(/^\.\//, '');
-      actual = (o.cited.startsWith('./') ? './' : '') + (h.from === written ? h.to : beside(o.file, h.to));
-    }
-    if (o.cited.includes('%20')) actual = actual.split(' ').join('%20');
-    changes.push({ file: o.file, line: o.line, kind: o.kind, cited: o.cited, actual, why: 'rename', commit: h.commit });
-  }
-  return changes;
+  const paths = (result.missingPaths || []).filter(renamed).map((o) => {
+    const actual = o.history.from === o.cited.replace(/^\.\//, '') ? o.history.to : beside(o.file, o.history.to);
+    return { file: o.file, line: o.line, cited: o.cited, actual, why: 'rename', commit: o.history.commit };
+  });
+  const links = (result.brokenLinks || []).filter((o) => renamed(o) && (o.kind === 'link' || o.kind === 'import')).map((o) => {
+    const actual = LINK_RENAMES.find((r) => r.when(o)).write(o, o.history);
+    return { file: o.file, line: o.line, kind: o.kind, cited: o.cited, actual: o.cited.includes('%20') ? actual.split(' ').join('%20') : actual, why: 'rename', commit: o.history.commit };
+  });
+  return [...paths, ...links];
 }
+
+/** True when git recorded the cited file as renamed, and to a name that exists. */
+const renamed = (o) => Boolean(o.history && o.history.event === 'renamed' && o.history.to);
+
+/** A path written from beside the note, or as it is when the note sits at the root. */
+const beside = (file, to) => (posix.dirname(file) === '.' ? to : posix.relative(posix.dirname(file), to));
+
+const LINK_RENAMES = [
+  { when: (o) => /^mdc:/i.test(o.cited), write: (o, h) => `mdc:${h.to}` },
+  { when: (o) => o.cited.startsWith('/'), write: (o, h) => `/${h.to}` },
+  { when: () => true, write: (o, h) => (o.cited.startsWith('./') ? './' : '') + (h.from === decode(o.cited).replace(/^\.\//, '') ? h.to : beside(o.file, h.to)) },
+];
 
 /**
  * Rewrites each cited path to its correct value, the spelling the git index holds or the name git
- * renamed it to. Findings on one line are applied longest path first, so `src/foo/bar.js` is
- * corrected before `src/foo` can touch it.
+ * renamed it to. Neither is a guess, so a link suggested from a name, a missing path with no history
+ * and a deleted file are never touched. Findings on one line are applied longest path first, so
+ * `src/foo/bar.js` is corrected before `src/foo` can touch it. `applyCaseFixes` is the name it had
+ * before it learned renames, kept for whoever imported it.
  * @returns {{files:number, paths:number, changes:[], skipped:[]}}
  */
 export function applyFixes(findings, targets) {
@@ -119,5 +108,4 @@ export function applyFixes(findings, targets) {
   return { files, paths: changes.length, changes, skipped };
 }
 
-/** The name the fix went by before it learned renames; kept for whoever imported it. */
 export const applyCaseFixes = applyFixes;

@@ -431,3 +431,24 @@ test('a shell comment ends a command line, the repository name is a prefix befor
   assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['make gone'], 'the words after # are a comment, and only the target nothing defines is reported');
   assert.deepEqual(r.missingPaths.map((o) => o.cited), ['docs/gone.md'], 'the repository name before a root file resolves, and a folder the sentence makes conditional is quiet');
 });
+
+test('a path the config calls transient, one in an absent folder of a paragraph that writes files, and one on disk git does not track are not reported', () => {
+  const repo = repoWith({
+    'CLAUDE.md': [
+      '# app',
+      '',
+      'The API schema is `generated/schema.json`, rebuilt on every run.',
+      '',
+      'Read `out/summary.md` after the build.',
+      'The build creates it.',
+      '',
+      'Notes live in `docs/draft.md` for now.',
+    ].join('\n') + '\n',
+    'generated/README.md': '',
+    'docs/a.md': '',
+    '.prumorc.json': JSON.stringify({ transient: ['generated'] }),
+  });
+  writeFileSync(join(repo, 'docs/draft.md'), '# not committed\n');
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.deepEqual(r.missingPaths.map((m) => m.cited), []);
+});

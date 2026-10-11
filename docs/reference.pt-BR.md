@@ -32,6 +32,7 @@ prumo budget [repo] [alvo...] [--since REF]
 | `--no-baseline` | Ignora o `.prumo-baseline.json` nesta rodada |
 | `--staged` | Checa só os arquivos de contexto preparados para o commit |
 | `--since REF` | Checa só os arquivos de contexto alterados desde `REF`, um commit ou um branch; com `budget`, compara os tamanhos com `REF` (padrão: o commit de trinta dias atrás) |
+| `--explain ARQ:LINHA` | Diz por que aquela linha foi reportada ou não, citação por citação; imprime e sai com 0 |
 | `-h`, `--help` | Mostra a ajuda |
 | `-v`, `--version` | Mostra a versão |
 
@@ -199,6 +200,26 @@ repos:
 ```
 
 **Só o que mudou.** `--staged` checa os arquivos de contexto em stage para o commit e nada mais, e `--since REF` os alterados desde um commit ou um branch, `--since origin/main` num pull request. As checagens continuam rodando contra o índice inteiro, então uma nota em stage que cita um arquivo que o commit não toca é checada por inteiro; o que nenhum dos dois limites enxerga é uma nota intocada enquanto o arquivo que ela cita foi renomeado, e por isso a rodada completa pertence ao branch principal ou a um agendamento. O cabeçalho diz qual limite valeu, e uma rodada que não alcança arquivo de contexto nenhum sai com 0. A action recebe o mesmo limite pela entrada `since`, e o checkout então precisa do histórico que alcança o branch, `fetch-depth: 0` no `actions/checkout`.
+
+## Por que uma linha foi ou não foi reportada
+
+Quando o prumo fica quieto sobre uma linha que você esperava ver no relatório, ou aponta uma que você não esperava, o `--explain` diz o que ele leu ali e o que cada checagem decidiu:
+
+```bash
+prumo --explain CLAUDE.md:3
+```
+
+```
+prumo — explain CLAUDE.md:3
+  The API lives in `src/api/routes.ts`; copy `path/to/config.json` from the example, and see [setup](docs/setup.md#install).
+
+  src/api/routes.ts       excused    the paragraph says the file is gone, moved, or only an example
+  path/to/config.json     excused    a placeholder, as path/to/, foo or bar
+  docs/setup.md           resolved   git tracks it
+  docs/setup.md#install   reported   BROKEN LINK
+```
+
+Cada caminho, link, wikilink, âncora, import e comando da linha volta com um de quatro desfechos. `reported` é um achado, com o tipo dele. `resolved` chegou a um arquivo, mostrado depois da `->` quando a nota o escreve de outro jeito. `excused` é um filtro que o calou, nas palavras desse filtro: no exemplo, a palavra *example* duas frases adiante cala um caminho que não existe, que é para isso que o filtro serve e também onde ele pode errar. `held` foi reportado e depois retido pela rodada: um arquivo que documenta outro projeto, o baseline, o `.gitignore`, um caminho contado uma vez só, como o link da mesma linha, ou um comando mostrado com mais de um gerenciador de pacotes no mesmo arquivo, que se lê como uma lista de alternativas. Uma linha que nem é lida diz por quê, dentro de um bloco cercado que cita markdown ou debaixo de um marcador `prumo-ignore`, e uma linha sem nada que se leia como citação diz isso. `ARQ` é um arquivo de contexto da rodada, como caminho a partir da raiz; `--format json` devolve os mesmos eventos como dados. Ele não se combina com `--fix`, `--baseline`, `--staged`, `--since`, `--sarif` nem `--quiet`, porque lê uma linha e não grava nada.
 
 ## Silenciando um achado
 

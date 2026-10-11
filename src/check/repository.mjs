@@ -1,15 +1,10 @@
-/**
- * prumo — what is read from the repository besides the index: a file's text, what a commit or a
- * branch changed, what `.gitignore` covers, and where the repository pushes to.
- */
-
 import { readFileSync, statSync } from 'node:fs';
 import { execSync, execFileSync } from 'node:child_process';
 
 export function readTextFile(path) {
   try {
     if (statSync(path).size > 2_000_000) return null;
-    return readFileSync(path, 'utf8').replace(/^﻿/, '');
+    return readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
   } catch {
     return null;
   }

@@ -1,8 +1,3 @@
-/**
- * prumo — the name and version printed above the report when a person is looking, that is when
- * stdout is a terminal. A pipe, a file, CI and an agent get the report alone, byte for byte as before.
- */
-
 const NAME = [
   '██████╗ ██████╗ ██╗   ██╗███╗   ███╗ ██████╗',
   '██╔══██╗██╔══██╗██║   ██║████╗ ████║██╔═══██╗',
@@ -16,7 +11,6 @@ const TAGLINE = 'is your documentation still true?';
 
 const ESC = '[';
 const RESET = ESC + '0m';
-/** The face of the letters, their shadow, the rule in the colour of the social card, the small print, and the link. */
 const PAINT = { face: '1;97', shadow: '38;5;240', rule: '38;5;79', small: '38;5;245', link: '4;38;5;79' };
 const paint = (kind, text) => ESC + PAINT[kind] + 'm' + text + RESET;
 

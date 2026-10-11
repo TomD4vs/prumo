@@ -1,9 +1,3 @@
-/**
- * prumo — what the words around a citation say about it: that the file is gone, that it is
- * written by the agent or a build, that its existence is a condition, or that it belongs to
- * another repository. Most of the filters that keep the checks quiet read prose here.
- */
-
 import { LIST_ITEM, TABLE_ROW } from './lines.mjs';
 
 export const NEGATION = new RegExp(
@@ -22,11 +16,6 @@ export const NEGATION = new RegExp(
   'i'
 );
 
-/**
- * Verbs that say the path is written by the agent, a command or a build, so the file is not here yet
- * by design: *"save it to `x`"*, *"the script creates `x`"*, *"Output: `x`"*. The verb nearest the
- * path in its sentence governs it, so *"read `a` and write the result to `b`"* keeps `a` checked.
- */
 export const PRODUCES = new RegExp('\\b(' + [
   'outputs?', 'writes?|writing|written', 'saves?|saved|saving', 'creates?|created|creating',
   'generates?|generated|generating', 'emits?|emitted|emitting', 'produces?|produced|producing',
@@ -37,10 +26,6 @@ export const PRODUCES = new RegExp('\\b(' + [
   'grava|gravam|grave|gravar|gravad[oa]s?', 'escreve|escrevem|escreva|escrever|escrit[oa]s?',
   'produz|produzem|produza|produzir|produzid[oa]s?',
 ].join('|') + ')\\b', 'i');
-/**
- * Verbs that presume the file is here: it is read, edited, run or said to live somewhere. They only
- * matter beside a producing verb, since a path with no verb at all is checked anyway.
- */
 const CONSUMES = new RegExp('\\b(' + [
   'reads?|reading', 'see', 'consults?', 'refers? to', 'checks?', 'looks? (at|in|into)', 'opens?', 'edits?|editing',
   'updates?|updating', 'modif(y|ies|ying)', 'follows?', 'defined in', 'lives? in', 'found in', 'located (in|at)',
@@ -52,9 +37,7 @@ const CONSUMES = new RegExp('\\b(' + [
   'atualize|atualizem', 'use|usem', 'rode|rodem', 'execute|executem', 'importe|importem', 'carregue', 'siga|sigam',
   'fica em|ficam em', 'est[áa] em|est[ãa]o em', 'definid[oa]s? em', 'mora em', 'encontra-se em', 'a partir de',
 ].join('|') + ')\\b', 'i');
-/** A producing verb after the path counts only in the passive: *"`x` is generated"*, never *"`x` creates users"*. */
 const PRODUCED = /\b(is|are|gets?|be|will be|should be|must be|ser[áa]|ser[ãa]o|s[ãa]o|fica|ficam|deve ser|devem ser)\s+(written|created|generated|saved|stored|placed|produced|emitted|rendered|dumped|recorded|logged|output|gerad[oa]s?|criad[oa]s?|salv[oa]s?|gravad[oa]s?|escrit[oa]s?|produzid[oa]s?)\b/i;
-/** A label in front of the path that names it as the thing written: `Output: x`, `Location: x`, `Saída: x`. */
 const OUTPUT_LABEL = /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*|__)?(?:outputs?|output (?:files?|paths?)|location|destination|target (?:files?|paths?)|generated files?|sa[íi]da|destino|arquivos? gerados?)(?:\*\*|__)?\s*:/i;
 const PRODUCES_ALL = new RegExp(PRODUCES.source, 'gi');
 const PRODUCED_ALL = new RegExp(PRODUCED.source, 'gi');
@@ -86,7 +69,11 @@ function sentenceAround(text, at, len) {
 
 /**
  * Which family of verb governs the citation at `at`: the producing or the consuming one nearest to
- * it, a producing verb after it counting only in the passive. Empty when neither family is there.
+ * it, a producing verb after it counting only in the passive, *"`x` is generated"* and never
+ * *"`x` creates users"*. Empty when neither family is there. A producing verb says the file is written
+ * by the agent, a command or a build, so it is not here yet by design: *"save it to `x`"*, *"Output:
+ * `x`"*. A consuming verb presumes the file is here, and only matters beside a producing one, so
+ * *"read `a` and write the result to `b`"* keeps `a` checked.
  * Backtick spans are masked, since `scripts/generate.js` holds a verb that governs nothing.
  */
 function governs(text, at, len) {
@@ -131,39 +118,52 @@ function mentions(text) {
 function introOf(lines, marked, i, m) {
   const proseAt = (j) => (j >= 0 && marked[j].kind === 'prose' ? lines[j] : '');
   const aboveBlank = (j) => (j >= 0 && !lines[j].trim() ? j - 1 : j);
-  if (m.kind === 'code') return proseAt(aboveBlank(m.anchor - 1));
-  const item = lines[i].match(LIST_ITEM);
-  if (item) {
-    let j = i - 1;
-    for (; j >= 0; j--) {
-      const it = lines[j].match(LIST_ITEM);
-      if (it) { if (it[1].length < item[1].length) break; continue; }
-      if (/^\s+\S/.test(lines[j]) || (!lines[j].trim() && j > 0 && LIST_ITEM.test(lines[j - 1]))) continue;
-      break;
-    }
-    return proseAt(aboveBlank(j));
-  }
-  if (TABLE_ROW.test(lines[i])) {
-    let j = i;
-    while (j > 0 && TABLE_ROW.test(lines[j - 1])) j--;
-    return `${lines[j]} ${proseAt(aboveBlank(j - 1))}`;
-  }
-  return '';
+  const intro = INTROS.find((x) => x.when(lines, i, m));
+  return intro ? intro.of(lines, i, m, proseAt, aboveBlank) : '';
 }
+
+const INTROS = [
+  { when: (lines, i, m) => m.kind === 'code', of: (lines, i, m, proseAt, aboveBlank) => proseAt(aboveBlank(m.anchor - 1)) },
+  { when: (lines, i) => LIST_ITEM.test(lines[i]), of: (lines, i, m, proseAt, aboveBlank) => proseAt(aboveBlank(aboveList(lines, i))) },
+  { when: (lines, i) => TABLE_ROW.test(lines[i]), of: (lines, i, m, proseAt, aboveBlank) => { const head = tableHead(lines, i); return `${lines[head]} ${proseAt(aboveBlank(head - 1))}`; } },
+];
+
+/**
+ * The line above the list an item sits in, or above its parent item when it is nested: the walk up
+ * passes items as deep or deeper, their continuation lines, and blank lines between items.
+ */
+function aboveList(lines, i) {
+  const depth = lines[i].match(LIST_ITEM)[1].length;
+  let j = i - 1;
+  for (; j >= 0; j--) {
+    const it = lines[j].match(LIST_ITEM);
+    const inside = it ? it[1].length >= depth : /^\s+\S/.test(lines[j]) || (!lines[j].trim() && j > 0 && LIST_ITEM.test(lines[j - 1]));
+    if (!inside) break;
+  }
+  return j;
+}
+
+/** The header row of the table a row sits in. */
+function tableHead(lines, i) {
+  let j = i;
+  while (j > 0 && TABLE_ROW.test(lines[j - 1])) j--;
+  return j;
+}
+
+const VERDICTS = [
+  (x) => (x.m.kind === 'prose' && x.sentence.at === x.at && OUTPUT_LABEL.test(x.m.text) ? 'produces' : ''),
+  (x) => (x.m.kind === 'prose' ? governs(x.sentence.text, x.sentence.at, x.len) : ''),
+  (x) => mentions(introOf(x.lines, x.marked, x.i, x.m)),
+  (x) => (x.headings[x.i] >= 0 ? mentions(x.lines[x.headings[x.i]]) : ''),
+];
 
 /**
  * Whether the sentence, the block's introduction or the section heading says the path is produced
- * or consumed. A label such as `Output:` opening the line settles it on its own.
+ * or consumed, asked in that order: the first of `VERDICTS` with an answer settles it. A label such
+ * as `Output:` opening the line settles it before anything else.
  */
 export function verdictOn(lines, marked, headings, i, m, at, len) {
-  if (m.kind === 'prose') {
-    const s = sentenceAround(m.text, at, len);
-    if (s.at === at && OUTPUT_LABEL.test(m.text)) return 'produces';
-    const v = governs(s.text, s.at, len);
-    if (v) return v;
-  }
-  const lead = mentions(introOf(lines, marked, i, m));
-  if (lead) return lead;
-  const h = headings[i];
-  return h >= 0 ? mentions(lines[h]) : '';
+  let sentence = null;
+  const x = { lines, marked, headings, i, m, at, len, get sentence() { return sentence ??= sentenceAround(m.text, at, len); } };
+  return VERDICTS.reduce((verdict, step) => verdict || step(x), '');
 }

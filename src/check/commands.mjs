@@ -1,13 +1,9 @@
-/**
- * prumo — the command check: a script or a target a note runs, `npm run x`, `make x`, that no
- * package.json, Makefile or composer.json in the repository defines.
- */
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTextFile } from './repository.mjs';
 import { PROMPT } from './paths.mjs';
 import { NEGATION } from './sentence.mjs';
+import { decide } from './rules.mjs';
 
 const SHELL_LANGUAGE = /^(bash|sh|shell|zsh|fish|console|terminal|cmd|bat|powershell|ps1?|pwsh|text|txt|plaintext|plain|makefile|make|dockerfile)?$/;
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/;
@@ -33,6 +29,26 @@ function makeTargets(body) {
   return { targets, dynamic };
 }
 
+const MANIFESTS = [
+  {
+    kind: 'npm', match: (name) => name === 'package.json',
+    read: (acc, json) => {
+      const j = json();
+      for (const s of Object.keys(j.scripts || {})) { acc.scripts.add(s); acc.accepted.add(s); }
+      for (const d of Object.keys(j.dependencies || {}).concat(Object.keys(j.devDependencies || {}))) acc.accepted.add(d.replace(/^@[^/]+\//, ''));
+    },
+  },
+  { kind: 'composer', match: (name) => name === 'composer.json', read: (acc, json) => { for (const s of Object.keys(json().scripts || {})) acc.composer.add(s); } },
+  {
+    kind: 'make', match: (name) => /^(GNUmakefile|[Mm]akefile)$/.test(name) || name.endsWith('.mk'),
+    read: (acc, json, text) => {
+      const r = makeTargets(text() || '');
+      for (const t of r.targets) acc.make.add(t);
+      acc.dynamic ||= r.dynamic;
+    },
+  },
+];
+
 /**
  * The scripts and targets this repository defines, read from every package.json, composer.json
  * and Makefile git tracks, so a note anywhere in a monorepo may name any of them. A kind the
@@ -40,31 +56,19 @@ function makeTargets(body) {
  * its scripts, `yarn x` and `pnpm x` run a dependency's binary, so those names are accepted too.
  */
 function commandSources(repo, tracked) {
-  const scripts = new Set(), accepted = new Set(KNOWN_BIN), composer = new Set(), make = new Set();
-  let sawNpm = false, sawComposer = false, sawMake = false, dynamic = false;
-  const manifest = (p) => { try { return JSON.parse(readFileSync(join(repo, p), 'utf8')) || {}; } catch { return {}; } };
+  const acc = { scripts: new Set(), accepted: new Set(KNOWN_BIN), composer: new Set(), make: new Set(), dynamic: false, saw: new Set() };
   for (const p of tracked) {
-    const name = p.slice(p.lastIndexOf('/') + 1);
-    if (name === 'package.json') {
-      sawNpm = true;
-      const j = manifest(p);
-      for (const s of Object.keys(j.scripts || {})) { scripts.add(s); accepted.add(s); }
-      for (const d of Object.keys(j.dependencies || {}).concat(Object.keys(j.devDependencies || {}))) accepted.add(d.replace(/^@[^/]+\//, ''));
-    } else if (name === 'composer.json') {
-      sawComposer = true;
-      for (const s of Object.keys(manifest(p).scripts || {})) composer.add(s);
-    } else if (/^(GNUmakefile|[Mm]akefile)$/.test(name) || name.endsWith('.mk')) {
-      sawMake = true;
-      const r = makeTargets(readTextFile(join(repo, p)) || '');
-      for (const t of r.targets) make.add(t);
-      if (r.dynamic) dynamic = true;
-    }
+    const manifest = MANIFESTS.find((m) => m.match(p.slice(p.lastIndexOf('/') + 1)));
+    if (!manifest) continue;
+    acc.saw.add(manifest.kind);
+    manifest.read(acc, () => { try { return JSON.parse(readFileSync(join(repo, p), 'utf8')) || {}; } catch { return {}; } }, () => readTextFile(join(repo, p)));
   }
+  const ifSeen = (kind, set) => (acc.saw.has(kind) ? set : null);
   return {
-    scripts: sawNpm ? scripts : null,
-    accepted: sawNpm ? accepted : null,
-    'composer.json': sawComposer ? composer : null,
-    Makefile: sawMake && !dynamic ? make : null,
+    scripts: ifSeen('npm', acc.scripts),
+    accepted: ifSeen('npm', acc.accepted),
+    'composer.json': ifSeen('composer', acc.composer),
+    Makefile: acc.dynamic ? null : ifSeen('make', acc.make),
   };
 }
 
@@ -74,37 +78,39 @@ export function makeCommandSources(repo, index) {
   return () => sources || (sources = commandSources(repo, index.tracked));
 }
 
+/** A command a note runs: as written, the name it asks for, the file that should define it, and whether only a script will do. */
+const command = (cited, name, source, strict) => ({ cited, name, source, strict });
+/** `x run name`, which names a script whatever the runner, and names nothing without the name. */
+const runScript = (cmd, first, second, source) => (second ? [command(`${cmd} ${first} ${second}`, second, source, true)] : []);
+/** `yarn x` and `pnpm x` run a script or a dependency's binary, unless `x` is a command of their own. */
+const runOrBinary = (cmd, builtins) => ({ first, second }) => (first === 'run' ? runScript(cmd, first, second, 'package.json') : builtins.has(first) ? [] : [command(`${cmd} ${first}`, first, 'package.json', false)]);
+
+const RUNNERS = new Map([
+  ['npm', ({ first, second }) => (/^run(-script)?$/.test(first) ? runScript('npm', first, second, 'package.json') : /^(test|stop|restart)$/.test(first) ? [command(`npm ${first}`, first, 'package.json', true)] : [])],
+  ['yarn', runOrBinary('yarn', YARN_BUILTIN)],
+  ['pnpm', runOrBinary('pnpm', PNPM_BUILTIN)],
+  ['bun', ({ first, second }) => (first === 'run' ? runScript('bun', first, second, 'package.json') : [])],
+  ['make', ({ args }) => args.map((t) => command(`make ${t}`, t, 'Makefile', true))],
+  ['composer', ({ first, second }) => (/^run(-script)?$/.test(first) ? runScript('composer', first, second, 'composer.json') : COMPOSER_BUILTIN.has(first) ? [] : [command(`composer ${first}`, first, 'composer.json', true)])],
+]);
+
 /**
  * The scripts and targets a line of commands names: `npm run x`, `yarn x`, `pnpm x`, `bun run x`,
  * `make x` and `composer x`. A chain is split on `&&`, `||`, `;` and `|`; a variable in front,
  * `sudo` and `time` are skipped; a flag that points at another folder or package skips the command.
- * `strict` says the name has to be a script, as `npm run` accepts nothing else.
+ * `strict` says the name has to be a script, as `npm run` accepts nothing else. A name that holds a
+ * dot, a slash, a glob or a variable is a path or a template, not a script.
  */
 function commandsIn(text) {
   const found = [];
-  const add = (cited, name, source, strict) => { if (!/[./\\*{}$<>[\]]/.test(name)) found.push({ cited, name, source, strict }); };
   for (const seg of text.replace(PROMPT, '').replace(/(^|\s)#.*$/, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
     const tok = seg.replace(/(["'])(?:(?!\1).)*\1/g, (q) => (q.includes(' ') ? '' : q)).trim().split(/\s+/).map((t) => t.replace(/^["'`]+|["'`]+$/g, '')).filter(Boolean);
     while (tok.length && (ENV_ASSIGNMENT.test(tok[0]) || tok[0] === 'sudo' || tok[0] === 'time')) tok.shift();
     const [cmd, ...rest] = tok;
-    if (!cmd || rest.some((t) => ELSEWHERE_FLAG.test(t))) continue;
+    const runner = RUNNERS.get(cmd);
     const args = rest.filter((t) => !t.startsWith('-') && !t.includes('='));
-    const [first, second] = args;
-    if (!first) continue;
-    if (cmd === 'npm') {
-      if (/^run(-script)?$/.test(first)) { if (second) add(`npm ${first} ${second}`, second, 'package.json', true); }
-      else if (/^(test|stop|restart)$/.test(first)) add(`npm ${first}`, first, 'package.json', true);
-    } else if (cmd === 'yarn' || cmd === 'pnpm') {
-      if (first === 'run') { if (second) add(`${cmd} run ${second}`, second, 'package.json', true); }
-      else if (!(cmd === 'yarn' ? YARN_BUILTIN : PNPM_BUILTIN).has(first)) add(`${cmd} ${first}`, first, 'package.json', false);
-    } else if (cmd === 'bun') {
-      if (first === 'run' && second) add(`bun run ${second}`, second, 'package.json', true);
-    } else if (cmd === 'make') {
-      for (const t of args) add(`make ${t}`, t, 'Makefile', true);
-    } else if (cmd === 'composer') {
-      if (/^run(-script)?$/.test(first)) { if (second) add(`composer ${first} ${second}`, second, 'composer.json', true); }
-      else if (!COMPOSER_BUILTIN.has(first)) add(`composer ${first}`, first, 'composer.json', true);
-    }
+    if (!runner || !args.length || rest.some((t) => ELSEWHERE_FLAG.test(t))) continue;
+    found.push(...runner({ first: args[0], second: args[1], args }).filter((c) => !/[./\\*{}$<>[\]]/.test(c.name)));
   }
   return found;
 }
@@ -133,33 +139,47 @@ function closestName(names, name) {
   return best;
 }
 
+/** One command on a line, with the names the repository defines for its kind, or null when it has no file of that kind. */
+function commandCitation(run, file, i, m, c) {
+  const src = run.sources();
+  return { run, file, i, m, kind: 'command', ...c, src, defined: c.source === 'package.json' ? (c.strict ? src.scripts : src.accepted) : src[c.source] };
+}
+
+const COMMAND_RULES = [
+  { when: (x) => !x.defined, outcome: 'excused', reason: (x) => `the repository has no ${x.source}, so the command belongs to another project, or the Makefile builds its targets` },
+  { when: (x) => x.defined.has(x.name), outcome: 'resolved', reason: (x) => `defined in a ${x.source} of the repository` },
+  { when: (x) => NEGATION.test(x.file.context(x.i, x.m.anchor, 2, 2)), outcome: 'excused', reason: 'the paragraph says the command is gone, renamed, or only an example' },
+  {
+    when: () => true, outcome: 'reported', reason: 'UNKNOWN COMMAND',
+    act: (x) => {
+      const near = closestName(x.source === 'package.json' ? x.src.scripts : x.defined, x.name);
+      x.run.findings.unknownCommands.push({
+        file: x.file.target.label,
+        line: x.i + 1,
+        cited: x.cited,
+        name: x.name,
+        source: x.source,
+        suggestion: near ? x.cited.slice(0, -x.name.length) + near : null,
+        excerpt: x.file.lines[x.i].trim().slice(0, 160),
+      });
+    },
+  },
+];
+
 /**
  * The command check on one line: the commands of a shell block, or of a backtick span with spaces
- * in prose, each reported once per line when nothing in the repository defines what it names.
+ * in prose, each decided once per line by `COMMAND_RULES`, and reported when nothing in the
+ * repository defines what it names.
  */
 export function checkCommands(run, file, i, m) {
   const code = m.kind === 'code';
   if (code && !SHELL_LANGUAGE.test(m.lang)) return;
   const spans = code ? [m.text] : [...m.text.matchAll(/`([^`\n]{3,200})`/g)].map((s) => s[1]).filter((s) => /\s/.test(s));
-  const seenCommand = new Set();
-  for (const span of spans) {
-    for (const c of commandsIn(span)) {
-      const src = run.sources();
-      const defined = c.source === 'package.json' ? (c.strict ? src.scripts : src.accepted) : src[c.source];
-      if (!defined || defined.has(c.name) || seenCommand.has(c.cited)) continue;
-      seenCommand.add(c.cited);
-      if (NEGATION.test(file.context(i, m.anchor, 2, 2))) continue;
-      const near = closestName(c.source === 'package.json' ? src.scripts : defined, c.name);
-      run.findings.unknownCommands.push({
-        file: file.target.label,
-        line: i + 1,
-        cited: c.cited,
-        name: c.name,
-        source: c.source,
-        suggestion: near ? c.cited.slice(0, -c.name.length) + near : null,
-        excerpt: file.lines[i].trim().slice(0, 160),
-      });
-    }
+  const seen = new Set();
+  for (const c of spans.flatMap(commandsIn)) {
+    if (seen.has(c.cited)) continue;
+    seen.add(c.cited);
+    decide(COMMAND_RULES, commandCitation(run, file, i, m, c));
   }
 }
 

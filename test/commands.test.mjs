@@ -76,3 +76,23 @@ test('pnpm version is a builtin, a Chinese sentence that says the file was delet
   assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['pnpm run release'], 'pnpm version is pnpm itself, and only the script nothing defines is reported');
   assert.deepEqual(r.missingPaths.map((o) => o.cited), ['src/gone.ts'], 'the lines that say deleted or removed in Chinese are quiet, and the path with markup glued on resolves');
 });
+
+test('composer scripts are read from composer.json, so a script it does not define is an unknown command', () => {
+  const r = checkFiles({
+    'CLAUDE.md': '# app\n\nRun `composer run lint` and `composer run deploy`.\n',
+    'composer.json': JSON.stringify({ scripts: { lint: 'phpcs' } }),
+  });
+  assert.deepEqual(r.unknownCommands.map((c) => c.cited), ['composer run deploy']);
+});
+
+test('yarn and bun scripts are checked like npm ones, and a yarn binary nothing installs is reported', () => {
+  const r = checkFiles({
+    'AGENTS.md': 'Run `yarn biuld`, `yarn run tset`, `yarn install`, `bun run lnt` and `bun install`.\n',
+    'package.json': JSON.stringify({ scripts: { build: 'x', test: 'x', lint: 'x' } }),
+  });
+  assert.deepEqual(r.unknownCommands.map((c) => [c.cited, c.suggestion]), [
+    ['yarn biuld', 'yarn build'],
+    ['yarn run tset', 'yarn run test'],
+    ['bun run lnt', 'bun run lint'],
+  ]);
+});

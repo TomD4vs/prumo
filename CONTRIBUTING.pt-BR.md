@@ -49,7 +49,7 @@ em Linux, Windows e macOS no CI.
   estrutura. O português é escrito, não traduzido.
 - **Nenhuma dependência.** O prumo não traz nenhuma e não acessa a rede. Uma mudança que precise de
   um pacote precisa antes de um bom argumento.
-- **Nenhum comentário dentro do corpo de uma função.** O resto do estilo da casa está no `AGENTS.md`.
+- **Comentário só acima de função**, como o docblock dela: nada de cabeçalho de arquivo, nada de comentário em constante, nada dentro do corpo de uma função. A suíte confere isso. O resto do estilo da casa está no `AGENTS.md`.
 
 ## Relatar um achado que está errado
 

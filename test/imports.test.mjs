@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { analyze, resolveTargets } from '../src/check.mjs';
 import { applyFixes, renameFixes } from '../src/fix.mjs';
 import { renderText, renderGithub } from '../src/report.mjs';
-import { checkFiles, committedRepo, git } from './support.mjs';
+import { checkFiles, committedRepo, repoWith, write, git } from './support.mjs';
 
 const imports = (r) => r.brokenLinks.filter((l) => l.kind === 'import').map((l) => `${l.file}:${l.line} @${l.cited}`);
 
@@ -102,9 +102,33 @@ test('an import that climbs out of the repository from a nested note is not chec
   assert.equal(r.stats.gitignored, 1);
 });
 
+test('an import of build output, of a path the config ignores or calls transient, or of a file on disk git does not track, is not reported', () => {
+  const repo = repoWith({
+    'CLAUDE.md': '# app\n\n@dist/report.md\n\n@docs/private.md\n\n@generated/api.md\n\n@docs/draft.md\n',
+    'dist/index.js': '',
+    'generated/README.md': '',
+    'docs/a.md': '',
+    '.prumorc.json': JSON.stringify({ ignore: ['docs/private.md'], transient: ['generated'] }),
+  });
+  write(repo, { 'docs/draft.md': '# a draft nobody committed\n' });
+  const r = analyze({ repo, targets: resolveTargets(repo, []) });
+  assert.deepEqual(imports(r), []);
+});
+
 test('the text and GitHub reports show an import as the note wrote it, with its @', () => {
   const r = checkFiles({ 'CLAUDE.md': '# app\n\n@docs/missing.md\n', 'docs/a.md': '# a\n' });
   assert.match(renderText(r), /^BROKEN LINK  \(1\)/m);
   assert.match(renderText(r), /^  CLAUDE\.md:3  @docs\/missing\.md$/m);
   assert.equal(renderGithub(r), '::warning file=CLAUDE.md,line=3::Broken link: @docs/missing.md');
+});
+
+test('--fix keeps the ./ an import was written with', () => {
+  const repo = committedRepo({ 'CLAUDE.md': '# root\n', 'packages/api/CLAUDE.md': '# api\n\n@./docs/old.md\n', 'packages/api/docs/old.md': '# the api, with enough text for git to see a rename\n' });
+  git(repo, 'mv packages/api/docs/old.md packages/api/docs/new.md');
+  git(repo, 'commit -qm moved');
+  const targets = resolveTargets(repo, []);
+  const changes = renameFixes(analyze({ repo, targets }));
+  assert.deepEqual(changes.map((c) => `${c.kind} ${c.cited} ${c.actual}`), ['import ./docs/old.md ./docs/new.md']);
+  applyFixes(changes, targets);
+  assert.equal(readFileSync(join(repo, 'packages/api/CLAUDE.md'), 'utf8'), '# api\n\n@./docs/new.md\n');
 });
