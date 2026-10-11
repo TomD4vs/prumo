@@ -25,6 +25,9 @@ export function trackedFiles(repo) {
   return list;
 }
 
+/** A pathspec that git reads literally, since a cited path may hold a character git would read as a pattern. */
+export const literal = (p) => (/[*?[\]]/.test(p) || p.startsWith(':') ? `:(literal)${p}` : p);
+
 /**
  * True when the repository is itself a skill. Auto-detection leaves a root `SKILL.md` out, so a run
  * inside a published skill finds nothing, which reads like a broken tool unless the message says why.

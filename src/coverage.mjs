@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve, relative, sep, posix } from 'node:path';
 import { analyze, loadConfig, makeMatcher, ageOf, SCHEMA_VERSION, VERSION } from './check.mjs';
 import { TRANSIENT } from './check/paths.mjs';
-import { literal } from './drift.mjs';
+import { literal } from './check/git-index.mjs';
 
 export const ACTIVE_DAYS = 90;
 const CHUNK = 100;

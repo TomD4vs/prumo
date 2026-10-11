@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { posix } from 'node:path';
+import { literal } from './git-index.mjs';
 
 /** A count of a unit of time, ago: `1 month ago`, `3 years ago`. */
 const counted = (n, unit) => `${n} ${n === 1 ? unit : `${unit}s`} ago`;
@@ -19,6 +20,7 @@ export function ageOf(seconds, now = Date.now() / 1000) {
 }
 
 const HISTORY_BUDGET = 200;
+const CHUNK = 100;
 
 /**
  * The files a commit renamed and deleted. `-l` raises git's rename limit, which a commit touching
@@ -38,6 +40,37 @@ function changesIn(git, sha) {
   return c;
 }
 
+/** The paths a cited path is looked up under in the history: as written from the root, then from beside the note. */
+function candidatesOf(cited, file, exact) {
+  const bare = cited.replace(/^\.\//, '');
+  if (!bare || /[*?<>{}]/.test(bare) || bare.endsWith('/') || bare.startsWith('/') || bare.startsWith('../')) return [];
+  const candidates = [bare];
+  if (!exact && file.includes('/')) {
+    const beside = posix.normalize(posix.join(posix.dirname(file), bare));
+    if (!beside.startsWith('../') && beside !== bare) candidates.push(beside);
+  }
+  return candidates;
+}
+
+/**
+ * The paths some commit touched, on any branch, read a hundred paths to a walk of the log, since one
+ * git process per path cost a second for every seven paths on Windows. `--full-history` keeps every
+ * branch the walk would prune for one path alone, and `--cc` names what a merge changed against every
+ * parent, so a file the walk never names was never touched, and `git log -1` would find nothing
+ * either. A folder is never named, which costs nothing, since git records a rename or a deletion
+ * file by file.
+ */
+function touchedAmong(git, paths) {
+  const asked = new Set(paths);
+  const found = new Set();
+  for (let i = 0; i < paths.length; i += CHUNK) {
+    let out = '';
+    try { out = git(['-c', 'core.quotepath=false', 'log', '--full-history', '--cc', '--format=', '--name-only', '--', ...paths.slice(i, i + CHUNK).map(literal)]); } catch { return new Set(paths); }
+    for (const name of out.split('\n')) if (asked.has(name)) found.add(name);
+  }
+  return found;
+}
+
 /**
  * What git recorded about a path that is not here: the commit that renamed it, followed to where
  * the file is now, or the commit that deleted it. A rename is git's own detection, by similarity,
@@ -50,12 +83,15 @@ export function makeHistorian(repo, index) {
   const commits = new Map();
   const seen = new Map();
   let budget = HISTORY_BUDGET;
+  let asked = new Set();
+  let touched = new Set();
   const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
   const changesOf = (sha) => {
     if (!commits.has(sha)) commits.set(sha, changesIn(git, sha));
     return commits.get(sha);
   };
   const lastTouch = (path) => {
+    if (asked.has(path) && !touched.has(path)) return null;
     let out = '';
     try { out = git(['log', '-1', '--format=%H%x09%ct', '--', path]).trim(); } catch { return null; }
     if (!out) return null;
@@ -77,16 +113,14 @@ export function makeHistorian(repo, index) {
     return null;
   };
   return {
+    /** Learns in a few walks of the log which of the paths the citations could be were ever touched, so `of` asks git only about those. */
+    prepare(citations) {
+      asked = new Set([...new Set(citations.flatMap(([cited, file, exact]) => candidatesOf(cited, file, exact)))].slice(0, HISTORY_BUDGET));
+      touched = touchedAmong(git, [...asked]);
+    },
     /** The history of a cited path, tried as written from the root and then from beside the note. */
     of(cited, file, exact = false) {
-      const bare = cited.replace(/^\.\//, '');
-      if (!bare || /[*?<>{}]/.test(bare) || bare.endsWith('/') || bare.startsWith('/') || bare.startsWith('../')) return null;
-      const candidates = [bare];
-      if (!exact && file.includes('/')) {
-        const beside = posix.normalize(posix.join(posix.dirname(file), bare));
-        if (!beside.startsWith('../') && beside !== bare) candidates.push(beside);
-      }
-      for (const path of candidates) {
+      for (const path of candidatesOf(cited, file, exact)) {
         if (!seen.has(path)) seen.set(path, follow(path, 0));
         const h = seen.get(path);
         if (h) return { ...h, from: path };

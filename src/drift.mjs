@@ -1,12 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { analyze, classifyLines, readTextFile, ageOf, SCHEMA_VERSION, VERSION } from './check.mjs';
+import { literal } from './check/git-index.mjs';
 
 const NOBODY = '0000000000000000000000000000000000000000';
 const CHUNK = 100;
-
-/** A pathspec that git reads literally, since a cited path may hold a character git would read as a pattern. */
-export const literal = (p) => (/[*?[\]]/.test(p) || p.startsWith(':') ? `:(literal)${p}` : p);
 
 /** A heading's title. A heading written as a link keeps its text, since the address is not part of the title. */
 const titleOf = (heading) => heading.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();

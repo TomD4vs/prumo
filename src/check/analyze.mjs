@@ -242,12 +242,13 @@ function orphansOf(checked, ignored) {
 function attachHistory(run) {
   const { findings, relOf } = run;
   const historian = makeHistorian(run.repo, run.index);
+  const linked = findings.brokenLinks.filter((o) => (o.kind === 'link' || o.kind === 'import') && relOf.has(o));
+  historian.prepare([...findings.missingPaths.map((o) => [o.cited, o.file, false]), ...linked.map((o) => [relOf.get(o), o.file, true])]);
   for (const o of findings.missingPaths) {
     const h = historian.of(o.cited, o.file);
     if (h) o.history = h;
   }
-  for (const o of findings.brokenLinks) {
-    if (!(o.kind === 'link' || o.kind === 'import') || !relOf.has(o)) continue;
+  for (const o of linked) {
     const h = historian.of(relOf.get(o), o.file, true);
     if (h) o.history = h;
   }
