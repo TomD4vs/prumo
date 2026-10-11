@@ -52,6 +52,11 @@ function repeatsAmong(notes) {
     .sort((x, y) => y.words * (y.at.length - 1) - x.words * (x.at.length - 1) || x.at[0].file.localeCompare(y.at[0].file) || x.at[0].line - y.at[0].line);
 }
 
+/** The paragraphs written twice: `copies` is the occurrences beyond the first, and `words` what removing them would save. */
+function repeatTotals(repeated) {
+  return { paragraphs: repeated.length, copies: repeated.reduce((n, r) => n + r.at.length - 1, 0), words: repeated.reduce((n, r) => n + r.words * (r.at.length - 1), 0) };
+}
+
 /**
  * The budget report of the context files: size, estimated tokens, growth since a commit, and the
  * paragraphs written twice.
@@ -129,8 +134,7 @@ export function budget({ repo, targets, config = null, since = '' }) {
       tokens,
       before: ref ? before : null,
       since: ref ? { ref: since || ref.slice(0, 7), date } : null,
-      // `copies` is the occurrences beyond the first, and `words` what removing them would save.
-      repeated: { paragraphs: repeated.length, copies: repeated.reduce((n, r) => n + r.at.length - 1, 0), words: repeated.reduce((n, r) => n + r.words * (r.at.length - 1), 0) },
+      repeated: repeatTotals(repeated),
     },
   };
 }

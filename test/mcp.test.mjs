@@ -1,42 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync, execSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const SERVER = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'prumo-mcp.mjs');
-const made = [];
-
-/** Builds a throwaway git repository whose index holds exactly the given files. */
-function repoWith(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'prumo-mcp-'));
-  made.push(dir);
-  for (const [path, content] of Object.entries(files)) {
-    const full = join(dir, path);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, content ?? '');
-  }
-  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
-  execSync('git add -A', { cwd: dir, stdio: 'ignore' });
-  return dir;
-}
-
-process.on('exit', () => {
-  for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} }
-});
-
-/** Sends each message on its own line, as a client would, and returns the replies parsed, in order. */
-function talk(messages) {
-  const input = messages.map((m) => (typeof m === 'string' ? m : JSON.stringify(m))).join('\n') + '\n';
-  const { stdout, status } = spawnSync(process.execPath, [SERVER], { input, encoding: 'utf8' });
-  assert.equal(status, 0);
-  return stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
-}
+import { ROOT, repoWith, git, talk } from './support.mjs';
 
 test('initialize answers with the protocol version, the server name and the package version', () => {
-  const version = JSON.parse(readFileSync(join(dirname(SERVER), '..', 'package.json'), 'utf8')).version;
+  const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
   const [r] = talk([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } }]);
   assert.equal(r.id, 1);
   assert.equal(r.result.protocolVersion, '2025-06-18');
@@ -58,7 +28,7 @@ test('tools/list offers prumo_check, prumo_drift and prumo_budget as read only a
 
 test('prumo_drift and prumo_budget return their reports as text and as structured content', () => {
   const repo = repoWith({ 'CLAUDE.md': '# app\n\n## Layout\n\nSee `src/app.js`.\n', 'src/app.js': '' });
-  execSync('git -c user.email=t@t -c user.name=t commit -qm first', { cwd: repo, stdio: 'ignore' });
+  git(repo, 'commit -qm first');
   const [d, b] = talk([
     { jsonrpc: '2.0', id: 30, method: 'tools/call', params: { name: 'prumo_drift', arguments: { repo } } },
     { jsonrpc: '2.0', id: 31, method: 'tools/call', params: { name: 'prumo_budget', arguments: { repo, since: 'HEAD' } } },

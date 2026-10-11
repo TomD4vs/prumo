@@ -1,42 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { resolveTargets, analyze } from '../src/check.mjs';
 import { drift, sectionsOf } from '../src/drift.mjs';
 import { renderDrift } from '../src/report.mjs';
+import { committedRepo, write, git, dated, cli } from './support.mjs';
 
-const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'prumo.mjs');
-const made = [];
-process.on('exit', () => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} } });
-
-const GIT = 'git -c user.email=t@t -c user.name=t -c core.safecrlf=false';
-const git = (dir, cmd, date = '') => execSync(`${GIT} ${cmd}`, {
-  cwd: dir,
-  stdio: ['ignore', 'pipe', 'ignore'],
-  env: { ...process.env, ...(date ? { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : {}) },
-}).toString().trim();
-function write(dir, files) {
-  for (const [path, content] of Object.entries(files)) {
-    const full = join(dir, path);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, content ?? '');
-  }
-}
-function repoWith(files, date) {
-  const dir = mkdtempSync(join(tmpdir(), 'prumo-drift-'));
-  made.push(dir);
-  write(dir, files);
-  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
-  git(dir, 'add -A');
-  git(dir, 'commit -qm first', date);
-  return dir;
-}
-const commit = (dir, files, date) => { write(dir, files); git(dir, 'add -A'); git(dir, `commit -qm change`, date); };
+const commit = (dir, files, date) => { write(dir, files); git(dir, 'add -A'); git(dir, 'commit -qm change', dated(date)); };
 const at = (iso) => Math.floor(Date.parse(iso) / 1000);
 const report = (repo, now) => drift({ repo, targets: resolveTargets(repo, []), now });
 
@@ -60,7 +32,7 @@ const NOTE = [
 ].join('\n');
 
 test('sections are ordered by the commits to what they cite since the section last changed, and their age comes from git blame', () => {
-  const repo = repoWith({
+  const repo = committedRepo({
     'CLAUDE.md': NOTE,
     'src/app.js': 'a',
     'src/models/user.js': 'u',
@@ -94,7 +66,7 @@ test('sections are ordered by the commits to what they cite since the section la
 });
 
 test('a section with an uncommitted line is as fresh as now, a section citing nothing is counted, and a note citing itself does not count itself', () => {
-  const repo = repoWith({
+  const repo = committedRepo({
     'CLAUDE.md': '# app\n\nRead `CLAUDE.md` first, then `src/app.js` and [[guide]].\n\n## Empty\n\nNothing cited here.\n',
     'src/app.js': 'a',
     'docs/notes/guide.md': '# guide\n',
@@ -107,7 +79,7 @@ test('a section with an uncommitted line is as fresh as now, a section citing no
   assert.match(text, /\n        1 context file with lines not committed yet\n/);
   assert.match(text, /not committed +0 of 2 cited files changed\n\n1 section cites nothing the repository has$/);
 
-  const fresh = repoWith({ 'src/app.js': 'a' }, '2025-01-01T12:00:00Z');
+  const fresh = committedRepo({ 'src/app.js': 'a' }, '2025-01-01T12:00:00Z');
   write(fresh, { 'AGENTS.md': '# app\n\nSee `src/app.js`.\n' });
   git(fresh, 'add -A');
   const f = report(fresh, at('2025-09-01T12:00:00Z'));
@@ -116,7 +88,7 @@ test('a section with an uncommitted line is as fresh as now, a section citing no
 });
 
 test('a citation resolved through an alias, a case mismatch or a folder still names the file git knows, and a folder counts the commits under it', () => {
-  const repo = repoWith({
+  const repo = committedRepo({
     'CLAUDE.md': '# app\n\n## Layout\n\nSee `@/lib/db.ts`, `SRC/App.ts` and `internal/`.\n',
     'src/lib/db.ts': 'd',
     'src/App.ts': 'a',
@@ -138,38 +110,37 @@ test('sections are split by headings outside fences, and a front matter alone is
 });
 
 test('the CLI runs the report, exits 0, takes --format json and --json FILE, and refuses the options of the check', () => {
-  const repo = repoWith({ 'CLAUDE.md': '# app\n\nSee `src/app.js`.\n', 'src/app.js': 'a' }, '2025-01-01T12:00:00Z');
-  // The shell running the suite may carry FORCE_COLOR; every CLI run here reads the plain report.
-  const run = (...args) => spawnSync(process.execPath, [CLI, 'drift', repo, ...args], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '' } });
+  const repo = committedRepo({ 'CLAUDE.md': '# app\n\nSee `src/app.js`.\n', 'src/app.js': 'a' }, '2025-01-01T12:00:00Z');
+  const run = (...args) => cli(['drift', repo, ...args]);
   const plain = run();
   assert.equal(plain.status, 0);
-  assert.match(plain.stdout, /^prumo — drift, 1 context file, 1 section, 1 cited file\n/);
-  assert.match(plain.stdout, /0 of 1 cited file changed/);
+  assert.match(plain.out, /^prumo — drift, 1 context file, 1 section, 1 cited file\n/);
+  assert.match(plain.out, /0 of 1 cited file changed/);
 
   const out = join(repo, 'drift.json');
   const json = run('--format', 'json', '--json', out);
   assert.equal(json.status, 0);
-  const parsed = JSON.parse(json.stdout);
+  const parsed = JSON.parse(json.out);
   assert.equal(parsed.command, 'drift');
   assert.equal(parsed.sections.length, 1);
   assert.equal(JSON.parse(readFileSync(out, 'utf8')).command, 'drift', '--json FILE writes the same result');
 
   const fix = run('--fix');
   assert.equal(fix.status, 2);
-  assert.match(fix.stderr, /--fix is not an option of "prumo drift"/);
+  assert.match(fix.err, /--fix is not an option of "prumo drift"/);
   const since = run('--since', 'HEAD');
   assert.equal(since.status, 2);
-  assert.match(since.stderr, /--since is not an option of "prumo drift"/);
+  assert.match(since.err, /--since is not an option of "prumo drift"/);
   const github = run('--format', 'github');
   assert.equal(github.status, 2);
-  assert.match(github.stderr, /Use text or json/);
+  assert.match(github.err, /Use text or json/);
 });
 
 test('a note with CRLF line endings has the same sections as one with LF, and a heading inside its fences is still code', () => {
   const files = { 'src/app.js': 'a', 'src/models/user.js': 'u', 'src/models/post.js': 'p', 'docs/schema.md': '# schema\n', 'tests/a.test.js': 't' };
   const shape = (r) => r.sections.map((s) => [s.section, s.line, s.cited, s.changed, s.commits]);
-  const lf = report(repoWith({ 'CLAUDE.md': NOTE, ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
-  const crlf = report(repoWith({ 'CLAUDE.md': NOTE.replace(/\n/g, '\r\n'), ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
+  const lf = report(committedRepo({ 'CLAUDE.md': NOTE, ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
+  const crlf = report(committedRepo({ 'CLAUDE.md': NOTE.replace(/\n/g, '\r\n'), ...files }, '2025-01-01T12:00:00Z'), at('2025-09-01T12:00:00Z'));
   assert.deepEqual(shape(crlf), shape(lf));
   assert.deepEqual(crlf.stats, lf.stats);
   assert.equal(crlf.stats.sections, 3, 'the heading inside the fence is not a section');

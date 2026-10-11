@@ -1,9 +1,18 @@
 name: ci
 
+# Runs on every push and pull request, and once a week on its own, so a new semgrep rule or a leaked
+# secret shows up without waiting for the next commit. Every action is pinned to a commit, since a
+# moved tag would run code nobody reviewed.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -14,13 +23,27 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node: [18, 20, 22]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
       - run: node --test
       - name: prumo checks its own context files
         run: node bin/prumo.mjs .
+
+  # Measured on 2026-10-11: 99.7% of lines, 92.6% of branches and 99.6% of functions. The floor sits a
+  # little under, so a change that lands without tests fails here; the flags need Node 22.8 or later.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: the suite, with a floor on coverage
+        run: >-
+          node --test --experimental-test-coverage --test-coverage-exclude='test/**'
+          --test-coverage-lines=98 --test-coverage-branches=90 --test-coverage-functions=98
 
   simulate:
     name: new-user simulation (${{ matrix.os }})
@@ -30,10 +53,32 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
       - name: pack the tarball and follow the docs through the CLI
         run: bash test/simulate-new-user.sh
         shell: bash
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      # gitleaks reads the whole history: a secret removed from HEAD is still in every commit before it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Measured on 2026-10-11 with semgrep 1.174: the four rule packs below found nothing in the code,
+      # and the only finding anywhere was the action tags this file now pins. Any finding fails the job.
+      # There is no dependency audit because the package has no dependencies; test/cli.test.mjs keeps it so.
+      - name: SAST
+        run: |
+          pipx install semgrep
+          semgrep --config p/javascript --config p/nodejs --config p/secrets --config p/owasp-top-ten \
+                  --error --metrics=off .
+
+      - name: secrets in the code and in the history
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

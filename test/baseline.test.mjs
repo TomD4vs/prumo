@@ -1,39 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { analyze, resolveTargets, loadBaseline, baselineOf, changedFiles, BASELINE_FILE } from '../src/check.mjs';
 import { renderText, renderGithub } from '../src/report.mjs';
+import { ROOT, repoWith, write, git, cli, talk } from './support.mjs';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const BIN = join(HERE, '..', 'bin', 'prumo.mjs');
-const SERVER = join(HERE, '..', 'bin', 'prumo-mcp.mjs');
-const made = [];
-process.on('exit', () => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} } });
-
-function repoWith(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'prumo-base-'));
-  made.push(dir);
-  for (const [path, content] of Object.entries(files)) {
-    const full = join(dir, path);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, content ?? '');
-  }
-  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
-  execSync('git add -A', { cwd: dir, stdio: 'ignore' });
-  return dir;
-}
-const git = (repo, cmd) => execSync(`git -c user.email=t@t -c user.name=t ${cmd}`, { cwd: repo, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-const write = (repo, path, content) => { mkdirSync(dirname(join(repo, path)), { recursive: true }); writeFileSync(join(repo, path), content); };
-// The shell running the suite may carry FORCE_COLOR; every CLI run here reads the plain report.
-const cli = (repo, args = []) => {
-  const r = spawnSync(process.execPath, [BIN, repo, ...args], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '0' } });
-  return { status: r.status, out: r.stdout, err: r.stderr };
-};
 const check = (repo, extra = {}) => analyze({ repo, targets: resolveTargets(repo, []), ...extra });
 const total = (r) => r.caseMismatch.length + r.brokenLinks.length + r.missingPaths.length + r.unknownCommands.length + r.configIssues.length + r.orphans.length;
 
@@ -54,7 +27,7 @@ test('a baseline records the findings of a run by kind, file and cited path, and
   ]);
   assert.equal(b.prumoVersion, first.prumoVersion);
   assert.ok(!Number.isNaN(Date.parse(b.recordedAt)));
-  write(repo, BASELINE_FILE, JSON.stringify(b, null, 2));
+  write(repo, { [BASELINE_FILE]: JSON.stringify(b, null, 2) });
 
   const held = check(repo, { baseline: loadBaseline(repo) });
   assert.equal(total(held), 0);
@@ -63,14 +36,14 @@ test('a baseline records the findings of a run by kind, file and cited path, and
   assert.equal(held.schemaVersion, 9);
   assert.equal(total(check(repo)), 3, 'without the baseline everything is reported');
 
-  write(repo, 'CLAUDE.md', readFileSync(join(repo, 'CLAUDE.md'), 'utf8') + 'And `docs/new.md`.\n');
+  write(repo, { 'CLAUDE.md': readFileSync(join(repo, 'CLAUDE.md'), 'utf8') + 'And `docs/new.md`.\n' });
   const grown = check(repo, { baseline: loadBaseline(repo) });
   assert.deepEqual(grown.missingPaths.map((o) => o.cited), ['docs/new.md']);
   assert.equal(total(grown), 1);
   assert.equal(grown.stats.baselined, 3);
 
-  write(repo, 'config/old.php', '');
-  execSync('git add -A', { cwd: repo, stdio: 'ignore' });
+  write(repo, { 'config/old.php': '' });
+  git(repo, 'add -A');
   const resolved = check(repo, { baseline: loadBaseline(repo) });
   assert.equal(resolved.stats.baselined, 2);
   assert.equal(resolved.stats.baselineStale, 1, 'the entry for config/old.php matches nothing now');
@@ -103,27 +76,27 @@ test('a baseline entry holds back as many lines as it counts, and a note the ind
 test('--baseline writes the file and exits 0, the next run exits 0 with the count, --no-baseline reports everything, and a broken baseline is an error', () => {
   const repo = repoWith(LEGACY);
   git(repo, 'commit -qm x');
-  const wrote = cli(repo, ['--baseline']);
+  const wrote = cli([repo, '--baseline']);
   assert.equal(wrote.status, 0);
   assert.match(wrote.out, /^3 to review, --fix corrects 1$/m);
   assert.match(wrote.out, /^baseline: \.prumo-baseline\.json, 3 findings recorded$/m);
   assert.ok(existsSync(join(repo, BASELINE_FILE)));
   assert.equal(JSON.parse(readFileSync(join(repo, BASELINE_FILE), 'utf8')).findings.length, 3);
 
-  const next = cli(repo);
+  const next = cli([repo]);
   assert.equal(next.status, 0);
   assert.match(next.out, /^        3 findings held in \.prumo-baseline\.json$/m);
   assert.match(next.out, /^nothing to review\.$/m);
 
-  const all = cli(repo, ['--no-baseline']);
+  const all = cli([repo, '--no-baseline']);
   assert.equal(all.status, 1);
   assert.match(all.out, /^3 to review, --fix corrects 1$/m);
 
-  const annotated = cli(repo, ['--format', 'github']);
+  const annotated = cli([repo, '--format', 'github']);
   assert.equal(annotated.out.trim(), '::notice::Baseline: 3 findings held in .prumo-baseline.json');
 
-  write(repo, BASELINE_FILE, '{ not json');
-  const broken = cli(repo);
+  write(repo, { [BASELINE_FILE]: '{ not json' });
+  const broken = cli([repo]);
   assert.equal(broken.status, 2);
   assert.match(broken.err, /\.prumo-baseline\.json is not valid JSON/);
 });
@@ -137,43 +110,43 @@ test('--staged checks the staged context files alone, --since REF the ones chang
   git(repo, 'commit -qm first');
   const first = git(repo, 'rev-parse HEAD');
 
-  const none = cli(repo, ['--staged']);
+  const none = cli([repo, '--staged']);
   assert.equal(none.status, 0);
   assert.match(none.out, /^prumo — 0 context files, 3 files tracked by git\n        only the context files staged for commit\n\nnothing to review\.$/m);
 
-  write(repo, 'AGENTS.md', '# agents\n\nSee `lib/gone.ts` and `lib/also.ts`.\n');
+  write(repo, { 'AGENTS.md': '# agents\n\nSee `lib/gone.ts` and `lib/also.ts`.\n' });
   git(repo, 'add AGENTS.md');
   assert.deepEqual([...changedFiles(repo, { staged: true })], ['AGENTS.md']);
-  const staged = cli(repo, ['--staged']);
+  const staged = cli([repo, '--staged']);
   assert.equal(staged.status, 1);
   assert.match(staged.out, /^prumo — 1 context file, 3 files tracked by git\n        only the context files staged for commit$/m);
   assert.match(staged.out, /lib\/also\.ts/);
   assert.doesNotMatch(staged.out, /src\/gone\.ts/, 'CLAUDE.md is not staged');
   assert.doesNotMatch(staged.out, /AGENT CONFIG/, '.mcp.json is not staged');
-  const asJson = JSON.parse(cli(repo, ['--staged', '--format', 'json']).out);
+  const asJson = JSON.parse(cli([repo, '--staged', '--format', 'json']).out);
   assert.equal(asJson.stats.only, 'staged');
   assert.equal(asJson.stats.targets, 1);
   assert.equal(asJson.stats.configs, 0);
 
-  write(repo, '.mcp.json', '{"mcpServers":{"x":{"command":"node","args":["scripts/server.mjs"],"env":{}}}}\n');
+  write(repo, { '.mcp.json': '{"mcpServers":{"x":{"command":"node","args":["scripts/server.mjs"],"env":{}}}}\n' });
   git(repo, 'add .mcp.json');
-  assert.match(cli(repo, ['--staged']).out, /^AGENT CONFIG  \(1\)/m, 'a staged config is read');
+  assert.match(cli([repo, '--staged']).out, /^AGENT CONFIG  \(1\)/m, 'a staged config is read');
 
   git(repo, 'commit -qm second');
-  const since = cli(repo, ['--since', first]);
+  const since = cli([repo, '--since', first]);
   assert.equal(since.status, 1);
   assert.match(since.out, new RegExp(`^        only the context files changed since ${first}$`, 'm'));
   assert.match(since.out, /^prumo — 1 context file, /m);
   assert.doesNotMatch(since.out, /src\/gone\.ts/);
-  assert.equal(JSON.parse(cli(repo, ['--since', first, '--format', 'json']).out).stats.only, `since ${first}`);
-  assert.equal(cli(repo, ['--since', 'HEAD']).status, 0, 'nothing changed since HEAD');
+  assert.equal(JSON.parse(cli([repo, '--since', first, '--format', 'json']).out).stats.only, `since ${first}`);
+  assert.equal(cli([repo, '--since', 'HEAD']).status, 0, 'nothing changed since HEAD');
 
-  const unknown = cli(repo, ['--since', 'nope']);
+  const unknown = cli([repo, '--since', 'nope']);
   assert.equal(unknown.status, 2);
   assert.match(unknown.err, /--since: git does not know "nope"/);
-  assert.equal(cli(repo, ['--since']).status, 2);
-  assert.equal(cli(repo, ['--staged', '--since', 'HEAD']).status, 2);
-  assert.equal(cli(repo).status, 1, 'without a limit the whole repository is checked');
+  assert.equal(cli([repo, '--since']).status, 2);
+  assert.equal(cli([repo, '--staged', '--since', 'HEAD']).status, 2);
+  assert.equal(cli([repo]).status, 1, 'without a limit the whole repository is checked');
 });
 
 test('the header says what limited the run and what the baseline holds, --baseline says what it recorded, and the GitHub format carries a notice', () => {
@@ -193,15 +166,12 @@ test('the header says what limited the run and what the baseline holds, --baseli
 
 test('the MCP server applies the baseline it finds at the root, and never writes one', () => {
   const repo = repoWith(LEGACY);
-  write(repo, BASELINE_FILE, JSON.stringify(baselineOf(check(repo))));
-  const input = [
+  write(repo, { [BASELINE_FILE]: JSON.stringify(baselineOf(check(repo))) });
+  const replies = talk([
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } },
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'prumo_check', arguments: { repo } } },
     { jsonrpc: '2.0', id: 3, method: 'tools/list' },
-  ].map((m) => JSON.stringify(m)).join('\n') + '\n';
-  const { stdout, status } = spawnSync(process.execPath, [SERVER], { input, encoding: 'utf8' });
-  assert.equal(status, 0);
-  const replies = stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  ]);
   const s = replies.find((r) => r.id === 2).result.structuredContent;
   assert.equal(s.stats.baselined, 3);
   assert.equal(s.missingPaths.length + s.caseMismatch.length + s.brokenLinks.length, 0);
@@ -213,10 +183,10 @@ test('the MCP server applies the baseline it finds at the root, and never writes
 });
 
 test('the pre-commit hook checks only the staged context files, and the action takes since and counts config issues in its total', () => {
-  const hook = readFileSync(join(HERE, '..', '.pre-commit-hooks.yaml'), 'utf8');
+  const hook = readFileSync(join(ROOT, '.pre-commit-hooks.yaml'), 'utf8');
   assert.match(hook, /^  args: \['--staged'\]$/m);
   assert.match(hook, /^  pass_filenames: false$/m);
-  const action = readFileSync(join(HERE, '..', 'action.yml'), 'utf8');
+  const action = readFileSync(join(ROOT, 'action.yml'), 'utf8');
   assert.match(action, /^  since:/m);
   assert.match(action, /args\+=\(--since "\$PRUMO_SINCE"\)/);
   assert.match(action, /configIssues/);

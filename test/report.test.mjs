@@ -39,7 +39,7 @@ test('each section renders the way the README shows it, and the total adds them 
     orphans: ['loose.md'],
   }));
   assert.match(out, /^CASE MISMATCH  \(1\)   wrong letter case: works on Windows and macOS, fails on Linux and CI$/m);
-  assert.match(out, /^  CLAUDE\.md:18\n      layouts\/AppLayout\.vue\n      ->  resources\/js\/Layouts\/AppLayout\.vue$/m);
+  assert.match(out, /^  CLAUDE\.md:18  layouts\/AppLayout\.vue   ->  resources\/js\/Layouts\/AppLayout\.vue$/m);
   assert.match(out, /^BROKEN LINK  \(2\)   points at a page or heading that is not there; 1 with a likely destination$/m);
   assert.match(out, /^  CLAUDE\.md:21  \[\[deploy-checklist\]\]   ->  deploy_checklist$/m);
   assert.match(out, /^  CLAUDE\.md:30  docs\/old\.md$/m);
@@ -48,6 +48,12 @@ test('each section renders the way the README shows it, and the total adds them 
   assert.match(out, /^MISSING PATH  \(1\)/m);
   assert.match(out, /^  docs\/setup\.md:44  config\/database\.php\n      Copy the template into `config\/database\.php`\.$/m);
   assert.match(out, /\n5 to review, --fix corrects 1$/);
+});
+
+test('a case mismatch too wide for one line puts the cited path and the correction on lines of their own', () => {
+  const deep = 'resources/js/components/administration/settings/notifications/NotificationPreferences.vue';
+  const out = renderText(result({ caseMismatch: [{ file: '.github/copilot-instructions.md', line: 112, cited: deep.toLowerCase(), actual: deep }] }));
+  assert.match(out, new RegExp(`^  \\.github/copilot-instructions\\.md:112\\n      ${deep.toLowerCase()}\\n      ->  ${deep}$`, 'm'));
 });
 
 test('an unknown command and a heading anchor render like the other findings, and count in the total', () => {

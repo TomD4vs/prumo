@@ -1,44 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { resolveTargets } from '../src/check.mjs';
 import { budget, paragraphsOf, CHARS_PER_TOKEN } from '../src/budget.mjs';
 import { renderBudget } from '../src/report.mjs';
+import { committedRepo, write, git, cli } from './support.mjs';
 
-const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'prumo.mjs');
-const made = [];
-process.on('exit', () => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} } });
-
-const GIT = 'git -c user.email=t@t -c user.name=t -c core.safecrlf=false';
-const git = (dir, cmd) => execSync(`${GIT} ${cmd}`, { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-function write(dir, files) {
-  for (const [path, content] of Object.entries(files)) {
-    const full = join(dir, path);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, content ?? '');
-  }
-}
-function repoWith(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'prumo-budget-'));
-  made.push(dir);
-  write(dir, files);
-  execSync('git init -q', { cwd: dir, stdio: 'ignore' });
-  git(dir, 'add -A');
-  git(dir, 'commit -qm first');
-  return dir;
-}
 const report = (repo, since = '') => budget({ repo, targets: resolveTargets(repo, []), since });
 
 const SHARED = 'Every handler validates its input with the schema beside it before touching the database, and returns the error shape the client expects.';
 const LONG = `# app\n\n## Conventions\n\n${SHARED}\n\nA short line.\n\n## Again\n\n${SHARED}\n\n\`\`\`bash\nnpm test\n\nnpm run build\n\`\`\`\n`;
 
 test('each file is measured, largest first, tokens are estimated at four characters each, and a paragraph written twice is reported by pair of files', () => {
-  const repo = repoWith({ 'CLAUDE.md': LONG, 'AGENTS.md': `# agents\n\n${SHARED}\n`, 'docs/notes.md': 'not a target' });
+  const repo = committedRepo({ 'CLAUDE.md': LONG, 'AGENTS.md': `# agents\n\n${SHARED}\n`, 'docs/notes.md': 'not a target' });
   const r = report(repo);
   assert.equal(r.command, 'budget');
   assert.deepEqual(r.files.map((f) => f.file), ['CLAUDE.md', 'AGENTS.md']);
@@ -59,12 +33,12 @@ test('each file is measured, largest first, tokens are estimated at four charact
 test('a fenced block is one paragraph, a heading alone and a short line are not repeats', () => {
   const lines = ['# T', '', 'one two', '', '```', 'a', '', 'b', '```', '', 'last'];
   assert.deepEqual(paragraphsOf(lines).map((p) => [p.line, p.text]), [[1, '# T'], [3, 'one two'], [5, '```\na\n\nb\n```'], [11, 'last']]);
-  const repo = repoWith({ 'CLAUDE.md': '# Same heading\n\nA short line.\n', 'AGENTS.md': '# Same heading\n\nA short line.\n' });
+  const repo = committedRepo({ 'CLAUDE.md': '# Same heading\n\nA short line.\n', 'AGENTS.md': '# Same heading\n\nA short line.\n' });
   assert.deepEqual(report(repo).repeated, []);
 });
 
 test('growth is measured against a commit: the one thirty days ago, the first one of a young repository, or the REF given', () => {
-  const repo = repoWith({ 'CLAUDE.md': '# app\n\nShort.\n' });
+  const repo = committedRepo({ 'CLAUDE.md': '# app\n\nShort.\n' });
   const first = git(repo, 'rev-parse HEAD');
   write(repo, { 'CLAUDE.md': '# app\n\nShort, then a paragraph that makes the note longer than it was at the first commit.\n', 'AGENTS.md': '# new\n\nAdded after the first commit.\n' });
   git(repo, 'add -A');
@@ -90,22 +64,21 @@ test('growth is measured against a commit: the one thirty days ago, the first on
 });
 
 test('the CLI runs the report, exits 0, takes --since and --format json, and refuses the options of the check', () => {
-  const repo = repoWith({ 'CLAUDE.md': '# app\n\nShort.\n' });
-  // The shell running the suite may carry FORCE_COLOR; every CLI run here reads the plain report.
-  const run = (...args) => spawnSync(process.execPath, [CLI, 'budget', repo, ...args], { encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '1', PRUMO_BANNER: '' } });
+  const repo = committedRepo({ 'CLAUDE.md': '# app\n\nShort.\n' });
+  const run = (...args) => cli(['budget', repo, ...args]);
   const plain = run();
   assert.equal(plain.status, 0);
-  assert.match(plain.stdout, /^prumo — budget, 1 context file, \d+ tokens at four characters each\n/);
-  assert.match(plain.stdout.trimEnd(), /nothing written twice\.$/);
+  assert.match(plain.out, /^prumo — budget, 1 context file, \d+ tokens at four characters each\n/);
+  assert.match(plain.out.trimEnd(), /nothing written twice\.$/);
   const json = run('--since', 'HEAD', '--format', 'json');
   assert.equal(json.status, 0);
-  const parsed = JSON.parse(json.stdout);
+  const parsed = JSON.parse(json.out);
   assert.equal(parsed.command, 'budget');
   assert.equal(parsed.stats.since.ref, 'HEAD');
   const unknownRef = run('--since', 'nope');
   assert.equal(unknownRef.status, 2);
-  assert.match(unknownRef.stderr, /git does not know "nope"/);
+  assert.match(unknownRef.err, /git does not know "nope"/);
   const staged = run('--staged');
   assert.equal(staged.status, 2);
-  assert.match(staged.stderr, /--staged is not an option of "prumo budget"/);
+  assert.match(staged.err, /--staged is not an option of "prumo budget"/);
 });

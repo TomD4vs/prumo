@@ -283,10 +283,10 @@ echo; echo "########## M. Fenced blocks, comments, and every citation --fix rewr
 mk fences; mkdir -p src docs scripts; echo x > src/Component.vue; echo x > docs/README.md; echo x > scripts/build.js
 printf '# app\n\n```\nsrc/component.vue\ndocs/missing-file.md\n```\n\n```markdown\n[quoted](docs/gone.md)\n```\n\n<!-- [commented](docs/also-gone.md) -->\n\nRun `node scripts/Build.js` twice: `node scripts/Build.js --watch`.\n\n[r]: docs/readme.md\n' > CLAUDE.md; ci
 OUT=$($PR --all 2>&1)
-echo "$OUT" | grep -q "^  CLAUDE.md:4$" && echo "$OUT" | grep -q "^  CLAUDE.md:5  docs/missing-file.md" && ok "a path inside a fenced block is checked, case and missing alike" || bad "fenced paths: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
+echo "$OUT" | grep -q "^  CLAUDE.md:4  src/component.vue   ->  src/Component.vue$" && echo "$OUT" | grep -q "^  CLAUDE.md:5  docs/missing-file.md" && ok "a path inside a fenced block is checked, case and missing alike" || bad "fenced paths: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
 echo "$OUT" | grep -q "gone.md" && bad "a link inside a markdown fence or an HTML comment was reported" || ok "a link inside a markdown fence or an HTML comment is a quotation"
-chk "$(echo "$OUT" | grep -c '^  CLAUDE.md:14$')" "1" "the same path twice on one line is one finding"
-echo "$OUT" | grep -q "^  CLAUDE.md:16$" && ok "a reference definition with the wrong case is a case mismatch" || bad "reference definition: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
+chk "$(echo "$OUT" | grep -c '^  CLAUDE.md:14  ')" "1" "the same path twice on one line is one finding"
+echo "$OUT" | grep -q "^  CLAUDE.md:16  docs/readme.md   ->  docs/README.md$" && ok "a reference definition with the wrong case is a case mismatch" || bad "reference definition: $(echo "$OUT" | grep -E '^  CLAUDE' | tr '\n' '|')"
 OUT=$($PR --fix --all 2>&1); RC=$?
 echo "$OUT" | grep -q "^FIXED  3 paths in 1 file" && echo "$OUT" | grep -q "^1 to review" && chk "$RC" "1" "--fix rewrites the fenced line, the command and the reference definition in one pass; the missing path remains, exit 1" || bad "fix: $(echo "$OUT" | grep -E '^(FIXED|  skipped|[0-9]+ to review)' | tr '\n' '|')"
 grep -q "^src/Component.vue$" CLAUDE.md && grep -q "node scripts/build.js --watch" CLAUDE.md && grep -q "^\[r\]: docs/README.md$" CLAUDE.md && ok "each line carries the spelling git holds" || bad "rewritten lines: $(grep -n -E 'Component|build.js|\[r\]' CLAUDE.md | tr '\n' '|')"
@@ -295,7 +295,7 @@ printf '.claude/skills/\n' > .gitignore; printf '# app\n' > CLAUDE.md; printf 'R
 printf -- '---\nname: deploy\ndescription: d\n---\nEdit `src/component.vue` and follow [setup](steps/setup.md).\n' > .claude/skills/deploy/SKILL.md; echo s > .claude/skills/deploy/steps/setup.md; ci
 OUT=$($PR 2>&1)
 echo "$OUT" | head -3 | grep -q "3 context files" && echo "$OUT" | grep -q "1 context file not tracked by git" && ok "an installed skill under .gitignore and a slash command are both read, and the header says which came from disk" || bad "untracked: $(echo "$OUT" | head -3 | tr '\n' '|')"
-echo "$OUT" | grep -q "^  .claude/skills/deploy/SKILL.md:5$" && ok "the case mismatch inside the untracked skill is reported" || bad "untracked case: $OUT"
+echo "$OUT" | grep -q "^  .claude/skills/deploy/SKILL.md:5  " && ok "the case mismatch inside the untracked skill is reported" || bad "untracked case: $OUT"
 echo "$OUT" | grep -q "steps/setup.md" && bad "the skill's own file beside it was reported" || ok "the file beside the skill is found on disk"
 echo "$OUT" | grep -q "^  .claude/commands/deploy.md:1  scripts/deploy.sh" && ok "a slash command citing a dead path is reported" || bad "command target: $OUT"
 

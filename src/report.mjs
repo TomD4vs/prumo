@@ -7,6 +7,9 @@ import { BASELINE_FILE } from './check.mjs';
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+/** The widest a finding may be written on one line; past it, the correction goes on lines of its own. */
+const ONE_LINE = 100;
+
 const ESC = '\x1b[';
 /** The card's teal for what is right, orange for what the note says, red and yellow for the badges. */
 const PAINT = { bold: '1', dim: '38;5;245', teal: '38;5;79', orange: '38;5;173', red: '38;5;203', yellow: '38;5;221', blue: '38;5;75' };
@@ -64,7 +67,11 @@ export function renderText(result, { all = false, fixed = null, jsonPath = null,
 
   if (caseMismatch.length) {
     out.push(title('CASE MISMATCH', PAINT.red, caseMismatch.length, 'wrong letter case: works on Windows and macOS, fails on Linux and CI'));
-    for (const o of cap(caseMismatch)) out.push(`  ${at(o)}`, `      ${orange(o.cited)}`, `      ${teal('->')}  ${teal(o.actual)}`);
+    for (const o of cap(caseMismatch)) {
+      const fits = `  ${o.file}:${o.line}  ${o.cited}   ->  ${o.actual}`.length <= ONE_LINE;
+      if (fits) out.push(`  ${at(o)}  ${orange(o.cited)}   ${teal('->')}  ${teal(o.actual)}`);
+      else out.push(`  ${at(o)}`, `      ${orange(o.cited)}`, `      ${teal('->')}  ${teal(o.actual)}`);
+    }
     out.push(...rest(caseMismatch));
   }
 

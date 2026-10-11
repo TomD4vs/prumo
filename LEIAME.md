@@ -76,9 +76,8 @@ prumo — 3 context files, 412 files tracked by git             ← o que ele le
         1 historical entry exempt from path checks            ← o que ele pulou de propósito
 
 CASE MISMATCH  (1)   wrong letter case: works on Windows and macOS, fails on Linux and CI
-  CLAUDE.md:18                                                ← arquivo e linha
-      layouts/AppLayout.vue                                   ← o que a nota diz
-      ->  resources/js/Layouts/AppLayout.vue                  ← o que o repositório tem
+  CLAUDE.md:18  layouts/AppLayout.vue   ->  resources/js/Layouts/AppLayout.vue
+                ↑ o que a nota diz          ↑ o que o repositório tem
 
 BROKEN LINK  (2)   points at a page or heading that is not there; 1 with a likely destination
   CLAUDE.md:21  [[deploy-checklist]]   ->  deploy_checklist   ← o arquivo que provavelmente era

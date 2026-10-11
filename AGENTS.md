@@ -7,13 +7,19 @@ still match the code. Node 18+, ESM, no build step.
 
 - `bin/prumo.mjs` — CLI: argument parsing, then the report, or one of the two reports, `drift` and `budget`. No analysis lives here.
 - `bin/prumo-mcp.mjs` — MCP server over stdio, four tools, same analysis and same reports.
-- `src/check.mjs` — the five checks, exported as `analyze()` and `resolveTargets()`.
+- `src/check.mjs` — what the analysis exports, `analyze()` and `resolveTargets()` among it; the code lives under `src/check/`, one module per job:
+  - `analyze.mjs` runs the checks over each context file, then the gates on another project, `.gitignore`, the baseline and the history;
+  - `paths.mjs`, `links.mjs`, `commands.mjs` and `agent-config.mjs` are the checks, each with the filters only it uses;
+  - `sentence.mjs` reads what the words around a citation say: negation, a file that gets written, a condition;
+  - `lines.mjs` tells prose from a fenced block and holds the `prumo-ignore` markers;
+  - `git-index.mjs` reads the index and resolves a path against it, in the order `docs/design.md` fixes;
+  - `targets.mjs`, `config.mjs`, `baseline.mjs`, `history.mjs`, `repository.mjs` and `version.mjs` are what the run reads around the notes.
 - `src/drift.mjs` and `src/budget.mjs` — the two reports, `drift()` and `budget()`: git blame and git log behind the sections of a note, and the size, growth and repeated paragraphs of each file. Neither is a check.
 - `src/index.mjs` — what the package exports: everything from the modules above and below.
 - `src/fix.mjs` — the only automatic rewrites: case mismatches, and the renames git recorded.
 - `src/report.mjs` — the text and GitHub renderers, shared by the CLI and the MCP server. Colour is a flag the CLI sets for a terminal; without it the text is the contract the README shows.
 - `src/banner.mjs` — the name and version above the report, printed only when stdout is a terminal.
-- `test/check.test.mjs`, `test/report.test.mjs`, `test/mcp.test.mjs`, `test/banner.test.mjs`, `test/baseline.test.mjs`, `test/history.test.mjs`, `test/drift.test.mjs`, `test/budget.test.mjs` — the suite: the analysis and the fix, the baseline and the limits to what changed, the history behind a missing path, the two renderers, the server driven over stdio, the banner, and the two reports. Every test that needs a repository builds a throwaway one.
+- `test/` — the suite, one file per subject: `paths`, `filters`, `links`, `commands`, `agent-config`, `lines`, `targets`, `config` and `fix` for the analysis, `hostile` for notes built to make a pattern backtrack, `cli` for what the command line and the docs promise, then `baseline`, `history`, `report`, `mcp`, `banner`, `drift` and `budget`. `test/support.mjs` builds the throwaway repositories every test needs and runs the CLI with the shell's colour settings cleared; `node --test` loads it as a file of its own, which is why the count is one above the tests.
 - `test/simulate-new-user.sh` — a new user follows the README against the packed tarball; `npm run simulate`.
 - `action.yml` — the GitHub Action, `uses: TomD4vs/prumo@v1`: a composite step that runs the checked-out `bin/prumo.mjs`. Not in the npm tarball.
 - `.pre-commit-hooks.yaml` — the hook for the pre-commit framework; its `files:` regex is guarded by the same test as the hook in `docs/agents.md`.
@@ -51,6 +57,35 @@ node bin/prumo.mjs . --all      # do not truncate
 - **Never write to the user's files.** The tool reads and reports; the edit is theirs.
 - **Comments only where they earn it**: the file header and a docblock on a declaration.
   Nothing inside a function body.
+
+## Before saying a change is done
+
+Every change, however small, goes through these steps before it is called done, and before any commit
+command is suggested. Nobody has to ask for them.
+
+1. **Rerun the reproduction.** A fix is done when the exact command that exposed the bug prints the right
+   thing now. Show the output from before and after side by side; a green suite answers a different question.
+2. **Prove the test by breaking the code.** Revert the fix, or remove the rule, and watch the new test fail.
+   A test that passes both ways tests nothing.
+3. **Run the whole suite**, `npm test`, never one file. Run `npm run simulate` too when the change reaches
+   the CLI, the text report or anything the docs show. For a change in `src/check/`, also run the old and the
+   new tree over a corpus of real repositories and read every finding that appears or disappears.
+4. **Scan the diff for bugs and security holes**, not only the file that was meant to change:
+   - who else calls what changed, and the same flow in the other check, the MCP server and the CLI;
+   - a path from a note or from the MCP client that escapes the repository: `--fix` and `prumo_fix` must
+     only ever write to the context files they read;
+   - a value from a note reaching a shell: git runs through `execFileSync` with an argument list, never a
+     command string built from text;
+   - a regular expression a hostile note can make backtrack for minutes, since every line of every note is
+     matched against dozens of them; `test/hostile.test.mjs` is where a new shape goes;
+   - a regular expression built from text the repository supplies, such as a rule's glob: the engine compiles
+     it on its first match and may refuse it there as too large, which once stopped the whole run;
+   - a crash on unexpected input: an empty file, a binary one, a huge line, an invalid JSON config;
+   - the absence check that silences a case mismatch, as `docs/design.md` warns.
+   Say in the report what the scan found, or that it found nothing.
+5. **Check CI after the push**, `gh run list --limit 3`. It runs the suite on Linux, Windows and macOS
+   with three Node versions, a floor on coverage, the simulation, semgrep and gitleaks, and the same
+   jobs again every Monday. A green local run proves nothing about the other two systems.
 
 ## Before publishing
 

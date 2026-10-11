@@ -1,16 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { banner, wantsBanner, wantsColor } from '../src/banner.mjs';
-
-const BIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'prumo.mjs');
-const made = [];
-process.on('exit', () => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch {} } });
+import { repoWith, cli } from './support.mjs';
 
 const strip = (s) => s.replace(/\[[0-9;]*m/g, '');
 
@@ -55,14 +47,8 @@ test('colour wants a terminal too, FORCE_COLOR turns it on and NO_COLOR wins', (
 });
 
 test('piped output opens with the header line, and only PRUMO_BANNER=1 puts the banner above it', () => {
-  const repo = mkdtempSync(join(tmpdir(), 'prumo-banner-'));
-  made.push(repo);
-  mkdirSync(join(repo, 'src'));
-  writeFileSync(join(repo, 'CLAUDE.md'), 'See `src/index.ts`.\n');
-  writeFileSync(join(repo, 'src/index.ts'), '');
-  execSync('git init -q && git add -A', { cwd: repo, stdio: 'ignore' });
-  // A FORCE_COLOR in the shell that runs the suite would paint the piped output; each run starts without it.
-  const run = (env) => execSync('node ' + JSON.stringify(BIN) + ' .', { cwd: repo, env: { ...process.env, FORCE_COLOR: '', ...env }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  const repo = repoWith({ 'CLAUDE.md': 'See `src/index.ts`.\n', 'src/index.ts': '' });
+  const run = (env) => cli(['.'], { cwd: repo, env: { NO_COLOR: '', ...env } }).out;
 
   const plain = run({ PRUMO_BANNER: '' });
   assert.match(plain, /^prumo — 1 context file, 2 files tracked by git\n/);

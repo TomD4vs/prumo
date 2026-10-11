@@ -18,6 +18,27 @@ const CHUNK = 100;
 /** A pathspec that git reads literally, since a cited path may hold a character git would read as a pattern. */
 const literal = (p) => (/[*?[\]]/.test(p) || p.startsWith(':') ? `:(literal)${p}` : p);
 
+/** A heading's title. A heading written as a link keeps its text, since the address is not part of the title. */
+const titleOf = (heading) => heading.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();
+
+/** The lines of a note as git blames them: the newline that ends the file is not a line, and keeping it would read the last section as uncommitted. */
+function blamedLines(body) {
+  const lines = body.split(/\r?\n/);
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+/** When a section was written: as old as the newest commit among its lines, and as fresh as now when one of them is not committed. */
+function dateOf(blame, s, now) {
+  let at = 0;
+  for (let i = s.start; i <= s.end; i++) {
+    const t = blame && blame[i];
+    if (!t || t.sha === NOBODY) return { at: now, committed: false };
+    if (t.at > at) at = t.at;
+  }
+  return at ? { at, committed: true } : { at: now, committed: false };
+}
+
 /**
  * The sections of a note: the text above the first heading, when it says anything beyond its
  * front matter, and one section per heading. A `#` inside a fenced block is code, not a heading.
@@ -36,8 +57,7 @@ export function sectionsOf(lines, marked = classifyLines(lines)) {
     if (!h) continue;
     current.end = i - 1;
     if (current.title || speaks(current.start, i)) out.push(current);
-    // A heading written as a link keeps its text; the address is not part of the title.
-    current = { title: h[1].replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim(), line: i + 1, start: i, end: -1 };
+    current = { title: titleOf(h[1]), line: i + 1, start: i, end: -1 };
   }
   current.end = lines.length - 1;
   if (current.title || speaks(current.start, lines.length)) out.push(current);
@@ -102,31 +122,18 @@ export function drift({ repo, targets, config = null, now = Math.floor(Date.now(
   for (const { file, path } of result.files) {
     const body = readTextFile(path);
     if (body === null) continue;
-    const lines = body.split(/\r?\n/);
-    // The newline that ends the file is not a line git blames; keeping it would read the last section as uncommitted.
-    if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
-    const parts = sectionsOf(lines);
+    const parts = sectionsOf(blamedLines(body));
     counted += parts.length;
     const here = cites.get(file) || [];
     if (!here.length) { quiet += parts.length; continue; }
     const blame = blameOf(git, file);
     if (!blame || blame.some((t) => t.sha === NOBODY)) uncommitted++;
-    // A section is as old as the newest commit among its lines, and as fresh as now when one of them is not committed.
-    const dateOf = (s) => {
-      let at = 0;
-      for (let i = s.start; i <= s.end; i++) {
-        const t = blame && blame[i];
-        if (!t || t.sha === NOBODY) return { at: now, committed: false };
-        if (t.at > at) at = t.at;
-      }
-      return at ? { at, committed: true } : { at: now, committed: false };
-    };
     const rows = [];
     let oldest = now;
     for (const s of parts) {
       const paths = new Set(here.filter((c) => c.line - 1 >= s.start && c.line - 1 <= s.end).map((c) => c.path));
       if (!paths.size) { quiet++; continue; }
-      const when = dateOf(s);
+      const when = dateOf(blame, s, now);
       if (when.at < oldest) oldest = when.at;
       rows.push({ s, paths, when });
       for (const p of paths) allPaths.add(p);
